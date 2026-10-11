@@ -1,0 +1,6 @@
+{
+  "name": "Villaggio Prenestino - Portale di Quartiere",
+  "description": "Web app dell'associazione di quartiere per servizi, informazioni, segnalazioni cittadine e volontariato con integrazione WordPress.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
