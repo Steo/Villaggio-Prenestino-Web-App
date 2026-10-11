@@ -22,9 +22,9 @@ const INTERACTIONS_KEY = 'vp_interactions_v1';
 const LOCAL_STORE_KEY = 'vp_local_store_v1';
 
 export const DEFAULT_CONFIG: WpPluginConfig = {
-  baseUrl: 'https://www.villaggioprenestino.it',
+  baseUrl: 'https://villaggioprenestino.it',
   apiKey: 'vpq_app_secure_key_2026',
-  useLiveApi: false, // Default to interactive offline/hybrid mode, easy to toggle
+  useLiveApi: true, // Attivo di default per caricare sempre i dati reali di WordPress
 };
 
 // Generatore token univoco per-device anonimo
@@ -67,7 +67,17 @@ export function getWpConfig(): WpPluginConfig {
   try {
     const raw = localStorage.getItem(CONFIG_KEY);
     if (raw) {
-      return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
+      const parsed = JSON.parse(raw);
+      let baseUrl = parsed.baseUrl || DEFAULT_CONFIG.baseUrl;
+      if (baseUrl.includes('www.villaggioprenestino.it')) {
+        baseUrl = baseUrl.replace('www.villaggioprenestino.it', 'villaggioprenestino.it');
+      }
+      return {
+        ...DEFAULT_CONFIG,
+        ...parsed,
+        baseUrl,
+        useLiveApi: parsed.useLiveApi !== undefined ? parsed.useLiveApi : true,
+      };
     }
   } catch (e) {
     console.error('Error loading config', e);
@@ -77,6 +87,27 @@ export function getWpConfig(): WpPluginConfig {
 
 export function saveWpConfig(cfg: WpPluginConfig): void {
   localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+}
+
+/**
+ * Calcola l'URL base ottimale per le API:
+ * Se l'app è in esecuzione su villaggioprenestino.it (es. /app/), restituisce stringa vuota ""
+ * così tutte le chiamate REST avvengono in modalità same-origin relativa (/wp-json/...)
+ * evitando qualsiasi blocco CORS o redirect tra www e non-www.
+ */
+export function getEffectiveBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname.includes('villaggioprenestino.it')) {
+      return '';
+    }
+  }
+  const cfg = getWpConfig();
+  let base = (cfg.baseUrl || 'https://villaggioprenestino.it').replace(/\/+$/, '');
+  if (base.includes('www.villaggioprenestino.it')) {
+    base = base.replace('www.villaggioprenestino.it', 'villaggioprenestino.it');
+  }
+  return base;
 }
 
 // Store locale sincronizzato per mantenere le aggiunte dell'utente
@@ -121,7 +152,8 @@ function saveLocalDataStore(store: LocalDataStore): void {
 }
 
 /**
- * Fetch Dati: prova prima le API WordPress reali, altrimenti usa il local store aggiornato
+ * Fetch Dati: interroga le API WordPress live (plugin VP + WP Core REST API)
+ * e aggiorna lo store locale per garantire continuità anche offline.
  */
 export async function fetchAllData(): Promise<{
   eventi: EventoQuartiere[];
@@ -133,11 +165,19 @@ export async function fetchAllData(): Promise<{
 }> {
   const cfg = getWpConfig();
   const localStore = getLocalDataStore();
+  const apiBase = getEffectiveBaseUrl();
 
-  if (cfg.useLiveApi && cfg.baseUrl) {
+  let liveEventi = localStore.eventi;
+  let liveRichieste = localStore.richieste;
+  let liveSegnalazioni = localStore.segnalazioni;
+  let liveProposte = localStore.proposte;
+  let liveNews = localStore.news;
+  let connected = false;
+
+  // 1. Prova a interrogare l'endpoint del plugin personalizzato VP Quartiere (/wp-json/vp/v1/dati)
+  if (cfg.useLiveApi) {
     try {
-      const cleanBase = cfg.baseUrl.replace(/\/+$/, '');
-      const resp = await fetch(`${cleanBase}/wp-json/vp/v1/dati`, {
+      const resp = await fetch(`${apiBase}/wp-json/vp/v1/dati`, {
         headers: {
           'X-VP-Key': cfg.apiKey,
           'X-VP-Token': getOrCreateToken(),
@@ -147,25 +187,59 @@ export async function fetchAllData(): Promise<{
       if (resp.ok) {
         const json = await resp.json();
         if (json.success) {
-          return {
-            eventi: json.eventi?.length ? json.eventi : localStore.eventi,
-            richieste: json.richieste?.length ? json.richieste : localStore.richieste,
-            segnalazioni: json.segnalazioni?.length ? json.segnalazioni : localStore.segnalazioni,
-            proposte: json.proposte?.length ? json.proposte : localStore.proposte,
-            news: json.news?.length ? json.news : localStore.news,
-            isLive: true,
-          };
+          connected = true;
+          if (Array.isArray(json.eventi) && json.eventi.length > 0) {
+            const today = new Date().toISOString().slice(0, 10);
+            const mapM: Record<string, string> = {
+              'GEN': '01', 'FEB': '02', 'MAR': '03', 'APR': '04', 'MAG': '05', 'GIU': '06',
+              'LUG': '07', 'AGO': '08', 'SET': '09', 'OTT': '10', 'NOV': '11', 'DIC': '12',
+              'JAN': '01', 'MAY': '05', 'JUN': '06', 'JUL': '07', 'AUG': '08', 'SEP': '09', 'OCT': '10', 'DEC': '12'
+            };
+            liveEventi = json.eventi.map((ev: any) => {
+              const y = ev.anno ? String(ev.anno).trim() : '2026';
+              const mNum = mapM[String(ev.m || '').toUpperCase()] || '10';
+              const dNum = String(parseInt(ev.d || '1', 10)).padStart(2, '0');
+              const iso = ev.dataCompleta || `${y}-${mNum}-${dNum}`;
+              const isPassato = Boolean(ev.passato || (iso && iso < today));
+              return {
+                ...ev,
+                anno: y,
+                dataCompleta: iso,
+                passato: isPassato,
+              };
+            });
+          }
+          if (Array.isArray(json.richieste) && json.richieste.length > 0) {
+            liveRichieste = json.richieste;
+          }
+          if (Array.isArray(json.segnalazioni) && json.segnalazioni.length > 0) {
+            liveSegnalazioni = json.segnalazioni;
+          }
+          if (Array.isArray(json.proposte) && json.proposte.length > 0) {
+            liveProposte = json.proposte;
+          }
+          if (Array.isArray(json.news) && json.news.length > 0) {
+            liveNews = json.news.map((item: any) => ({
+              id: item.id,
+              titolo: decodeHtmlEntities(item.titolo || ''),
+              estratto: cleanExcerpt(item.estratto || ''),
+              data: item.data || '',
+              link: item.link || 'https://villaggioprenestino.it',
+              img: item.img || 'https://images.unsplash.com/photo-1577495508048-b635879837f1?auto=format&fit=crop&w=700&q=80',
+              autore: 'Associazione Villaggio Prenestino',
+            }));
+          }
         }
       }
     } catch (err) {
-      console.warn('Connessione alle WP REST API non riuscita, uso dati di fallback/locali:', err);
+      console.warn('Connessione al plugin VP non riuscita, provo endpoint WP standard:', err);
     }
   }
 
-  // Fallback: prova comunque a caricare le ultime news reali tramite WP REST API pubblica standard
+  // 2. Prova sempre a sincronizzare gli ULTIMI ARTICOLI REALI dal blog WordPress (/wp-json/wp/v2/posts)
+  // Questo garantisce che le notizie siano SEMPRE quelle reali pubblicate sul sito web
   try {
-    const cleanBase = cfg.baseUrl.replace(/\/+$/, '');
-    const newsResp = await fetch(`${cleanBase}/wp-json/wp/v2/posts?per_page=3&_embed`, {
+    const newsResp = await fetch(`${apiBase}/wp-json/wp/v2/posts?per_page=3&_embed`, {
       headers: { 'Accept': 'application/json' },
     });
     if (newsResp.ok) {
@@ -174,42 +248,88 @@ export async function fetchAllData(): Promise<{
         const parsedNews: WpArticle[] = wpPosts.map((p: any) => {
           let img = 'https://images.unsplash.com/photo-1577495508048-b635879837f1?auto=format&fit=crop&w=700&q=80';
           if (p._embedded && p._embedded['wp:featuredmedia'] && p._embedded['wp:featuredmedia'][0]) {
-            img = p._embedded['wp:featuredmedia'][0].source_url || img;
+            const media = p._embedded['wp:featuredmedia'][0];
+            img = media.source_url || media.media_details?.sizes?.medium_large?.source_url || media.media_details?.sizes?.full?.source_url || img;
           }
+          const rawExcerpt = p.excerpt?.rendered ? stripTags(p.excerpt.rendered) : '';
           return {
             id: p.id,
             titolo: p.title?.rendered ? decodeHtmlEntities(p.title.rendered) : 'Notizia dal quartiere',
-            estratto: p.excerpt?.rendered ? stripTags(p.excerpt.rendered) : '',
+            estratto: cleanExcerpt(rawExcerpt),
             data: new Date(p.date).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }),
-            link: p.link || 'https://www.villaggioprenestino.it',
+            link: p.link || 'https://villaggioprenestino.it',
             img,
             autore: 'Associazione Villaggio Prenestino',
           };
         });
-        localStore.news = parsedNews;
-        saveLocalDataStore(localStore);
+        liveNews = parsedNews;
+        connected = true;
       }
     }
   } catch (e) {
-    // Silenzioso: continua con localStore
+    console.warn('Sincronizzazione news WP standard fallita:', e);
   }
 
+  // Salva nello store locale così la Web App funziona all'istante anche offline
+  localStore.eventi = liveEventi;
+  localStore.richieste = liveRichieste;
+  localStore.segnalazioni = liveSegnalazioni;
+  localStore.proposte = liveProposte;
+  localStore.news = liveNews;
+  saveLocalDataStore(localStore);
+
   return {
-    ...localStore,
-    isLive: false,
+    eventi: liveEventi,
+    richieste: liveRichieste,
+    segnalazioni: liveSegnalazioni,
+    proposte: liveProposte,
+    news: liveNews,
+    isLive: connected,
   };
 }
 
-function decodeHtmlEntities(str: string): string {
-  const txt = document.createElement('textarea');
-  txt.innerHTML = str;
-  return txt.value;
+export function decodeHtmlEntities(str: string): string {
+  if (!str) return '';
+  if (typeof document !== 'undefined') {
+    const txt = document.createElement('textarea');
+    txt.innerHTML = str;
+    return txt.value;
+  }
+  return str
+    .replace(/&#8217;/g, "'")
+    .replace(/&#8216;/g, "'")
+    .replace(/&#8220;/g, '"')
+    .replace(/&#8221;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&hellip;/g, '...')
+    .replace(/&nbsp;/g, ' ');
 }
 
-function stripTags(html: string): string {
-  const tmp = document.createElement('div');
-  tmp.innerHTML = html;
-  return tmp.textContent || tmp.innerText || '';
+export function stripTags(html: string): string {
+  if (!html) return '';
+  if (typeof document !== 'undefined') {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || '';
+  }
+  return html.replace(/<[^>]*>/g, '');
+}
+
+export function cleanExcerpt(html: string): string {
+  if (!html) return 'Leggi l\'articolo completo dal sito di Villaggio Prenestino.';
+  let text = stripTags(html);
+  // Elimina shortcode Divi tipo [et_pb_section ...] e [/et_pb_section]
+  text = text.replace(/\[\/?et_pb_[^\]]*\]/gi, ' ');
+  // Elimina qualsiasi altro shortcode residuo
+  text = text.replace(/\[[^\]]+\]/g, ' ');
+  text = decodeHtmlEntities(text);
+  text = text.replace(/\s+/g, ' ').trim();
+  if (text.length < 5) {
+    return 'Leggi l\'articolo completo e tutti i dettagli su Villaggio Prenestino.';
+  }
+  return text;
 }
 
 /**
@@ -263,10 +383,10 @@ export async function submitInteraction(params: {
   saveLocalDataStore(store);
 
   // 2. Se connesso alle API live, invia la richiesta al server WordPress
-  if (cfg.useLiveApi && cfg.baseUrl) {
+  if (cfg.useLiveApi) {
     try {
-      const cleanBase = cfg.baseUrl.replace(/\/+$/, '');
-      const resp = await fetch(`${cleanBase}/wp-json/vp/v1/interazione`, {
+      const apiBase = getEffectiveBaseUrl();
+      const resp = await fetch(`${apiBase}/wp-json/vp/v1/interazione`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -328,10 +448,10 @@ export async function submitSegnalazione(data: {
   store.segnalazioni.unshift(newSegnalazione);
   saveLocalDataStore(store);
 
-  if (cfg.useLiveApi && cfg.baseUrl) {
+  if (cfg.useLiveApi) {
     try {
-      const cleanBase = cfg.baseUrl.replace(/\/+$/, '');
-      await fetch(`${cleanBase}/wp-json/vp/v1/segnalazione`, {
+      const apiBase = getEffectiveBaseUrl();
+      await fetch(`${apiBase}/wp-json/vp/v1/segnalazione`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -362,10 +482,10 @@ export async function submitCandidaturaVolontario(data: CandidaturaVolontario): 
   const cfg = getWpConfig();
   const token = getOrCreateToken();
 
-  if (cfg.useLiveApi && cfg.baseUrl) {
+  if (cfg.useLiveApi) {
     try {
-      const cleanBase = cfg.baseUrl.replace(/\/+$/, '');
-      const resp = await fetch(`${cleanBase}/wp-json/vp/v1/volontario`, {
+      const apiBase = getEffectiveBaseUrl();
+      const resp = await fetch(`${apiBase}/wp-json/vp/v1/volontario`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -399,10 +519,10 @@ export async function submitProposta(titolo: string): Promise<{ success: boolean
   });
   saveLocalDataStore(store);
 
-  if (cfg.useLiveApi && cfg.baseUrl) {
+  if (cfg.useLiveApi) {
     try {
-      const cleanBase = cfg.baseUrl.replace(/\/+$/, '');
-      await fetch(`${cleanBase}/wp-json/vp/v1/proposta`, {
+      const apiBase = getEffectiveBaseUrl();
+      await fetch(`${apiBase}/wp-json/vp/v1/proposta`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -434,6 +554,33 @@ export async function adminCreateEvento(
   };
   store.eventi.unshift(nuovoEvento);
   saveLocalDataStore(store);
+
+  // Sincronizza anche con WordPress in live
+  const cfg = getWpConfig();
+  if (cfg.useLiveApi) {
+    try {
+      const apiBase = getEffectiveBaseUrl();
+      const resp = await fetch(`${apiBase}/wp-json/vp/v1/evento`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-VP-Key': cfg.apiKey,
+          'X-VP-Token': getOrCreateToken(),
+        },
+        body: JSON.stringify(eventoData),
+      });
+      if (resp.ok) {
+        const json = await resp.json();
+        if (json.id) {
+          nuovoEvento.id = json.id;
+          saveLocalDataStore(store);
+        }
+      }
+    } catch (e) {
+      console.warn('Salvataggio evento su WordPress non riuscito:', e);
+    }
+  }
+
   return nuovoEvento;
 }
 
@@ -446,9 +593,28 @@ export async function adminUpdateSegnalazioneStato(
   if (seg) {
     seg.s = nuovoStato;
     saveLocalDataStore(store);
-    return true;
   }
-  return false;
+
+  // Sincronizza anche con WordPress in live
+  const cfg = getWpConfig();
+  if (cfg.useLiveApi) {
+    try {
+      const apiBase = getEffectiveBaseUrl();
+      await fetch(`${apiBase}/wp-json/vp/v1/segnalazione/stato`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-VP-Key': cfg.apiKey,
+          'X-VP-Token': getOrCreateToken(),
+        },
+        body: JSON.stringify({ id, stato: nuovoStato.toString() }),
+      });
+    } catch (e) {
+      console.warn('Aggiornamento stato segnalazione su WordPress fallito:', e);
+    }
+  }
+
+  return true;
 }
 
 export async function adminCreateRichiesta(
@@ -463,6 +629,33 @@ export async function adminCreateRichiesta(
   };
   store.richieste.unshift(nuovaRichiesta);
   saveLocalDataStore(store);
+
+  // Sincronizza anche con WordPress in live
+  const cfg = getWpConfig();
+  if (cfg.useLiveApi) {
+    try {
+      const apiBase = getEffectiveBaseUrl();
+      const resp = await fetch(`${apiBase}/wp-json/vp/v1/richiesta`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-VP-Key': cfg.apiKey,
+          'X-VP-Token': getOrCreateToken(),
+        },
+        body: JSON.stringify(richiestaData),
+      });
+      if (resp.ok) {
+        const json = await resp.json();
+        if (json.id) {
+          nuovaRichiesta.id = json.id;
+          saveLocalDataStore(store);
+        }
+      }
+    } catch (e) {
+      console.warn('Salvataggio richiesta su WordPress non riuscito:', e);
+    }
+  }
+
   return nuovaRichiesta;
 }
 

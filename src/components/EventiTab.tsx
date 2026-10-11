@@ -192,6 +192,11 @@ export const EventiTab: React.FC<EventiTabProps> = ({
                     <span className="block text-[9px] font-bold tracking-wider uppercase text-white/90 mt-0.5">
                       {ev.m}
                     </span>
+                    {ev.anno && (
+                      <span className="block text-[8px] font-bold text-amber-200/90 leading-tight">
+                        {ev.anno}
+                      </span>
+                    )}
                   </div>
                   <h3 className="text-sm font-bold text-slate-900 leading-snug flex-1">
                     {ev.t}
@@ -209,6 +214,11 @@ export const EventiTab: React.FC<EventiTabProps> = ({
                   <span className="block text-[11px] font-bold tracking-wider uppercase text-white/90 mt-0.5">
                     {ev.m}
                   </span>
+                  {ev.anno && (
+                    <span className="block text-[10px] font-bold text-amber-200/80 mt-0.5">
+                      {ev.anno}
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex-1 min-w-0 space-y-1.5 w-full">
@@ -321,6 +331,11 @@ export const EventiTab: React.FC<EventiTabProps> = ({
                     <span className="block text-[9px] font-bold tracking-wider uppercase text-slate-300/80 mt-0.5">
                       {ev.m}
                     </span>
+                    {ev.anno && (
+                      <span className="block text-[8px] font-bold text-slate-300/70 leading-tight">
+                        {ev.anno}
+                      </span>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
                     <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 leading-snug">
@@ -340,6 +355,11 @@ export const EventiTab: React.FC<EventiTabProps> = ({
                   <span className="block text-[11px] font-bold tracking-wider uppercase text-slate-300/80 mt-0.5">
                     {ev.m}
                   </span>
+                  {ev.anno && (
+                    <span className="block text-[10px] font-bold text-slate-300/70 mt-0.5">
+                      {ev.anno}
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex-1 min-w-0 space-y-1.5 w-full">

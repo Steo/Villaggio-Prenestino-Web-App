@@ -114,8 +114,10 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
   const [newEvent, setNewEvent] = useState({
     t: '',
     p: '',
+    dataCompleta: '2026-11-25',
     d: '25',
     m: 'NOV',
+    anno: '2026',
     ora: '10:00',
     luogo: 'Piazza Villaggio Prenestino',
     target: 20,
@@ -240,26 +242,35 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
   const handleCreaNuovoEvento = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newEvent.t.trim()) return;
+
+    // Se la data completa è nel passato, contrassegna automaticamente l'evento come passato
+    const today = new Date().toISOString().slice(0, 10);
+    const isPassato = Boolean(newEvent.dataCompleta && newEvent.dataCompleta < today);
+
     if (onCreateEvento) {
       onCreateEvento({
         t: newEvent.t.trim(),
         p: newEvent.p.trim() || 'Evento organizzato dal Comitato di Quartiere Villaggio Prenestino.',
         d: newEvent.d.trim(),
         m: newEvent.m.trim().toUpperCase(),
+        anno: newEvent.anno.trim(),
+        dataCompleta: newEvent.dataCompleta,
         ora: newEvent.ora.trim(),
         luogo: newEvent.luogo.trim(),
         target: Number(newEvent.target) || 20,
         tipo: newEvent.tipo,
         quota: newEvent.tipo === 'pagamento' ? newEvent.quota : undefined,
-        passato: false,
+        passato: isPassato,
         n: 0,
       });
       setShowNewEventModal(false);
       setNewEvent({
         t: '',
         p: '',
+        dataCompleta: '2026-11-25',
         d: '25',
         m: 'NOV',
+        anno: '2026',
         ora: '10:00',
         luogo: 'Piazza Villaggio Prenestino',
         target: 20,
@@ -839,30 +850,52 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Giorno (es. 25):
+                    <div className="sm:col-span-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                      <label className="block text-xs font-bold text-slate-800 mb-1">
+                        📅 Data Completa Evento (Seleziona Giorno, Mese e Anno):
                       </label>
-                      <input
-                        type="text"
-                        required
-                        value={newEvent.d}
-                        onChange={(e) => setNewEvent({ ...newEvent, d: e.target.value })}
-                        className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Mese (es. NOV):
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={newEvent.m}
-                        onChange={(e) => setNewEvent({ ...newEvent, m: e.target.value })}
-                        className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white uppercase"
-                      />
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-center">
+                        <div className="sm:col-span-2">
+                          <input
+                            type="date"
+                            required
+                            value={newEvent.dataCompleta}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (!val) return;
+                              const parts = val.split('-');
+                              if (parts.length === 3) {
+                                const mapM: Record<string, string> = {
+                                  '01': 'GEN', '02': 'FEB', '03': 'MAR', '04': 'APR',
+                                  '05': 'MAG', '06': 'GIU', '07': 'LUG', '08': 'AGO',
+                                  '09': 'SET', '10': 'OTT', '11': 'NOV', '12': 'DIC',
+                                };
+                                setNewEvent({
+                                  ...newEvent,
+                                  dataCompleta: val,
+                                  anno: parts[0],
+                                  m: mapM[parts[1]] || 'OTT',
+                                  d: String(parseInt(parts[2], 10)),
+                                });
+                              }
+                            }}
+                            className="w-full px-3 py-2 text-xs font-bold bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#0073aa]"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1 sm:col-span-2 text-xs text-slate-500">
+                          <span className="font-semibold text-slate-700">
+                            {newEvent.d} {newEvent.m} {newEvent.anno}
+                          </span>
+                          {newEvent.dataCompleta && newEvent.dataCompleta < new Date().toISOString().slice(0, 10) && (
+                            <span className="ml-auto px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
+                              Passato (Archivio)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1.5">
+                        Se imposti una data passata (es. ieri o anno precedente), l'evento verrà inserito automaticamente nella sezione <strong>"Eventi Passati"</strong>.
+                      </p>
                     </div>
 
                     <div>
@@ -1298,13 +1331,13 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
               <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-50 via-teal-50 to-amber-50/50 border-2 border-emerald-300 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                   <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-600 text-white uppercase tracking-wider mb-1.5">
-                    Versione 1.3.0 Aggiornata con Dashboard Insight
+                    Versione 1.3.1: Menu Unificato & Navigazione a Schede (Tab)
                   </span>
                   <h3 className="text-base font-bold text-slate-900 leading-snug">
                     Scarica il Plugin WordPress: <code className="text-emerald-800">vp-quartiere.zip</code>
                   </h3>
                   <p className="text-xs text-slate-600 mt-1 max-w-md">
-                    Include i Custom Post Type, la nuova sezione <strong>Insight & Statistiche</strong> in wp-admin, gestione eventi, segnalazioni e Albo Volontari protetto.
+                    Menu verticale di WordPress ordinato sotto l'unica voce <strong>"🏡 VP Quartiere"</strong> con comoda navigazione a Schede (Tab), data completa con anno per gli eventi (passati/attivi), segnalazioni e Albo Volontari protetto.
                   </p>
                 </div>
 
@@ -1315,7 +1348,7 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
                     className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-emerald-700/20 transition flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <Download className="w-4 h-4" />
-                    <span>Scarica ZIP (v1.3.0)</span>
+                    <span>Scarica ZIP (v1.3.1)</span>
                   </button>
                   <button
                     onClick={handleCopiaCodice}
@@ -1349,10 +1382,10 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
                     Nel menu a sinistra vai su <strong>Plugin &gt; Aggiungi nuovo &gt; Carica plugin</strong>.
                   </li>
                   <li>
-                    Carica il file <strong>vp-quartiere.zip</strong> scaricato qui sopra e clicca su <strong>Installa adesso</strong>, poi su <strong>Attiva plugin</strong>.
+                    Carica il file <strong>vp-quartiere.zip</strong> scaricato qui sopra e clicca su <strong>Installa adesso</strong>, poi su <strong>Attiva plugin</strong> (sostituisci la versione precedente se richiesta).
                   </li>
                   <li>
-                    Troverai nel menu principale la nuova voce <strong>"📊 VP Quartiere (Insight)"</strong>, insieme a <strong>"Eventi Quartiere"</strong>, <strong>"Serve una Mano"</strong>, <strong>"Segnalazioni"</strong> e <strong>"Albo Volontari"</strong>.
+                    Troverai nel menu verticale una <strong>sola voce ordinata: "🏡 VP Quartiere"</strong>. Tutte le sezioni (Eventi con anno, Serve una Mano, Segnalazioni, Proposte, Albo Volontari e Impostazioni) sono raggruppate lì dentro e navigabili anche tramite le comode <strong>Schede (Tab) interne</strong>!
                   </li>
                 </ol>
               </div>

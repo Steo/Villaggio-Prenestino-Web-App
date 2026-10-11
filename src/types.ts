@@ -16,6 +16,8 @@ export interface EventoQuartiere {
   p: string;           // Descrizione / Dettagli
   d: string;           // Giorno (es. "18")
   m: string;           // Mese (es. "OTT")
+  anno?: string;       // Anno (es. "2026")
+  dataCompleta?: string; // Data formato ISO YYYY-MM-DD (es. "2026-10-10")
   ora: string;         // Orario (es. "10:30")
   luogo: string;       // Indirizzo / Luogo
   n: number;           // Numero partecipanti / volontari attuali

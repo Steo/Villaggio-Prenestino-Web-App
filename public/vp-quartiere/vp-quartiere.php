@@ -3,7 +3,7 @@
  * Plugin Name: VP Quartiere - Gestione Web App Villaggio Prenestino
  * Plugin URI:  https://www.villaggioprenestino.it
  * Description: Plugin ufficiale per la gestione della Web App di quartiere: gestisce segnalazioni con foto, richieste di volontariato con contatti dei cittadini, eventi, proposte, dashboard Insight e REST API.
- * Version:     1.3.0
+ * Version:     1.3.1
  * Author:      Comitato di Quartiere Villaggio Prenestino
  * Author URI:  https://www.villaggioprenestino.it
  * License:     GPL-2.0+
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('VPQ_VERSION', '1.3.0');
+define('VPQ_VERSION', '1.3.1');
 define('VPQ_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('VPQ_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -73,12 +73,12 @@ function vpq_activate() {
  */
 add_action('init', 'vpq_register_post_types');
 function vpq_register_post_types() {
-    // 1. Eventi del quartiere
+    // 1. Eventi del quartiere (Raggruppati sotto il menu unico vp-quartiere)
     register_post_type('vp_evento', [
         'labels' => [
-            'name'               => 'Eventi (App)',
+            'name'               => 'Eventi Quartiere',
             'singular_name'      => 'Evento',
-            'menu_name'          => 'Eventi Quartiere',
+            'menu_name'          => '📅 Eventi Quartiere',
             'add_new'            => 'Aggiungi Evento',
             'add_new_item'       => 'Nuovo Evento',
             'edit_item'          => 'Modifica Evento',
@@ -86,17 +86,16 @@ function vpq_register_post_types() {
         ],
         'public'       => false,
         'show_ui'      => true,
-        'show_in_menu' => true,
-        'menu_icon'    => 'dashicons-calendar-alt',
+        'show_in_menu' => 'vp-quartiere',
         'supports'     => ['title', 'editor', 'thumbnail'],
     ]);
 
     // 2. Richieste Volontariato ("Serve una mano")
     register_post_type('vp_richiesta', [
         'labels' => [
-            'name'               => 'Volontariato (App)',
+            'name'               => 'Serve una Mano (Volontariato)',
             'singular_name'      => 'Azione Volontariato',
-            'menu_name'          => 'Serve una Mano',
+            'menu_name'          => '🤝 Serve una Mano',
             'add_new'            => 'Nuova Richiesta',
             'add_new_item'       => 'Nuova Richiesta Volontari',
             'edit_item'          => 'Modifica Richiesta',
@@ -104,55 +103,51 @@ function vpq_register_post_types() {
         ],
         'public'       => false,
         'show_ui'      => true,
-        'show_in_menu' => true,
-        'menu_icon'    => 'dashicons-heart',
+        'show_in_menu' => 'vp-quartiere',
         'supports'     => ['title', 'editor'],
     ]);
 
     // 3. Segnalazioni Cittadine
     register_post_type('vp_segnalazione', [
         'labels' => [
-            'name'               => 'Segnalazioni (App)',
+            'name'               => 'Segnalazioni Cittadini',
             'singular_name'      => 'Segnalazione',
-            'menu_name'          => 'Segnalazioni',
+            'menu_name'          => '⚠️ Segnalazioni',
             'add_new'            => 'Nuova Segnalazione',
             'edit_item'          => 'Dettagli Segnalazione',
             'all_items'          => 'Tutte le Segnalazioni',
         ],
         'public'       => false,
         'show_ui'      => true,
-        'show_in_menu' => true,
-        'menu_icon'    => 'dashicons-warning',
+        'show_in_menu' => 'vp-quartiere',
         'supports'     => ['title', 'editor', 'thumbnail'],
     ]);
 
     // 4. Proposte Cittadini
     register_post_type('vp_proposta', [
         'labels' => [
-            'name'               => 'Proposte (App)',
+            'name'               => 'Proposte Cittadini',
             'singular_name'      => 'Proposta',
-            'menu_name'          => 'Proposte Cittadini',
+            'menu_name'          => '💡 Proposte Cittadini',
             'all_items'          => 'Tutte le Proposte',
         ],
         'public'       => false,
         'show_ui'      => true,
-        'show_in_menu' => true,
-        'menu_icon'    => 'dashicons-lightbulb',
+        'show_in_menu' => 'vp-quartiere',
         'supports'     => ['title', 'editor'],
     ]);
 
     // 5. Iscrizioni Registro Volontari ("Partecipa")
     register_post_type('vp_volontario', [
         'labels' => [
-            'name'               => 'Volontari Registrati',
+            'name'               => 'Albo Volontari Registrati',
             'singular_name'      => 'Volontario',
-            'menu_name'          => 'Albo Volontari',
+            'menu_name'          => '👥 Albo Volontari',
             'all_items'          => 'Tutti i Volontari',
         ],
         'public'       => false,
         'show_ui'      => true,
-        'show_in_menu' => true,
-        'menu_icon'    => 'dashicons-groups',
+        'show_in_menu' => 'vp-quartiere',
         'supports'     => ['title', 'editor'],
     ]);
 }
@@ -172,21 +167,158 @@ function vpq_add_meta_boxes() {
     add_meta_box('vpq_volontario_meta', 'Recapiti Volontario', 'vpq_render_volontario_meta', 'vp_volontario', 'normal', 'high');
 }
 
+/**
+ * Helper per calcolare la data completa, giorno, mese abbreviato e stabilire se un evento è passato.
+ */
+function vpq_normalize_data_evento($giorno, $mese, $anno = '', $ora = '10:00', $passato_esplicito = false) {
+    $current_year = date('Y');
+    $anno = $anno ? trim($anno) : $current_year;
+    if (strlen($anno) === 2) {
+        $anno = '20' . $anno;
+    }
+
+    $map_mesi = [
+        'GEN' => '01', 'FEB' => '02', 'MAR' => '03', 'APR' => '04', 'MAG' => '05', 'GIU' => '06',
+        'LUG' => '07', 'AGO' => '08', 'SET' => '09', 'OTT' => '10', 'NOV' => '11', 'DIC' => '12',
+        'JAN' => '01', 'MAY' => '05', 'JUN' => '06', 'JUL' => '07', 'AUG' => '08', 'SEP' => '09', 'OCT' => '10', 'DEC' => '12',
+        '01'  => '01', '02'  => '02', '03'  => '03', '04'  => '04', '05'  => '05', '06'  => '06',
+        '07'  => '07', '08'  => '08', '09'  => '09', '10'  => '10', '11'  => '11', '12'  => '12',
+        '1'   => '01', '2'   => '02', '3'   => '03', '4'   => '04', '5'   => '05', '6'   => '06',
+        '7'   => '07', '8'   => '08', '9'   => '09',
+    ];
+
+    $m_clean = strtoupper(trim($mese));
+    $num_mese = isset($map_mesi[$m_clean]) ? $map_mesi[$m_clean] : date('m');
+    $num_giorno = sprintf('%02d', max(1, min(31, (int)$giorno)));
+
+    $iso_date = sprintf('%04d-%02d-%02d', (int)$anno, (int)$num_mese, (int)$num_giorno);
+
+    // Mese display italiano (es. OTT)
+    $mesi_nomi = [
+        '01' => 'GEN', '02' => 'FEB', '03' => 'MAR', '04' => 'APR',
+        '05' => 'MAG', '06' => 'GIU', '07' => 'LUG', '08' => 'AGO',
+        '09' => 'SET', '10' => 'OTT', '11' => 'NOV', '12' => 'DIC'
+    ];
+    $mese_display = isset($mesi_nomi[$num_mese]) ? $mesi_nomi[$num_mese] : $m_clean;
+
+    // Controllo se è passato: o è stato flaggato manualmente, oppure la data completa è precedente ad oggi
+    $oggi = current_time('Y-m-d'); // Fuso orario locale WordPress
+    $is_passato = $passato_esplicito || ($iso_date < $oggi);
+
+    return [
+        'giorno'        => (string)(int)$num_giorno,
+        'mese'          => $mese_display,
+        'anno'          => (string)$anno,
+        'data_completa' => $iso_date,
+        'is_passato'    => (bool)$is_passato,
+    ];
+}
+
 function vpq_render_evento_meta($post) {
     wp_nonce_field('vpq_save_meta', 'vpq_meta_nonce');
     $giorno   = get_post_meta($post->ID, '_vp_giorno', true) ?: date('d');
     $mese     = get_post_meta($post->ID, '_vp_mese', true) ?: strtoupper(date('M'));
+    $anno     = get_post_meta($post->ID, '_vp_anno', true) ?: date('Y');
+    $data_iso = get_post_meta($post->ID, '_vp_data_completa', true);
     $ora      = get_post_meta($post->ID, '_vp_ora', true) ?: '10:00';
     $luogo    = get_post_meta($post->ID, '_vp_luogo', true) ?: 'Piazza Villaggio Prenestino';
     $target   = get_post_meta($post->ID, '_vp_target', true) ?: '10';
+    $tipo     = get_post_meta($post->ID, '_vp_tipo', true) ?: 'volontariato';
+    $quota    = get_post_meta($post->ID, '_vp_quota', true) ?: '';
+    $passato  = (bool) get_post_meta($post->ID, '_vp_passato', true);
+
+    // Se non è impostata la data ISO, calcolala per valorizzare l'input HTML5 date
+    if (!$data_iso) {
+        $norm = vpq_normalize_data_evento($giorno, $mese, $anno, $ora, $passato);
+        $data_iso = $norm['data_completa'];
+    }
     ?>
     <table class="form-table">
-        <tr><th><label for="vp_giorno">Giorno (es. 15):</label></th><td><input type="text" id="vp_giorno" name="vp_giorno" value="<?php echo esc_attr($giorno); ?>" class="regular-text" style="width:80px;" /></td></tr>
-        <tr><th><label for="vp_mese">Mese (es. OTT):</label></th><td><input type="text" id="vp_mese" name="vp_mese" value="<?php echo esc_attr($mese); ?>" class="regular-text" style="width:80px;" /></td></tr>
-        <tr><th><label for="vp_ora">Orario (es. 10:30):</label></th><td><input type="text" id="vp_ora" name="vp_ora" value="<?php echo esc_attr($ora); ?>" class="regular-text" /></td></tr>
+        <tr>
+            <th><label for="vp_tipo">Tipologia Evento:</label></th>
+            <td>
+                <select id="vp_tipo" name="vp_tipo">
+                    <option value="volontariato" <?php selected($tipo, 'volontariato'); ?>>🤝 Volontariato di Quartiere (Gratuito)</option>
+                    <option value="gratuito" <?php selected($tipo, 'gratuito'); ?>>🎟️ Evento Pubblico Gratuito (Festa / Incontro)</option>
+                    <option value="pagamento" <?php selected($tipo, 'pagamento'); ?>>💳 Iscrizione a Pagamento (Biglietto / Quota)</option>
+                </select>
+            </td>
+        </tr>
+        <tr><th><label for="vp_quota">Quota (se a pagamento):</label></th><td><input type="text" id="vp_quota" name="vp_quota" value="<?php echo esc_attr($quota); ?>" placeholder="es. 10€" class="regular-text" style="width:120px;" /></td></tr>
+
+        <!-- Selezione data completa con calendario nativo e anno -->
+        <tr style="background:#f9f9f9;">
+            <th><label for="vp_data_completa"><strong>Data Completa Evento (con Anno):</strong></label></th>
+            <td>
+                <input type="date" id="vp_data_completa" name="vp_data_completa" value="<?php echo esc_attr($data_iso); ?>" class="regular-text" style="width:180px;font-weight:bold;" />
+                <p class="description" style="margin-top:4px;">
+                    📅 <strong>Scegli giorno, mese e anno</strong> dal calendario. Se imposti una data nel passato, l'evento verrà spostato <strong>automaticamente nella sezione "Eventi Passati"</strong> dell'app.
+                </p>
+            </td>
+        </tr>
+
+        <tr>
+            <th>Campi Data Dettagliati:</th>
+            <td>
+                <span style="display:inline-block;margin-right:15px;">
+                    <label for="vp_giorno">Giorno:</label>
+                    <input type="text" id="vp_giorno" name="vp_giorno" value="<?php echo esc_attr($giorno); ?>" class="small-text" style="width:60px;" />
+                </span>
+                <span style="display:inline-block;margin-right:15px;">
+                    <label for="vp_mese">Mese (es. OTT):</label>
+                    <input type="text" id="vp_mese" name="vp_mese" value="<?php echo esc_attr($mese); ?>" class="small-text" style="width:70px;text-transform:uppercase;" />
+                </span>
+                <span style="display:inline-block;margin-right:15px;">
+                    <label for="vp_anno"><strong>Anno (es. 2026):</strong></label>
+                    <input type="text" id="vp_anno" name="vp_anno" value="<?php echo esc_attr($anno); ?>" class="small-text" style="width:75px;font-weight:bold;" />
+                </span>
+            </td>
+        </tr>
+
+        <tr><th><label for="vp_ora">Orario (es. 10:30):</label></th><td><input type="text" id="vp_ora" name="vp_ora" value="<?php echo esc_attr($ora); ?>" class="regular-text" style="width:120px;" /></td></tr>
         <tr><th><label for="vp_luogo">Luogo/Indirizzo:</label></th><td><input type="text" id="vp_luogo" name="vp_luogo" value="<?php echo esc_attr($luogo); ?>" class="regular-text" /></td></tr>
         <tr><th><label for="vp_target">Numero volontari/iscritti target:</label></th><td><input type="number" id="vp_target" name="vp_target" value="<?php echo esc_attr($target); ?>" class="small-text" /></td></tr>
+        <tr>
+            <th><label for="vp_passato">Stato Evento:</label></th>
+            <td>
+                <label>
+                    <input type="checkbox" id="vp_passato" name="vp_passato" value="1" <?php checked($passato, true); ?> />
+                    Segna come evento concluso/passato manualmente (apparirà nella sezione "Eventi Passati" dell'app)
+                </label>
+                <p class="description" style="color:#666;">Nota: se la data dell'evento è passata, il plugin lo mostrerà comunque in "Eventi Passati" automaticamente.</p>
+            </td>
+        </tr>
     </table>
+    <script>
+    (function(){
+        var dateInput = document.getElementById('vp_data_completa');
+        var dInput = document.getElementById('vp_giorno');
+        var mInput = document.getElementById('vp_mese');
+        var yInput = document.getElementById('vp_anno');
+        var passCheck = document.getElementById('vp_passato');
+        if (!dateInput || !dInput || !mInput || !yInput) return;
+
+        var mapMesi = ['GEN','FEB','MAR','APR','MAG','GIU','LUG','AGO','SET','OTT','NOV','DIC'];
+
+        dateInput.addEventListener('change', function(){
+            if (!this.value) return;
+            var parts = this.value.split('-'); // YYYY-MM-DD
+            if (parts.length === 3) {
+                var year = parts[0];
+                var mNum = parseInt(parts[1], 10);
+                var day = parseInt(parts[2], 10);
+                yInput.value = year;
+                mInput.value = mapMesi[mNum - 1] || 'OTT';
+                dInput.value = day;
+
+                var today = new Date().toISOString().slice(0, 10);
+                if (dateInput.value < today && passCheck) {
+                    passCheck.checked = true;
+                }
+            }
+        });
+    })();
+    </script>
     <?php
 }
 
@@ -194,10 +326,20 @@ function vpq_render_richiesta_meta($post) {
     wp_nonce_field('vpq_save_meta', 'vpq_meta_nonce');
     $luogo     = get_post_meta($post->ID, '_vp_luogo', true) ?: 'Parco di Via Fosso dell\'Osa';
     $obiettivo = get_post_meta($post->ID, '_vp_obiettivo', true) ?: '8';
+    $urgente   = (bool) get_post_meta($post->ID, '_vp_urgente', true);
     ?>
     <table class="form-table">
         <tr><th><label for="vp_luogo">Dove (Luogo/Zona):</label></th><td><input type="text" id="vp_luogo" name="vp_luogo" value="<?php echo esc_attr($luogo); ?>" class="regular-text" /></td></tr>
         <tr><th><label for="vp_obiettivo">Volontari necessari (Target):</label></th><td><input type="number" id="vp_obiettivo" name="vp_obiettivo" value="<?php echo esc_attr($obiettivo); ?>" class="small-text" /></td></tr>
+        <tr>
+            <th><label for="vp_urgente">Priorità:</label></th>
+            <td>
+                <label>
+                    <input type="checkbox" id="vp_urgente" name="vp_urgente" value="1" <?php checked($urgente, true); ?> />
+                    <strong>Attività Urgente</strong> (mostrerà il badge rosso di allerta nell'app)
+                </label>
+            </td>
+        </tr>
     </table>
     <?php
 }
@@ -251,10 +393,33 @@ function vpq_save_meta($post_id) {
 
     if (isset($_POST['vp_giorno'])) update_post_meta($post_id, '_vp_giorno', sanitize_text_field($_POST['vp_giorno']));
     if (isset($_POST['vp_mese'])) update_post_meta($post_id, '_vp_mese', sanitize_text_field($_POST['vp_mese']));
+    if (isset($_POST['vp_anno'])) update_post_meta($post_id, '_vp_anno', sanitize_text_field($_POST['vp_anno']));
+    if (isset($_POST['vp_data_completa'])) update_post_meta($post_id, '_vp_data_completa', sanitize_text_field($_POST['vp_data_completa']));
     if (isset($_POST['vp_ora'])) update_post_meta($post_id, '_vp_ora', sanitize_text_field($_POST['vp_ora']));
     if (isset($_POST['vp_luogo'])) update_post_meta($post_id, '_vp_luogo', sanitize_text_field($_POST['vp_luogo']));
     if (isset($_POST['vp_target'])) update_post_meta($post_id, '_vp_target', absint($_POST['vp_target']));
+    if (isset($_POST['vp_tipo'])) update_post_meta($post_id, '_vp_tipo', sanitize_text_field($_POST['vp_tipo']));
+    if (isset($_POST['vp_quota'])) update_post_meta($post_id, '_vp_quota', sanitize_text_field($_POST['vp_quota']));
+
+    // Se stiamo salvando un vp_evento, normalizza la data e calcola automaticamente lo stato passato
+    if (get_post_type($post_id) === 'vp_evento') {
+        $g = isset($_POST['vp_giorno']) ? sanitize_text_field($_POST['vp_giorno']) : get_post_meta($post_id, '_vp_giorno', true);
+        $m = isset($_POST['vp_mese']) ? sanitize_text_field($_POST['vp_mese']) : get_post_meta($post_id, '_vp_mese', true);
+        $y = isset($_POST['vp_anno']) ? sanitize_text_field($_POST['vp_anno']) : get_post_meta($post_id, '_vp_anno', true);
+        $ora = isset($_POST['vp_ora']) ? sanitize_text_field($_POST['vp_ora']) : get_post_meta($post_id, '_vp_ora', true);
+        $pass_check = isset($_POST['vp_passato']) ? true : false;
+
+        $norm = vpq_normalize_data_evento($g, $m, $y, $ora, $pass_check);
+        update_post_meta($post_id, '_vp_giorno', $norm['giorno']);
+        update_post_meta($post_id, '_vp_mese', $norm['mese']);
+        update_post_meta($post_id, '_vp_anno', $norm['anno']);
+        update_post_meta($post_id, '_vp_data_completa', $norm['data_completa']);
+        update_post_meta($post_id, '_vp_passato', $norm['is_passato'] ? '1' : '0');
+    } else {
+        update_post_meta($post_id, '_vp_passato', isset($_POST['vp_passato']) ? '1' : '0');
+    }
     if (isset($_POST['vp_obiettivo'])) update_post_meta($post_id, '_vp_obiettivo', absint($_POST['vp_obiettivo']));
+    update_post_meta($post_id, '_vp_urgente', isset($_POST['vp_urgente']) ? '1' : '0');
     if (isset($_POST['vp_stato'])) update_post_meta($post_id, '_vp_stato', sanitize_text_field($_POST['vp_stato']));
     if (isset($_POST['vp_telefono'])) update_post_meta($post_id, '_vp_telefono', sanitize_text_field($_POST['vp_telefono']));
 }
@@ -340,6 +505,47 @@ add_action('manage_vp_volontario_posts_custom_column', function($col, $post_id) 
     }
 }, 10, 2);
 
+// 4. Eventi Quartiere: Data Completa, Stato (In programma / Concluso), Partecipanti
+add_filter('manage_vp_evento_posts_columns', function($cols) {
+    $cols['vp_data_col']   = 'Data Evento';
+    $cols['vp_stato_ev']   = 'Stato Evento';
+    $cols['vp_part_col']   = 'Partecipanti';
+    $cols['vp_luogo_ev']   = 'Luogo';
+    return $cols;
+});
+add_action('manage_vp_evento_posts_custom_column', function($col, $post_id) {
+    global $wpdb;
+    if ($col === 'vp_data_col') {
+        $g = get_post_meta($post_id, '_vp_giorno', true);
+        $m = get_post_meta($post_id, '_vp_mese', true);
+        $y = get_post_meta($post_id, '_vp_anno', true) ?: date('Y');
+        $ora = get_post_meta($post_id, '_vp_ora', true) ?: '10:00';
+        echo '<strong>' . esc_html($g . ' ' . $m . ' ' . $y) . '</strong> <small>(' . esc_html($ora) . ')</small>';
+    }
+    if ($col === 'vp_stato_ev') {
+        $g = get_post_meta($post_id, '_vp_giorno', true);
+        $m = get_post_meta($post_id, '_vp_mese', true);
+        $y = get_post_meta($post_id, '_vp_anno', true) ?: date('Y');
+        $pass_meta = (bool) get_post_meta($post_id, '_vp_passato', true);
+        $norm = vpq_normalize_data_evento($g, $m, $y, '10:00', $pass_meta);
+
+        if ($norm['is_passato']) {
+            echo '<span style="background:#e2e8f0;color:#475569;padding:3px 8px;border-radius:12px;font-weight:bold;font-size:11px;">🏁 Concluso / Passato</span>';
+        } else {
+            echo '<span style="background:#dcfce7;color:#166534;padding:3px 8px;border-radius:12px;font-weight:bold;font-size:11px;">🟢 In Programma</span>';
+        }
+    }
+    if ($col === 'vp_part_col') {
+        $table = $wpdb->prefix . 'vp_interazioni';
+        $count = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE tipo='evento_vengo' AND post_id=%d", $post_id));
+        $target = (int) get_post_meta($post_id, '_vp_target', true) ?: 10;
+        echo '<strong>' . $count . ' / ' . $target . '</strong>';
+    }
+    if ($col === 'vp_luogo_ev') {
+        echo esc_html(get_post_meta($post_id, '_vp_luogo', true) ?: '—');
+    }
+}, 10, 2);
+
 
 /**
  * Gestione CORS per Web App
@@ -417,6 +623,27 @@ add_action('rest_api_init', function() {
         'callback'            => 'vpq_api_get_insights',
         'permission_callback' => '__return_true',
     ]);
+
+    // 8. POST /wp-json/vp/v1/evento - Creazione nuovo evento
+    register_rest_route($ns, '/evento', [
+        'methods'             => 'POST',
+        'callback'            => 'vpq_api_post_evento',
+        'permission_callback' => '__return_true',
+    ]);
+
+    // 9. POST /wp-json/vp/v1/richiesta - Creazione nuova attività volontariato
+    register_rest_route($ns, '/richiesta', [
+        'methods'             => 'POST',
+        'callback'            => 'vpq_api_post_richiesta',
+        'permission_callback' => '__return_true',
+    ]);
+
+    // 10. POST /wp-json/vp/v1/segnalazione/stato - Aggiornamento stato segnalazione
+    register_rest_route($ns, '/segnalazione/stato', [
+        'methods'             => 'POST',
+        'callback'            => 'vpq_api_post_segnalazione_stato',
+        'permission_callback' => '__return_true',
+    ]);
 });
 
 /**
@@ -430,23 +657,37 @@ function vpq_api_get_dati() {
     $eventi_query = new WP_Query([
         'post_type'      => 'vp_evento',
         'post_status'    => 'publish',
-        'posts_per_page' => 20,
+        'posts_per_page' => 50,
         'orderby'        => 'date',
-        'order'          => 'ASC',
+        'order'          => 'DESC',
     ]);
     $eventi = [];
     foreach ($eventi_query->posts as $p) {
         $count = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE tipo='evento_vengo' AND post_id=%d", $p->ID));
+        $giorno_raw  = get_post_meta($p->ID, '_vp_giorno', true) ?: date('d');
+        $mese_raw    = get_post_meta($p->ID, '_vp_mese', true) ?: strtoupper(date('M'));
+        $anno_raw    = get_post_meta($p->ID, '_vp_anno', true) ?: date('Y');
+        $ora         = get_post_meta($p->ID, '_vp_ora', true) ?: '10:00';
+        $passato_raw = (bool) get_post_meta($p->ID, '_vp_passato', true);
+
+        // Normalizza la data ed esegue il controllo automatico passato rispetto ad oggi
+        $norm = vpq_normalize_data_evento($giorno_raw, $mese_raw, $anno_raw, $ora, $passato_raw);
+
         $eventi[] = [
-            'id'    => $p->ID,
-            't'     => $p->post_title,
-            'p'     => wp_strip_all_tags($p->post_content),
-            'd'     => get_post_meta($p->ID, '_vp_giorno', true) ?: date('d'),
-            'm'     => get_post_meta($p->ID, '_vp_mese', true) ?: strtoupper(date('M')),
-            'ora'   => get_post_meta($p->ID, '_vp_ora', true) ?: '10:00',
-            'luogo' => get_post_meta($p->ID, '_vp_luogo', true) ?: 'Villaggio Prenestino',
-            'n'     => $count,
-            'target'=> (int) get_post_meta($p->ID, '_vp_target', true) ?: 10,
+            'id'           => $p->ID,
+            't'            => $p->post_title,
+            'p'            => wp_strip_all_tags($p->post_content),
+            'd'            => $norm['giorno'],
+            'm'            => $norm['mese'],
+            'anno'         => $norm['anno'],
+            'dataCompleta' => $norm['data_completa'],
+            'ora'          => $ora,
+            'luogo'        => get_post_meta($p->ID, '_vp_luogo', true) ?: 'Villaggio Prenestino',
+            'n'            => $count,
+            'target'       => (int) get_post_meta($p->ID, '_vp_target', true) ?: 10,
+            'tipo'         => get_post_meta($p->ID, '_vp_tipo', true) ?: 'volontariato',
+            'passato'      => $norm['is_passato'],
+            'quota'        => get_post_meta($p->ID, '_vp_quota', true) ?: '',
         ];
     }
 
@@ -454,7 +695,7 @@ function vpq_api_get_dati() {
     $richieste_query = new WP_Query([
         'post_type'      => 'vp_richiesta',
         'post_status'    => 'publish',
-        'posts_per_page' => 20,
+        'posts_per_page' => 50,
         'orderby'        => 'date',
         'order'          => 'DESC',
     ]);
@@ -462,12 +703,13 @@ function vpq_api_get_dati() {
     foreach ($richieste_query->posts as $p) {
         $aderiti = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE tipo='cisono' AND post_id=%d", $p->ID));
         $richieste[] = [
-            'id'   => $p->ID,
-            't'    => $p->post_title,
-            'w'    => get_post_meta($p->ID, '_vp_luogo', true) ?: 'Villaggio Prenestino',
-            'desc' => wp_strip_all_tags($p->post_content),
-            'have' => $aderiti,
-            'need' => (int) get_post_meta($p->ID, '_vp_obiettivo', true) ?: 8,
+            'id'     => $p->ID,
+            't'      => $p->post_title,
+            'w'      => get_post_meta($p->ID, '_vp_luogo', true) ?: 'Villaggio Prenestino',
+            'desc'   => wp_strip_all_tags($p->post_content),
+            'have'   => $aderiti,
+            'need'   => (int) get_post_meta($p->ID, '_vp_obiettivo', true) ?: 8,
+            'urgente'=> (bool) get_post_meta($p->ID, '_vp_urgente', true),
         ];
     }
 
@@ -550,10 +792,23 @@ function vpq_get_ultimi_articoli() {
     $res = [];
     foreach ($posts as $post) {
         $thumb = get_the_post_thumbnail_url($post->ID, 'medium_large');
+        $raw_excerpt = get_the_excerpt($post->ID);
+        if (!$raw_excerpt) {
+            $raw_excerpt = wp_trim_words($post->post_content, 25);
+        }
+        $clean = strip_shortcodes($raw_excerpt);
+        $clean = preg_replace('/\[\/?et_pb_[^\]]*\]/i', ' ', $clean);
+        $clean = preg_replace('/\[[^\]]+\]/', ' ', $clean);
+        $estratto = wp_strip_all_tags($clean);
+        $estratto = trim(preg_replace('/\s+/', ' ', $estratto));
+        if (empty($estratto)) {
+            $estratto = 'Leggi l\'articolo completo sul sito di Villaggio Prenestino.';
+        }
+
         $res[] = [
             'id'      => $post->ID,
             'titolo'  => html_entity_decode(get_the_title($post->ID)),
-            'estratto'=> wp_strip_all_tags(wp_trim_words($post->post_content, 25)),
+            'estratto'=> $estratto,
             'data'    => get_the_date('d M Y', $post->ID),
             'link'    => get_permalink($post->ID),
             'img'     => $thumb ?: 'https://images.unsplash.com/photo-1577495508048-b635879837f1?auto=format&fit=crop&w=600&q=80',
@@ -791,73 +1046,158 @@ function vpq_api_get_insights() {
 }
 
 /**
- * Menu Amministrazione WordPress con Sezione Insight & Dashboard
+ * 8. CALLBACK: POST /evento (Creazione evento da app/admin)
+ */
+function vpq_api_post_evento(WP_REST_Request $request) {
+    $titolo      = sanitize_text_field($request->get_param('t') ?: $request->get_param('titolo'));
+    $descrizione = sanitize_textarea_field($request->get_param('p') ?: $request->get_param('descrizione') ?: '');
+    $giorno      = sanitize_text_field($request->get_param('d') ?: date('d'));
+    $mese        = sanitize_text_field($request->get_param('m') ?: strtoupper(date('M')));
+    $anno        = sanitize_text_field($request->get_param('anno') ?: date('Y'));
+    $data_iso    = sanitize_text_field($request->get_param('dataCompleta') ?: '');
+    $ora         = sanitize_text_field($request->get_param('ora') ?: '10:00');
+    $luogo       = sanitize_text_field($request->get_param('luogo') ?: 'Villaggio Prenestino');
+    $target      = absint($request->get_param('target') ?: 10);
+    $tipo        = sanitize_text_field($request->get_param('tipo') ?: 'volontariato');
+    $quota       = sanitize_text_field($request->get_param('quota') ?: '');
+    $passato     = (bool) $request->get_param('passato');
+
+    if ($data_iso && strpos($data_iso, '-') !== false) {
+        $parts = explode('-', $data_iso);
+        if (count($parts) === 3) {
+            $anno = $parts[0];
+            $mapM = ['01'=>'GEN','02'=>'FEB','03'=>'MAR','04'=>'APR','05'=>'MAG','06'=>'GIU','07'=>'LUG','08'=>'AGO','09'=>'SET','10'=>'OTT','11'=>'NOV','12'=>'DIC'];
+            $mese = isset($mapM[$parts[1]]) ? $mapM[$parts[1]] : $mese;
+            $giorno = (string)(int)$parts[2];
+        }
+    }
+
+    $norm = vpq_normalize_data_evento($giorno, $mese, $anno, $ora, $passato);
+
+    if (!$titolo) {
+        return new WP_Error('vpq_no_title', 'Titolo evento mancante.', ['status' => 400]);
+    }
+
+    $post_id = wp_insert_post([
+        'post_type'    => 'vp_evento',
+        'post_title'   => $titolo,
+        'post_content' => $descrizione,
+        'post_status'  => 'publish',
+    ]);
+
+    if (is_wp_error($post_id)) {
+        return new WP_Error('vpq_save_error', 'Impossibile salvare l\'evento.', ['status' => 500]);
+    }
+
+    update_post_meta($post_id, '_vp_giorno', $norm['giorno']);
+    update_post_meta($post_id, '_vp_mese', $norm['mese']);
+    update_post_meta($post_id, '_vp_anno', $norm['anno']);
+    update_post_meta($post_id, '_vp_data_completa', $norm['data_completa']);
+    update_post_meta($post_id, '_vp_ora', $ora);
+    update_post_meta($post_id, '_vp_luogo', $luogo);
+    update_post_meta($post_id, '_vp_target', $target);
+    update_post_meta($post_id, '_vp_tipo', $tipo);
+    update_post_meta($post_id, '_vp_quota', $quota);
+    update_post_meta($post_id, '_vp_passato', $norm['is_passato'] ? '1' : '0');
+
+    return rest_ensure_response([
+        'success'   => true,
+        'id'        => $post_id,
+        'messaggio' => 'Evento pubblicato su WordPress con successo!',
+    ]);
+}
+
+/**
+ * 9. CALLBACK: POST /richiesta (Creazione attività volontariato da app/admin)
+ */
+function vpq_api_post_richiesta(WP_REST_Request $request) {
+    $titolo      = sanitize_text_field($request->get_param('t') ?: $request->get_param('titolo'));
+    $descrizione = sanitize_textarea_field($request->get_param('desc') ?: $request->get_param('descrizione') ?: '');
+    $luogo       = sanitize_text_field($request->get_param('w') ?: $request->get_param('luogo') ?: 'Villaggio Prenestino');
+    $need        = absint($request->get_param('need') ?: $request->get_param('obiettivo') ?: 8);
+    $urgente     = (bool) $request->get_param('urgente');
+
+    if (!$titolo) {
+        return new WP_Error('vpq_no_title', 'Titolo richiesta mancante.', ['status' => 400]);
+    }
+
+    $post_id = wp_insert_post([
+        'post_type'    => 'vp_richiesta',
+        'post_title'   => $titolo,
+        'post_content' => $descrizione,
+        'post_status'  => 'publish',
+    ]);
+
+    if (is_wp_error($post_id)) {
+        return new WP_Error('vpq_save_error', 'Impossibile salvare la richiesta.', ['status' => 500]);
+    }
+
+    update_post_meta($post_id, '_vp_luogo', $luogo);
+    update_post_meta($post_id, '_vp_obiettivo', $need);
+    update_post_meta($post_id, '_vp_urgente', $urgente ? '1' : '0');
+
+    return rest_ensure_response([
+        'success'   => true,
+        'id'        => $post_id,
+        'messaggio' => 'Attività di volontariato pubblicata su WordPress con successo!',
+    ]);
+}
+
+/**
+ * 10. CALLBACK: POST /segnalazione/stato (Aggiornamento stato da app/admin)
+ */
+function vpq_api_post_segnalazione_stato(WP_REST_Request $request) {
+    $post_id = absint($request->get_param('id'));
+    $stato   = sanitize_text_field($request->get_param('stato'));
+
+    if (!$post_id || !$stato) {
+        return new WP_Error('vpq_bad_data', 'ID o stato mancante.', ['status' => 400]);
+    }
+
+    update_post_meta($post_id, '_vp_stato', $stato);
+
+    return rest_ensure_response([
+        'success'   => true,
+        'messaggio' => 'Stato segnalazione aggiornato con successo!',
+    ]);
+}
+
+/**
+ * Menu Amministrazione WordPress Unificato con Hub & Schede (Tab)
+ * Raggruppa tutte le funzionalità dell'app sotto un'unica voce nel menu verticale di WordPress!
  */
 add_action('admin_menu', function() {
-    // Menu Principale VP Quartiere
+    // 1. Voce Principale UNICA nel menu verticale
     add_menu_page(
-        'VP Quartiere - Insight & Gestione App',
-        '📊 VP Quartiere',
+        'VP Quartiere - Centro Gestione App',
+        '🏡 VP Quartiere',
         'manage_options',
-        'vp-quartiere-insights',
-        'vpq_render_insights_dashboard',
-        'dashicons-chart-area',
-        26
+        'vp-quartiere',
+        'vpq_render_admin_hub',
+        'dashicons-location-alt',
+        25
     );
 
-    // Sottomenu Insight
+    // 2. Prima sotto-voce: apre la Dashboard con le Schede (Tab)
     add_submenu_page(
-        'vp-quartiere-insights',
-        'Insight & Statistiche Community',
-        '📊 Insight & Dati',
+        'vp-quartiere',
+        'Dashboard & Hub Gestione a Schede',
+        '📊 Dashboard & Tab Hub',
         'manage_options',
-        'vp-quartiere-insights',
-        'vpq_render_insights_dashboard'
+        'vp-quartiere',
+        'vpq_render_admin_hub'
     );
 
-    // Collegamenti rapidi ai Custom Post Type
-    add_submenu_page(
-        'vp-quartiere-insights',
-        'Eventi del Quartiere',
-        '📅 Eventi Quartiere',
-        'manage_options',
-        'edit.php?post_type=vp_evento'
-    );
+    // I 5 Custom Post Type sono raggruppati qui sotto grazie a 'show_in_menu' => 'vp-quartiere':
+    // - edit.php?post_type=vp_evento
+    // - edit.php?post_type=vp_richiesta
+    // - edit.php?post_type=vp_segnalazione
+    // - edit.php?post_type=vp_proposta
+    // - edit.php?post_type=vp_volontario
 
+    // 3. Impostazioni REST API
     add_submenu_page(
-        'vp-quartiere-insights',
-        'Segnalazioni dei Cittadini',
-        '⚠️ Segnalazioni',
-        'manage_options',
-        'edit.php?post_type=vp_segnalazione'
-    );
-
-    add_submenu_page(
-        'vp-quartiere-insights',
-        'Richieste Volontariato',
-        '🤝 Serve una Mano',
-        'manage_options',
-        'edit.php?post_type=vp_richiesta'
-    );
-
-    add_submenu_page(
-        'vp-quartiere-insights',
-        'Albo Cittadini Volontari',
-        '👥 Albo Volontari',
-        'manage_options',
-        'edit.php?post_type=vp_volontario'
-    );
-
-    add_submenu_page(
-        'vp-quartiere-insights',
-        'Proposte & Idee dei Cittadini',
-        '💡 Idee Cittadini',
-        'manage_options',
-        'edit.php?post_type=vp_proposta'
-    );
-
-    add_submenu_page(
-        'vp-quartiere-insights',
+        'vp-quartiere',
         'Impostazioni & REST API App',
         '⚙️ Impostazioni API',
         'manage_options',
@@ -867,13 +1207,44 @@ add_action('admin_menu', function() {
 });
 
 /**
- * Render Dashboard Insight in WordPress wp-admin
+ * Funzione di fallback per retrocompatibilità con vecchi link
  */
 function vpq_render_insights_dashboard() {
+    vpq_render_admin_hub('panoramica');
+}
+
+/**
+ * Funzione impostazioni: reindirizza o renderizza la tab Impostazioni dell'Hub
+ */
+function vpq_render_admin_page() {
+    vpq_render_admin_hub('impostazioni');
+}
+
+/**
+ * Render dell'Hub Unificato con Navigazione a Schede (Tabs)
+ */
+function vpq_render_admin_hub($preset_tab = '') {
     if (!current_user_can('manage_options')) return;
     global $wpdb;
     $table = $wpdb->prefix . 'vp_interazioni';
 
+    // Gestione salvataggio impostazioni
+    if (isset($_POST['vpq_save_settings']) && check_admin_referer('vpq_settings_nonce')) {
+        update_option('vpq_allow_origins', sanitize_text_field($_POST['vpq_allow_origins']));
+        if (!empty($_POST['vpq_regenerate_key'])) {
+            update_option('vpq_api_key', wp_generate_password(32, false));
+        }
+        echo '<div class="notice notice-success is-dismissible" style="margin:15px 0;"><p><strong>Impostazioni API salvate con successo!</strong></p></div>';
+    }
+
+    // Tab attiva
+    $allowed_tabs = ['panoramica', 'eventi', 'volontari', 'segnalazioni', 'impostazioni', 'webapp'];
+    $active_tab   = !empty($preset_tab) ? $preset_tab : (isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'panoramica');
+    if (!in_array($active_tab, $allowed_tabs)) {
+        $active_tab = 'panoramica';
+    }
+
+    // Statistiche generali
     $tot_segnalazioni = (int) wp_count_posts('vp_segnalazione')->publish ?: 28;
     $risolte_count    = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE meta_key='_vp_stato' AND meta_value='3'") ?: 19;
     $inoltrate_count  = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE meta_key='_vp_stato' AND meta_value='2'") ?: 6;
@@ -881,306 +1252,672 @@ function vpq_render_insights_dashboard() {
     $tasso_risolte    = round(($risolte_count / max(1, $tot_segnalazioni)) * 100);
 
     $tot_volontari    = (int) wp_count_posts('vp_volontario')->private ?: 34;
+    $tot_richieste    = (int) wp_count_posts('vp_richiesta')->publish ?: 4;
     $tot_idee         = (int) wp_count_posts('vp_proposta')->publish ?: 14;
     $tot_voti         = (int) $wpdb->get_var("SELECT COUNT(*) FROM $table WHERE tipo='proposta_vota'") ?: 192;
     $tot_eventi       = (int) wp_count_posts('vp_evento')->publish ?: 7;
     $tot_partecipanti = (int) $wpdb->get_var("SELECT COUNT(*) FROM $table WHERE tipo='evento_vengo'") ?: 164;
+
+    // Configurazione API
+    $api_key       = get_option('vpq_api_key');
+    $origins       = get_option('vpq_allow_origins', '*');
+    $endpoint_base = home_url('/wp-json/vp/v1/');
+    $app_url       = home_url('/app/');
     ?>
-    <div class="wrap" style="max-width:1200px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen-Sans,Ubuntu,Cantarell,sans-serif;">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:15px;margin:20px 0 25px 0;">
+    <div class="wrap" style="max-width:1240px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen-Sans,Ubuntu,Cantarell,sans-serif;">
+        
+        <!-- Header Unificato Hub -->
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:15px;margin:20px 0 15px 0;">
             <div>
-                <h1 style="margin:0;font-size:24px;font-weight:800;color:#1e293b;display:flex;align-items:center;gap:10px;">
-                    <span class="dashicons dashicons-chart-area" style="font-size:28px;width:28px;height:28px;color:#0073aa;"></span>
-                    Insight & Statistiche Web App - Villaggio Prenestino
+                <h1 style="margin:0;font-size:24px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:10px;">
+                    <span class="dashicons dashicons-location-alt" style="font-size:28px;width:28px;height:28px;color:#059669;"></span>
+                    Centro Gestione Web App - Villaggio Prenestino
                 </h1>
                 <p style="margin:4px 0 0 0;color:#64748b;font-size:13px;">
-                    Monitoraggio visivo dell'impatto civico, segnalazioni sul territorio, partecipazione ai bandi di volontariato e proposte dei residenti.
+                    Pannello unico a schede per gestire contenuti, consultare statistiche civiche e configurare le API senza disperdere voci nel menu di WordPress.
                 </p>
             </div>
-            <div>
+            <div style="display:flex;align-items:center;gap:10px;">
                 <span style="background:#dcfce7;color:#166534;font-weight:bold;padding:6px 12px;border-radius:20px;font-size:12px;border:1px solid #bbf7d0;">
-                    ● Sincronizzazione Live Attiva (v1.3.0)
+                    ● Sincronizzazione Live Attiva (v1.3.1)
                 </span>
+                <a href="<?php echo esc_url($app_url); ?>" target="_blank" class="button button-secondary" style="font-size:12px;">
+                    📱 Apri Web App &rarr;
+                </a>
             </div>
         </div>
 
-        <!-- 4 KPI Cards -->
-        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:16px;margin-bottom:25px;">
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-                <div style="display:flex;justify-content:space-between;align-items:center;color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;">
-                    <span>Segnalazioni Cittadini</span>
-                    <span class="dashicons dashicons-warning" style="color:#d97706;"></span>
+        <!-- Barra di Navigazione a Schede (Tab) -->
+        <h2 class="nav-tab-wrapper" style="margin-bottom:20px;border-bottom:1px solid #cbd5e1;padding-bottom:0;">
+            <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=panoramica'); ?>" class="nav-tab <?php echo $active_tab === 'panoramica' ? 'nav-tab-active' : ''; ?>" style="font-weight:600;font-size:13px;">
+                📊 Panoramica & Statistiche
+            </a>
+            <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=eventi'); ?>" class="nav-tab <?php echo $active_tab === 'eventi' ? 'nav-tab-active' : ''; ?>" style="font-weight:600;font-size:13px;">
+                📅 Eventi del Quartiere
+            </a>
+            <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=volontari'); ?>" class="nav-tab <?php echo $active_tab === 'volontari' ? 'nav-tab-active' : ''; ?>" style="font-weight:600;font-size:13px;">
+                🤝 Volontariato & Albo
+            </a>
+            <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=segnalazioni'); ?>" class="nav-tab <?php echo $active_tab === 'segnalazioni' ? 'nav-tab-active' : ''; ?>" style="font-weight:600;font-size:13px;">
+                ⚠️ Segnalazioni & Proposte
+            </a>
+            <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=impostazioni'); ?>" class="nav-tab <?php echo $active_tab === 'impostazioni' ? 'nav-tab-active' : ''; ?>" style="font-weight:600;font-size:13px;">
+                ⚙️ Impostazioni & API
+            </a>
+            <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=webapp'); ?>" class="nav-tab <?php echo $active_tab === 'webapp' ? 'nav-tab-active' : ''; ?>" style="font-weight:600;font-size:13px;">
+                📱 Web App & Download
+            </a>
+        </h2>
+
+        <!-- ========================================== -->
+        <!-- TAB 1: PANORAMICA & STATISTICHE (INSIGHT)  -->
+        <!-- ========================================== -->
+        <?php if ($active_tab === 'panoramica'): ?>
+            <!-- 4 KPI Cards -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:16px;margin-bottom:25px;">
+                <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;">
+                        <span>Segnalazioni Cittadini</span>
+                        <span class="dashicons dashicons-warning" style="color:#d97706;"></span>
+                    </div>
+                    <div style="font-size:32px;font-weight:900;color:#0f172a;margin:8px 0 4px 0;"><?php echo $tot_segnalazioni; ?></div>
+                    <div style="font-size:12px;color:#16a34a;font-weight:700;">
+                        <?php echo $tasso_risolte; ?>% risolte con successo
+                    </div>
+                    <div style="font-size:11px;color:#94a3b8;margin-top:6px;border-top:1px solid #f1f5f9;padding-top:6px;">
+                        Inoltrate a Municipio: <?php echo $inoltrate_count; ?> • In attesa: <?php echo $ricevute_count; ?>
+                    </div>
                 </div>
-                <div style="font-size:32px;font-weight:900;color:#0f172a;margin:8px 0 4px 0;"><?php echo $tot_segnalazioni; ?></div>
-                <div style="font-size:12px;color:#16a34a;font-weight:700;">
-                    <?php echo $tasso_risolte; ?>% risolte con successo
+
+                <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;">
+                        <span>Volontari Mobilitati</span>
+                        <span class="dashicons dashicons-heart" style="color:#10b981;"></span>
+                    </div>
+                    <div style="font-size:32px;font-weight:900;color:#0f172a;margin:8px 0 4px 0;"><?php echo $tot_volontari; ?></div>
+                    <div style="font-size:12px;color:#059669;font-weight:700;">
+                        Albo permanente con recapiti
+                    </div>
+                    <div style="font-size:11px;color:#94a3b8;margin-top:6px;border-top:1px solid #f1f5f9;padding-top:6px;">
+                        <?php echo $tot_richieste; ?> iniziative "Serve una Mano"
+                    </div>
                 </div>
-                <div style="font-size:11px;color:#94a3b8;margin-top:6px;border-top:1px solid #f1f5f9;padding-top:6px;">
-                    Inoltrate a Municipio: <?php echo $inoltrate_count; ?> • In attesa: <?php echo $ricevute_count; ?>
+
+                <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;">
+                        <span>Idee & Proposte</span>
+                        <span class="dashicons dashicons-lightbulb" style="color:#6366f1;"></span>
+                    </div>
+                    <div style="font-size:32px;font-weight:900;color:#0f172a;margin:8px 0 4px 0;"><?php echo $tot_idee; ?></div>
+                    <div style="font-size:12px;color:#4f46e5;font-weight:700;">
+                        <?php echo $tot_voti; ?> voti di preferenza
+                    </div>
+                    <div style="font-size:11px;color:#94a3b8;margin-top:6px;border-top:1px solid #f1f5f9;padding-top:6px;">
+                        Partecipazione civica attiva
+                    </div>
+                </div>
+
+                <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;">
+                        <span>Eventi & Comunità</span>
+                        <span class="dashicons dashicons-calendar-alt" style="color:#e11d48;"></span>
+                    </div>
+                    <div style="font-size:32px;font-weight:900;color:#0f172a;margin:8px 0 4px 0;"><?php echo $tot_partecipanti; ?></div>
+                    <div style="font-size:12px;color:#e11d48;font-weight:700;">
+                        Partecipanti registrati
+                    </div>
+                    <div style="font-size:11px;color:#94a3b8;margin-top:6px;border-top:1px solid #f1f5f9;padding-top:6px;">
+                        <?php echo $tot_eventi; ?> eventi gestiti nel quartiere
+                    </div>
                 </div>
             </div>
 
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-                <div style="display:flex;justify-content:space-between;align-items:center;color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;">
-                    <span>Volontari Mobilitati</span>
-                    <span class="dashicons dashicons-heart" style="color:#10b981;"></span>
-                </div>
-                <div style="font-size:32px;font-weight:900;color:#0f172a;margin:8px 0 4px 0;"><?php echo $tot_volontari; ?></div>
-                <div style="font-size:12px;color:#059669;font-weight:700;">
-                    ~96 ore civiche donate
-                </div>
-                <div style="font-size:11px;color:#94a3b8;margin-top:6px;border-top:1px solid #f1f5f9;padding-top:6px;">
-                    Albo permanente con recapiti telefonici
-                </div>
-            </div>
+            <!-- Griglia Grafica -->
+            <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;margin-bottom:25px;">
+                <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                        <div>
+                            <h3 style="margin:0;font-size:15px;font-weight:800;color:#1e293b;">Andamento Segnalazioni nel Tempo (Maggio - Ottobre 2026)</h3>
+                            <p style="margin:2px 0 0 0;font-size:12px;color:#64748b;">Confronto tra segnalazioni inviate dai cittadini e risolte dal CdQ o Municipio VI</p>
+                        </div>
+                        <div style="font-size:11px;color:#64748b;font-weight:600;">
+                            <span style="display:inline-block;width:10px;height:10px;background:#f59e0b;border-radius:2px;margin-right:4px;"></span> Inviate
+                            <span style="display:inline-block;width:10px;height:10px;background:#10b981;border-radius:2px;margin-left:10px;margin-right:4px;"></span> Risolte
+                        </div>
+                    </div>
 
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-                <div style="display:flex;justify-content:space-between;align-items:center;color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;">
-                    <span>Idee & Proposte</span>
-                    <span class="dashicons dashicons-lightbulb" style="color:#6366f1;"></span>
+                    <div style="height:170px;display:flex;align-items:flex-end;justify-content:space-around;padding-top:15px;border-bottom:1px solid #e2e8f0;">
+                        <?php
+                        $mesi = [
+                            ['Maggio', 3, 2],
+                            ['Giugno', 5, 4],
+                            ['Luglio', 4, 3],
+                            ['Agosto', 2, 2],
+                            ['Settembre', 6, 5],
+                            ['Ottobre', 8, 6],
+                        ];
+                        foreach ($mesi as $m) {
+                            $h1 = min(130, $m[1] * 16);
+                            $h2 = min(130, $m[2] * 16);
+                            echo '<div style="display:flex;flex-direction:column;align-items:center;gap:6px;">';
+                            echo '  <div style="display:flex;align-items:flex-end;gap:4px;height:130px;">';
+                            echo '      <div style="width:16px;height:' . $h1 . 'px;background:linear-gradient(to top, #f59e0b, #fbbf24);border-radius:4px 4px 0 0;" title="' . $m[1] . ' inviate"></div>';
+                            echo '      <div style="width:16px;height:' . $h2 . 'px;background:linear-gradient(to top, #059669, #10b981);border-radius:4px 4px 0 0;" title="' . $m[2] . ' risolte"></div>';
+                            echo '  </div>';
+                            echo '  <span style="font-size:11px;font-weight:700;color:#475569;">' . substr($m[0], 0, 3) . '</span>';
+                            echo '</div>';
+                        }
+                        ?>
+                    </div>
+                    <div style="margin-top:12px;font-size:12px;color:#64748b;display:flex;justify-content:space-between;">
+                        <span>✓ Tempo medio di presa in carico: <strong>inferiore a 24 ore</strong></span>
+                        <span>✓ Tasso di risposta: <strong>100% delle istanze vagliate</strong></span>
+                    </div>
                 </div>
-                <div style="font-size:32px;font-weight:900;color:#0f172a;margin:8px 0 4px 0;"><?php echo $tot_idee; ?></div>
-                <div style="font-size:12px;color:#4f46e5;font-weight:700;">
-                    <?php echo $tot_voti; ?> voti di preferenza
-                </div>
-                <div style="font-size:11px;color:#94a3b8;margin-top:6px;border-top:1px solid #f1f5f9;padding-top:6px;">
-                    Gradimento civico dell'85%
-                </div>
-            </div>
 
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-                <div style="display:flex;justify-content:space-between;align-items:center;color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;">
-                    <span>Partecipazione Eventi</span>
-                    <span class="dashicons dashicons-calendar-alt" style="color:#e11d48;"></span>
-                </div>
-                <div style="font-size:32px;font-weight:900;color:#0f172a;margin:8px 0 4px 0;"><?php echo $tot_partecipanti; ?></div>
-                <div style="font-size:12px;color:#e11d48;font-weight:700;">
-                    82% affluenza su target
-                </div>
-                <div style="font-size:11px;color:#94a3b8;margin-top:6px;border-top:1px solid #f1f5f9;padding-top:6px;">
-                    <?php echo $tot_eventi; ?> eventi organizzati nel 2026
-                </div>
-            </div>
-        </div>
-
-        <!-- Griglia Grafica: Andamento Temporale e Distribuzione -->
-        <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;margin-bottom:25px;">
-            <!-- Grafico a Barre: Andamento Segnalazioni -->
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.05);display:flex;flex-direction:column;justify-content:space-between;">
                     <div>
-                        <h3 style="margin:0;font-size:15px;font-weight:800;color:#1e293b;">Andamento Segnalazioni nel Tempo (Maggio - Ottobre 2026)</h3>
-                        <p style="margin:2px 0 0 0;font-size:12px;color:#64748b;">Confronto tra segnalazioni inviate dai cittadini e risolte dal CdQ o Municipio VI</p>
-                    </div>
-                    <div style="font-size:11px;color:#64748b;font-weight:600;">
-                        <span style="display:inline-block;width:10px;height:10px;background:#f59e0b;border-radius:2px;margin-right:4px;"></span> Inviate
-                        <span style="display:inline-block;width:10px;height:10px;background:#10b981;border-radius:2px;margin-left:10px;margin-right:4px;"></span> Risolte
-                    </div>
-                </div>
+                        <h3 style="margin:0;font-size:15px;font-weight:800;color:#1e293b;">Criticità per Settore</h3>
+                        <p style="margin:2px 0 15px 0;font-size:12px;color:#64748b;">Ripartizione istanze territoriali</p>
+                        
+                        <div style="margin-bottom:12px;">
+                            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+                                <span style="font-weight:600;color:#334155;">Buche e Asfalto</span>
+                                <span style="font-weight:800;color:#0f172a;">39%</span>
+                            </div>
+                            <div style="width:100%;height:8px;background:#f1f5f9;border-radius:10px;overflow:hidden;">
+                                <div style="width:39%;height:100%;background:#f59e0b;border-radius:10px;"></div>
+                            </div>
+                        </div>
 
-                <!-- Barre Grafiche HTML/CSS -->
-                <div style="height:170px;display:flex;align-items:flex-end;justify-content:space-around;padding-top:15px;border-bottom:1px solid #e2e8f0;">
-                    <?php
-                    $mesi = [
-                        ['Maggio', 3, 2],
-                        ['Giugno', 5, 4],
-                        ['Luglio', 4, 3],
-                        ['Agosto', 2, 2],
-                        ['Settembre', 6, 5],
-                        ['Ottobre', 8, 6],
-                    ];
-                    foreach ($mesi as $m) {
-                        $h1 = min(130, $m[1] * 16);
-                        $h2 = min(130, $m[2] * 16);
-                        echo '<div style="display:flex;flex-direction:column;align-items:center;gap:6px;">';
-                        echo '  <div style="display:flex;align-items:flex-end;gap:4px;height:130px;">';
-                        echo '      <div style="width:16px;height:' . $h1 . 'px;background:linear-gradient(to top, #f59e0b, #fbbf24);border-radius:4px 4px 0 0;" title="' . $m[1] . ' inviate"></div>';
-                        echo '      <div style="width:16px;height:' . $h2 . 'px;background:linear-gradient(to top, #059669, #10b981);border-radius:4px 4px 0 0;" title="' . $m[2] . ' risolte"></div>';
-                        echo '  </div>';
-                        echo '  <span style="font-size:11px;font-weight:700;color:#475569;">' . substr($m[0], 0, 3) . '</span>';
-                        echo '</div>';
-                    }
-                    ?>
-                </div>
-                <div style="margin-top:12px;font-size:12px;color:#64748b;display:flex;justify-content:space-between;">
-                    <span>✓ Tempo medio di presa in carico: <strong>inferiore a 24 ore</strong></span>
-                    <span>✓ Tasso di risposta: <strong>100% delle istanze vagliate</strong></span>
+                        <div style="margin-bottom:12px;">
+                            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+                                <span style="font-weight:600;color:#334155;">Parchi e Verde Pubblico</span>
+                                <span style="font-weight:800;color:#0f172a;">29%</span>
+                            </div>
+                            <div style="width:100%;height:8px;background:#f1f5f9;border-radius:10px;overflow:hidden;">
+                                <div style="width:29%;height:100%;background:#10b981;border-radius:10px;"></div>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom:12px;">
+                            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+                                <span style="font-weight:600;color:#334155;">Illuminazione & Guasti</span>
+                                <span style="font-weight:800;color:#0f172a;">18%</span>
+                            </div>
+                            <div style="width:100%;height:8px;background:#f1f5f9;border-radius:10px;overflow:hidden;">
+                                <div style="width:18%;height:100%;background:#3b82f6;border-radius:10px;"></div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+                                <span style="font-weight:600;color:#334155;">Rifiuti & Decoro</span>
+                                <span style="font-weight:800;color:#0f172a;">14%</span>
+                            </div>
+                            <div style="width:100%;height:8px;background:#f1f5f9;border-radius:10px;overflow:hidden;">
+                                <div style="width:14%;height:100%;background:#ef4444;border-radius:10px;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:15px;padding-top:12px;border-top:1px solid #f1f5f9;">
+                        <a href="<?php echo admin_url('edit.php?post_type=vp_segnalazione'); ?>" class="button button-secondary" style="width:100%;text-align:center;">
+                            Gestisci Segnalazioni & Foto &rarr;
+                        </a>
+                    </div>
                 </div>
             </div>
 
-            <!-- Categorie di Segnalazioni -->
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.05);display:flex;flex-direction:column;justify-content:space-between;">
-                <div>
-                    <h3 style="margin:0;font-size:15px;font-weight:800;color:#1e293b;">Criticità per Settore</h3>
-                    <p style="margin:2px 0 15px 0;font-size:12px;color:#64748b;">Ripartizione istanze territoriali</p>
+            <!-- Griglia: Volontari e Barometro Idee -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+                <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                    <h3 style="margin:0 0 4px 0;font-size:15px;font-weight:800;color:#1e293b;">Disponibilità Volontari per Ambito</h3>
+                    <p style="margin:0 0 15px 0;font-size:12px;color:#64748b;">Campi di interesse espressi dai residenti nell'Albo</p>
                     
-                    <div style="margin-bottom:12px;">
-                        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
-                            <span style="font-weight:600;color:#334155;">Buche e Asfalto</span>
-                            <span style="font-weight:800;color:#0f172a;">39%</span>
-                        </div>
-                        <div style="width:100%;height:8px;background:#f1f5f9;border-radius:10px;overflow:hidden;">
-                            <div style="width:39%;height:100%;background:#f59e0b;border-radius:10px;"></div>
-                        </div>
-                    </div>
+                    <ul style="margin:0;padding:0;list-style:none;font-size:13px;">
+                        <li style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f8fafc;">
+                            <span>🌳 Cura del verde e parchi</span>
+                            <strong>14 volontari (41%)</strong>
+                        </li>
+                        <li style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f8fafc;">
+                            <span>🎉 Eventi e feste di quartiere</span>
+                            <strong>11 volontari (32%)</strong>
+                        </li>
+                        <li style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f8fafc;">
+                            <span>🧹 Decoro Urbano</span>
+                            <strong>9 volontari (26%)</strong>
+                        </li>
+                        <li style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f8fafc;">
+                            <span>📦 Raccolta beni e solidarietà</span>
+                            <strong>8 volontari (24%)</strong>
+                        </li>
+                        <li style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f8fafc;">
+                            <span>🛠️ Logistica e piccoli lavori manuali</span>
+                            <strong>7 volontari (21%)</strong>
+                        </li>
+                        <li style="display:flex;justify-content:space-between;padding:8px 0;">
+                            <span>📷 Comunicazione foto e social</span>
+                            <strong>5 volontari (15%)</strong>
+                        </li>
+                    </ul>
+                </div>
 
-                    <div style="margin-bottom:12px;">
-                        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
-                            <span style="font-weight:600;color:#334155;">Parchi e Verde Pubblico</span>
-                            <span style="font-weight:800;color:#0f172a;">29%</span>
-                        </div>
-                        <div style="width:100%;height:8px;background:#f1f5f9;border-radius:10px;overflow:hidden;">
-                            <div style="width:29%;height:100%;background:#10b981;border-radius:10px;"></div>
-                        </div>
-                    </div>
+                <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                    <h3 style="margin:0 0 4px 0;font-size:15px;font-weight:800;color:#1e293b;">Barometro Idee dei Cittadini</h3>
+                    <p style="margin:0 0 15px 0;font-size:12px;color:#64748b;">Le proposte più sostenute dalla comunità locale</p>
 
-                    <div style="margin-bottom:12px;">
-                        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
-                            <span style="font-weight:600;color:#334155;">Illuminazione & Guasti</span>
-                            <span style="font-weight:800;color:#0f172a;">18%</span>
+                    <div style="display:flex;flex-direction:column;gap:10px;">
+                        <div style="background:#f8fafc;padding:10px 14px;border-radius:12px;border:1px solid #e2e8f0;">
+                            <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#1e293b;">
+                                <span>Dosso o dissuasore in Via Fosso dell'Osa</span>
+                                <span style="color:#d97706;">83 voti</span>
+                            </div>
+                            <div style="font-size:11px;color:#64748b;margin-top:3px;">Stato: Inoltrata al Municipio VI</div>
                         </div>
-                        <div style="width:100%;height:8px;background:#f1f5f9;border-radius:10px;overflow:hidden;">
-                            <div style="width:18%;height:100%;background:#3b82f6;border-radius:10px;"></div>
-                        </div>
-                    </div>
 
-                    <div>
-                        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
-                            <span style="font-weight:600;color:#334155;">Rifiuti & Decoro</span>
-                            <span style="font-weight:800;color:#0f172a;">14%</span>
+                        <div style="background:#f8fafc;padding:10px 14px;border-radius:12px;border:1px solid #e2e8f0;">
+                            <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#1e293b;">
+                                <span>Orto sociale didattico con i ragazzi delle scuole</span>
+                                <span style="color:#d97706;">62 voti</span>
+                            </div>
+                            <div style="font-size:11px;color:#64748b;margin-top:3px;">Stato: In studio di fattibilità</div>
                         </div>
-                        <div style="width:100%;height:8px;background:#f1f5f9;border-radius:10px;overflow:hidden;">
-                            <div style="width:14%;height:100%;background:#ef4444;border-radius:10px;"></div>
+
+                        <div style="background:#f8fafc;padding:10px 14px;border-radius:12px;border:1px solid #e2e8f0;">
+                            <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#1e293b;">
+                                <span>Casetta per il bookcrossing (scambio libri) nel parco</span>
+                                <span style="color:#10b981;">47 voti</span>
+                            </div>
+                            <div style="font-size:11px;color:#10b981;margin-top:3px;">Stato: Approvata dal Direttivo</div>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <div style="margin-top:15px;padding-top:12px;border-top:1px solid #f1f5f9;">
-                    <a href="<?php echo admin_url('edit.php?post_type=vp_segnalazione'); ?>" class="button button-secondary" style="width:100%;text-align:center;">
-                        Gestisci Segnalazioni & Foto &rarr;
+        <!-- ========================================== -->
+        <!-- TAB 2: EVENTI DEL QUARTIERE                -->
+        <!-- ========================================== -->
+        <?php elseif ($active_tab === 'eventi'): ?>
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+                <div>
+                    <h2 style="margin:0;font-size:18px;font-weight:800;color:#0f172a;">Gestione Eventi della Comunità</h2>
+                    <p style="margin:4px 0 0 0;font-size:12px;color:#64748b;">
+                        Crea nuovi eventi o modifica quelli esistenti con la data completa di anno. Se la data è passata, l'evento viene mostrato nella sezione <strong>"Eventi passati"</strong>.
+                    </p>
+                </div>
+                <div style="display:flex;gap:10px;">
+                    <a href="<?php echo admin_url('post-new.php?post_type=vp_evento'); ?>" class="button button-primary" style="background:#059669;border-color:#047857;font-weight:700;padding:6px 14px;height:auto;">
+                        ➕ Nuovo Evento
+                    </a>
+                    <a href="<?php echo admin_url('edit.php?post_type=vp_evento'); ?>" class="button button-secondary" style="padding:6px 14px;height:auto;">
+                        📋 Tutti gli Eventi in WordPress &rarr;
                     </a>
                 </div>
             </div>
-        </div>
 
-        <!-- Sezione Volontari per Competenze e Top Idee -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-                <h3 style="margin:0 0 4px 0;font-size:15px;font-weight:800;color:#1e293b;">Disponibilità Volontari per Ambito</h3>
-                <p style="margin:0 0 15px 0;font-size:12px;color:#64748b;">Campi di interesse espressi dai residenti nell'Albo</p>
-                
-                <ul style="margin:0;padding:0;list-style:none;font-size:13px;">
-                    <li style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f8fafc;">
-                        <span>🌳 Cura del verde e parchi</span>
-                        <strong>14 volontari (41%)</strong>
-                    </li>
-                    <li style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f8fafc;">
-                        <span>🎉 Eventi e feste di quartiere</span>
-                        <strong>11 volontari (32%)</strong>
-                    </li>
-                    <li style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f8fafc;">
-                        <span>🧹 Decoro Urbano</span>
-                        <strong>9 volontari (26%)</strong>
-                    </li>
-                    <li style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f8fafc;">
-                        <span>📦 Raccolta beni e solidarietà</span>
-                        <strong>8 volontari (24%)</strong>
-                    </li>
-                    <li style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f8fafc;">
-                        <span>🛠️ Logistica e piccoli lavori manuali</span>
-                        <strong>7 volontari (21%)</strong>
-                    </li>
-                    <li style="display:flex;justify-content:space-between;padding:8px 0;">
-                        <span>📷 Comunicazione foto e social</span>
-                        <strong>5 volontari (15%)</strong>
-                    </li>
-                </ul>
+            <!-- Avviso funzionalità Anno -->
+            <div style="background:#eff6ff;border-left:4px solid #3b82f6;padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:20px;font-size:13px;color:#1e40af;">
+                <strong>💡 Novità v1.3.1:</strong> Ora puoi inserire l'anno esatto per ogni evento (es. 2024, 2025, 2026). Gli eventi con data anteriore ad oggi vengono automaticamente categorizzati come <strong>"Eventi passati"</strong> nella Web App.
             </div>
 
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-                <h3 style="margin:0 0 4px 0;font-size:15px;font-weight:800;color:#1e293b;">Barometro Idee dei Cittadini</h3>
-                <p style="margin:0 0 15px 0;font-size:12px;color:#64748b;">Le proposte più sostenute dalla comunità locale</p>
+            <!-- Tabella Eventi Recenti -->
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                <table class="wp-list-table widefat fixed striped" style="border:none;">
+                    <thead>
+                        <tr>
+                            <th style="font-weight:700;padding:12px 16px;">Titolo Evento</th>
+                            <th style="font-weight:700;width:150px;">Data Completa</th>
+                            <th style="font-weight:700;width:110px;">Orario</th>
+                            <th style="font-weight:700;width:180px;">Luogo</th>
+                            <th style="font-weight:700;width:120px;">Stato</th>
+                            <th style="font-weight:700;width:110px;text-align:center;">Partecipanti</th>
+                            <th style="font-weight:700;width:90px;text-align:right;padding-right:16px;">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php
+                        $eventi_query = new WP_Query([
+                            'post_type'      => 'vp_evento',
+                            'post_status'    => 'publish',
+                            'posts_per_page' => 20,
+                            'orderby'        => 'date',
+                            'order'          => 'DESC',
+                        ]);
 
-                <div style="display:flex;flex-direction:column;gap:10px;">
-                    <div style="background:#f8fafc;padding:10px 14px;border-radius:12px;border:1px solid #e2e8f0;">
-                        <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#1e293b;">
-                            <span>Dosso o dissuasore in Via Fosso dell'Osa</span>
-                            <span style="color:#d97706;">83 voti</span>
+                        if ($eventi_query->have_posts()):
+                            while ($eventi_query->have_posts()): $eventi_query->the_post();
+                                $eid   = get_the_ID();
+                                $d     = get_post_meta($eid, '_vp_giorno', true) ?: '';
+                                $m     = get_post_meta($eid, '_vp_mese', true) ?: '';
+                                $a     = get_post_meta($eid, '_vp_anno', true) ?: date('Y');
+                                $ora   = get_post_meta($eid, '_vp_ora', true) ?: '10:00';
+                                $luogo = get_post_meta($eid, '_vp_luogo', true) ?: 'Villaggio Prenestino';
+                                $pass  = get_post_meta($eid, '_vp_passato', true);
+                                $is_passato = ($pass === '1' || $pass === true || $pass === 'true');
+                                $part  = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE tipo='evento_vengo' AND post_id=%d", $eid));
+                                ?>
+                                <tr>
+                                    <td style="padding:12px 16px;">
+                                        <strong>
+                                            <a href="<?php echo esc_url(get_edit_post_link($eid)); ?>" style="color:#0f172a;text-decoration:none;">
+                                                <?php the_title(); ?>
+                                            </a>
+                                        </strong>
+                                    </td>
+                                    <td>
+                                        <code style="background:#f1f5f9;padding:3px 8px;border-radius:4px;font-weight:600;color:#0f172a;">
+                                            <?php echo esc_html($d . ' ' . $m . ' ' . $a); ?>
+                                        </code>
+                                    </td>
+                                    <td><?php echo esc_html($ora); ?></td>
+                                    <td><?php echo esc_html($luogo); ?></td>
+                                    <td>
+                                        <?php if ($is_passato): ?>
+                                            <span style="background:#f1f5f9;color:#64748b;font-weight:700;padding:3px 8px;border-radius:12px;font-size:11px;">
+                                                🏁 Passato
+                                            </span>
+                                        <?php else: ?>
+                                            <span style="background:#dcfce7;color:#166534;font-weight:700;padding:3px 8px;border-radius:12px;font-size:11px;">
+                                                🟢 Attivo
+                                            </span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td style="text-align:center;">
+                                        <span style="background:#f8fafc;padding:2px 8px;border-radius:10px;font-weight:700;font-size:12px;">
+                                            👥 <?php echo $part; ?>
+                                        </span>
+                                    </td>
+                                    <td style="text-align:right;padding-right:16px;">
+                                        <a href="<?php echo esc_url(get_edit_post_link($eid)); ?>" class="button button-small">
+                                            Modifica
+                                        </a>
+                                    </td>
+                                </tr>
+                                <?php
+                            endwhile;
+                            wp_reset_postdata();
+                        else:
+                            ?>
+                            <tr>
+                                <td colspan="7" style="text-align:center;padding:30px;color:#64748b;">
+                                    Nessun evento ancora inserito. <a href="<?php echo admin_url('post-new.php?post_type=vp_evento'); ?>">Aggiungi il primo evento &rarr;</a>
+                                </td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 3: VOLONTARIATO & ALBO                 -->
+        <!-- ========================================== -->
+        <?php elseif ($active_tab === 'volontari'): ?>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+                <!-- Colonna 1: Serve una Mano (Iniziative attive) -->
+                <div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                        <div>
+                            <h3 style="margin:0;font-size:16px;font-weight:800;color:#0f172a;">Richieste "Serve una Mano"</h3>
+                            <p style="margin:2px 0 0 0;font-size:12px;color:#64748b;">Iniziative civiche in cerca di volontari</p>
                         </div>
-                        <div style="font-size:11px;color:#64748b;margin-top:3px;">Stato: Inoltrata al Municipio VI</div>
+                        <a href="<?php echo admin_url('post-new.php?post_type=vp_richiesta'); ?>" class="button button-primary button-small">
+                            ➕ Nuova Richiesta
+                        </a>
                     </div>
 
-                    <div style="background:#f8fafc;padding:10px 14px;border-radius:12px;border:1px solid #e2e8f0;">
-                        <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#1e293b;">
-                            <span>Orto sociale didattico con i ragazzi delle scuole</span>
-                            <span style="color:#d97706;">62 voti</span>
+                    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                        <table class="wp-list-table widefat fixed striped" style="border:none;">
+                            <thead>
+                                <tr>
+                                    <th style="font-weight:700;padding:10px 14px;">Titolo</th>
+                                    <th style="font-weight:700;width:90px;">Volontari</th>
+                                    <th style="font-weight:700;width:75px;text-align:right;padding-right:14px;">Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php
+                                $richieste = get_posts(['post_type' => 'vp_richiesta', 'posts_per_page' => 10, 'post_status' => 'publish']);
+                                if ($richieste):
+                                    foreach ($richieste as $r):
+                                        $req = get_post_meta($r->ID, '_vp_volontari_richiesti', true) ?: 3;
+                                        $ad  = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE tipo='richiesta_aderisci' AND post_id=%d", $r->ID));
+                                        ?>
+                                        <tr>
+                                            <td style="padding:10px 14px;">
+                                                <strong><a href="<?php echo get_edit_post_link($r->ID); ?>"><?php echo esc_html($r->post_title); ?></a></strong>
+                                            </td>
+                                            <td>
+                                                <span style="font-size:12px;font-weight:700;color:#059669;"><?php echo $ad; ?> / <?php echo $req; ?></span>
+                                            </td>
+                                            <td style="text-align:right;padding-right:14px;">
+                                                <a href="<?php echo get_edit_post_link($r->ID); ?>" class="button button-small">Modifica</a>
+                                            </td>
+                                        </tr>
+                                        <?php
+                                    endforeach;
+                                else:
+                                    echo '<tr><td colspan="3" style="text-align:center;padding:20px;color:#64748b;">Nessuna richiesta presente.</td></tr>';
+                                endif;
+                                ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Colonna 2: Albo Volontari Registrati -->
+                <div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                        <div>
+                            <h3 style="margin:0;font-size:16px;font-weight:800;color:#0f172a;">Albo Volontari Registrati</h3>
+                            <p style="margin:2px 0 0 0;font-size:12px;color:#64748b;">Cittadini disponibili con recapiti privati</p>
                         </div>
-                        <div style="font-size:11px;color:#64748b;margin-top:3px;">Stato: In studio di fattibilità</div>
+                        <a href="<?php echo admin_url('edit.php?post_type=vp_volontario'); ?>" class="button button-secondary button-small">
+                            📋 Visualizza Albo Completo
+                        </a>
                     </div>
 
-                    <div style="background:#f8fafc;padding:10px 14px;border-radius:12px;border:1px solid #e2e8f0;">
-                        <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#1e293b;">
-                            <span>Casetta per il bookcrossing (scambio libri) nel parco</span>
-                            <span style="color:#10b981;">47 voti</span>
-                        </div>
-                        <div style="font-size:11px;color:#10b981;margin-top:3px;">Stato: Approvata dal Direttivo</div>
+                    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                        <table class="wp-list-table widefat fixed striped" style="border:none;">
+                            <thead>
+                                <tr>
+                                    <th style="font-weight:700;padding:10px 14px;">Nome Cittadino</th>
+                                    <th style="font-weight:700;width:120px;">Telefono</th>
+                                    <th style="font-weight:700;">Attività Offerte</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php
+                                $volontari = get_posts(['post_type' => 'vp_volontario', 'posts_per_page' => 10, 'post_status' => 'any']);
+                                if ($volontari):
+                                    foreach ($volontari as $v):
+                                        $tel = get_post_meta($v->ID, '_vp_telefono', true) ?: 'Non specificato';
+                                        $att = get_post_meta($v->ID, '_vp_attivita', true) ?: 'Supporto generale';
+                                        ?>
+                                        <tr>
+                                            <td style="padding:10px 14px;">
+                                                <strong><a href="<?php echo get_edit_post_link($v->ID); ?>"><?php echo esc_html($v->post_title); ?></a></strong>
+                                            </td>
+                                            <td>
+                                                <code style="font-size:11px;background:#f8fafc;padding:2px 6px;border-radius:4px;"><?php echo esc_html($tel); ?></code>
+                                            </td>
+                                            <td style="font-size:12px;color:#475569;">
+                                                <?php echo esc_html($att); ?>
+                                            </td>
+                                        </tr>
+                                        <?php
+                                    endforeach;
+                                else:
+                                    echo '<tr><td colspan="3" style="text-align:center;padding:20px;color:#64748b;">Nessun volontario iscritto finora.</td></tr>';
+                                endif;
+                                ?>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-    <?php
-}
 
-function vpq_render_admin_page() {
-    if (!current_user_can('manage_options')) return;
+        <!-- ========================================== -->
+        <!-- TAB 4: SEGNALAZIONI & PROPOSTE             -->
+        <!-- ========================================== -->
+        <?php elseif ($active_tab === 'segnalazioni'): ?>
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+                <div>
+                    <h2 style="margin:0;font-size:18px;font-weight:800;color:#0f172a;">Istanze dei Cittadini & Segnalazioni</h2>
+                    <p style="margin:4px 0 0 0;font-size:12px;color:#64748b;">
+                        Monitora e aggiorna lo stato delle segnalazioni dei residenti (Ricevuta, Inoltrata al Municipio VI, Risolta).
+                    </p>
+                </div>
+                <a href="<?php echo admin_url('edit.php?post_type=vp_segnalazione'); ?>" class="button button-primary" style="padding:6px 14px;height:auto;">
+                    ⚠️ Gestisci Tutte le Segnalazioni in WordPress &rarr;
+                </a>
+            </div>
 
-    if (isset($_POST['vpq_save_settings']) && check_admin_referer('vpq_settings_nonce')) {
-        update_option('vpq_allow_origins', sanitize_text_field($_POST['vpq_allow_origins']));
-        if (!empty($_POST['vpq_regenerate_key'])) {
-            update_option('vpq_api_key', wp_generate_password(32, false));
-        }
-        echo '<div class="updated"><p>Impostazioni salvate con successo!</p></div>';
-    }
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05);margin-bottom:25px;">
+                <table class="wp-list-table widefat fixed striped" style="border:none;">
+                    <thead>
+                        <tr>
+                            <th style="font-weight:700;padding:12px 16px;">Problematica Segnalata</th>
+                            <th style="font-weight:700;width:150px;">Categoria</th>
+                            <th style="font-weight:700;width:180px;">Indirizzo / Luogo</th>
+                            <th style="font-weight:700;width:130px;">Stato Risoluzione</th>
+                            <th style="font-weight:700;width:80px;text-align:right;padding-right:16px;">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php
+                        $segnalazioni = get_posts(['post_type' => 'vp_segnalazione', 'posts_per_page' => 15, 'post_status' => 'publish']);
+                        if ($segnalazioni):
+                            foreach ($segnalazioni as $s):
+                                $cat   = get_post_meta($s->ID, '_vp_categoria', true) ?: 'Generico';
+                                $luogo = get_post_meta($s->ID, '_vp_luogo', true) ?: 'Villaggio Prenestino';
+                                $stato = (int) get_post_meta($s->ID, '_vp_stato', true) ?: 1;
+                                ?>
+                                <tr>
+                                    <td style="padding:12px 16px;">
+                                        <strong><a href="<?php echo get_edit_post_link($s->ID); ?>"><?php echo esc_html($s->post_title); ?></a></strong>
+                                    </td>
+                                    <td><span style="font-size:12px;color:#475569;"><?php echo esc_html($cat); ?></span></td>
+                                    <td><span style="font-size:12px;color:#475569;"><?php echo esc_html($luogo); ?></span></td>
+                                    <td>
+                                        <?php if ($stato === 3): ?>
+                                            <span style="background:#dcfce7;color:#166534;font-weight:700;padding:3px 8px;border-radius:12px;font-size:11px;">🟢 Risolta</span>
+                                        <?php elseif ($stato === 2): ?>
+                                            <span style="background:#fef3c7;color:#92400e;font-weight:700;padding:3px 8px;border-radius:12px;font-size:11px;">🟡 Inoltrata</span>
+                                        <?php else: ?>
+                                            <span style="background:#fee2e2;color:#991b1b;font-weight:700;padding:3px 8px;border-radius:12px;font-size:11px;">🔴 Ricevuta</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td style="text-align:right;padding-right:16px;">
+                                        <a href="<?php echo get_edit_post_link($s->ID); ?>" class="button button-small">Dettagli</a>
+                                    </td>
+                                </tr>
+                                <?php
+                            endforeach;
+                        else:
+                            echo '<tr><td colspan="5" style="text-align:center;padding:25px;color:#64748b;">Nessuna segnalazione registrata.</td></tr>';
+                        endif;
+                        ?>
+                    </tbody>
+                </table>
+            </div>
 
-    $api_key = get_option('vpq_api_key');
-    $origins = get_option('vpq_allow_origins', '*');
-    $endpoint_base = home_url('/wp-json/vp/v1/');
-    ?>
-    <div class="wrap">
-        <h1>🏡 Gestione Web App - Villaggio Prenestino</h1>
-        <p>Configurazione del ponte di comunicazione tra WordPress e l'applicazione mobile/desktop dei cittadini.</p>
-        
-        <div style="background:#fff;border-left:4px solid #00a32a;padding:15px;margin:20px 0;box-shadow:0 1px 1px rgba(0,0,0,.05);">
-            <h3 style="margin-top:0;">⚡ Stato Integrazione API</h3>
-            <p><strong>Endpoint Principale API:</strong> <code><?php echo esc_html($endpoint_base); ?>dati</code></p>
-            <p><strong>Chiave di Sicurezza App:</strong> <code style="background:#f0f0f1;padding:3px 6px;"><?php echo esc_html($api_key); ?></code></p>
-        </div>
+        <!-- ========================================== -->
+        <!-- TAB 5: IMPOSTAZIONI & API                  -->
+        <!-- ========================================== -->
+        <?php elseif ($active_tab === 'impostazioni'): ?>
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:25px;box-shadow:0 1px 3px rgba(0,0,0,0.05);max-width:850px;">
+                <h2 style="margin:0 0 4px 0;font-size:18px;font-weight:800;color:#0f172a;">Configurazione Comunicazione Web App & REST API</h2>
+                <p style="margin:0 0 20px 0;font-size:13px;color:#64748b;">
+                    Parametri di sincronizzazione dati tra WordPress e la Web App attiva per i cittadini.
+                </p>
 
-        <form method="post">
-            <?php wp_nonce_field('vpq_settings_nonce'); ?>
-            <table class="form-table">
-                <tr>
-                    <th><label for="vpq_allow_origins">Domini Autorizzati (CORS):</label></th>
-                    <td>
-                        <input type="text" id="vpq_allow_origins" name="vpq_allow_origins" value="<?php echo esc_attr($origins); ?>" class="large-text" />
-                        <p class="description">Inserisci <code>*</code> per consentire a tutti i dispositivi/app, oppure l'URL specifico dove risiede l'app (es. <code>https://www.villaggioprenestino.it</code>).</p>
-                    </td>
-                </tr>
-                <tr>
-                    <th>Sicurezza Chiave:</th>
-                    <td>
-                        <label>
-                            <input type="checkbox" name="vpq_regenerate_key" value="1" />
-                            Rigenera una nuova chiave API di sicurezza
-                        </label>
-                    </td>
-                </tr>
-            </table>
-            <p class="submit">
-                <input type="submit" name="vpq_save_settings" class="button button-primary" value="Salva Impostazioni" />
-            </p>
-        </form>
+                <div style="background:#f8fafc;border-left:4px solid #059669;padding:14px 18px;border-radius:0 8px 8px 0;margin-bottom:20px;">
+                    <div style="font-size:13px;color:#334155;line-height:1.7;">
+                        <div><strong>Endpoint Feed Dati App:</strong> <code><?php echo esc_html($endpoint_base); ?>dati</code></div>
+                        <div style="margin-top:4px;"><strong>Chiave Segreta di Sicurezza (Header X-VP-Key):</strong> 
+                            <code style="background:#e2e8f0;padding:3px 8px;border-radius:4px;font-weight:700;color:#0f172a;"><?php echo esc_html($api_key); ?></code>
+                        </div>
+                    </div>
+                </div>
+
+                <form method="post">
+                    <?php wp_nonce_field('vpq_settings_nonce'); ?>
+                    <table class="form-table" style="margin-top:0;">
+                        <tr>
+                            <th scope="row" style="font-weight:700;">Domini Autorizzati (CORS):</th>
+                            <td>
+                                <input type="text" name="vpq_allow_origins" value="<?php echo esc_attr($origins); ?>" class="regular-text" style="width:100%;max-width:500px;" />
+                                <p class="description" style="margin-top:4px;">
+                                    Usa <code>*</code> per consentire a tutti i dispositivi/app, oppure inserisci l'URL esatto (es. <code>https://www.villaggioprenestino.it</code>).
+                                </p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row" style="font-weight:700;">Sicurezza Chiave:</th>
+                            <td>
+                                <label style="display:flex;align-items:center;gap:8px;">
+                                    <input type="checkbox" name="vpq_regenerate_key" value="1" />
+                                    <span>Rigenera una nuova chiave API di sicurezza</span>
+                                </label>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <p class="submit" style="margin-top:20px;padding-top:15px;border-top:1px solid #f1f5f9;">
+                        <input type="submit" name="vpq_save_settings" class="button button-primary" value="Salva Impostazioni API" style="padding:6px 16px;height:auto;" />
+                    </p>
+                </form>
+            </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 6: WEB APP & DOWNLOAD                  -->
+        <!-- ========================================== -->
+        <?php elseif ($active_tab === 'webapp'): ?>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+                <!-- Card 1: Stato Web App -->
+                <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                        <span class="dashicons dashicons-smartphone" style="font-size:26px;width:26px;height:26px;color:#2563eb;"></span>
+                        <h3 style="margin:0;font-size:16px;font-weight:800;color:#0f172a;">Applicazione Pubblicata</h3>
+                    </div>
+                    <p style="font-size:13px;color:#64748b;line-height:1.5;">
+                        La Web App dei cittadini è accessibile al percorso dedicato del sito web. Tutti i dati inseriti nel plugin compaiono istantaneamente nell'app.
+                    </p>
+                    <div style="margin:16px 0;background:#f8fafc;padding:12px 14px;border-radius:10px;border:1px solid #e2e8f0;">
+                        <span style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Indirizzo Web App:</span>
+                        <div style="font-size:13px;font-weight:700;color:#2563eb;margin-top:2px;">
+                            <a href="<?php echo esc_url($app_url); ?>" target="_blank" style="text-decoration:none;">
+                                <?php echo esc_html($app_url); ?> &rarr;
+                            </a>
+                        </div>
+                    </div>
+                    <a href="<?php echo esc_url($app_url); ?>" target="_blank" class="button button-primary" style="background:#2563eb;border-color:#1d4ed8;width:100%;text-align:center;padding:6px 0;height:auto;">
+                        🚀 Apri la Web App nel Browser
+                    </a>
+                </div>
+
+                <!-- Card 2: Risorse & Download ZIP -->
+                <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                        <span class="dashicons dashicons-download" style="font-size:26px;width:26px;height:26px;color:#059669;"></span>
+                        <h3 style="margin:0;font-size:16px;font-weight:800;color:#0f172a;">File del Progetto & Pacchetti</h3>
+                    </div>
+                    <p style="font-size:13px;color:#64748b;line-height:1.5;">
+                        Scarica l'archivio del plugin o i file statici compilati della web app per l'installazione su Ergonet o altri server.
+                    </p>
+                    <div style="display:flex;flex-direction:column;gap:10px;margin-top:16px;">
+                        <a href="<?php echo esc_url(home_url('/vp-quartiere.zip')); ?>" class="button button-secondary" style="display:flex;align-items:center;justify-content:center;gap:6px;padding:6px 0;height:auto;">
+                            <span class="dashicons dashicons-admin-plugins" style="margin-top:-2px;"></span> Scarica Plugin Aggiornato (vp-quartiere.zip v1.3.1)
+                        </a>
+                        <a href="<?php echo esc_url(home_url('/villaggioprenestino-app.zip')); ?>" class="button button-secondary" style="display:flex;align-items:center;justify-content:center;gap:6px;padding:6px 0;height:auto;">
+                            <span class="dashicons dashicons-media-archive" style="margin-top:-2px;"></span> Scarica Pacchetto Web App (villaggioprenestino-app.zip)
+                        </a>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
+
     </div>
     <?php
 }
