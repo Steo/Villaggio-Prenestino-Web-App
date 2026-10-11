@@ -31,6 +31,7 @@ interface HomeTabProps {
   onRequestJoinEvento: (evento: EventoQuartiere) => void;
   darkMode?: boolean;
   onOpenWpPanel?: () => void;
+  isAdmin?: boolean;
 }
 
 export const HomeTab: React.FC<HomeTabProps> = ({
@@ -43,6 +44,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   onRequestJoinEvento,
   darkMode,
   onOpenWpPanel,
+  isAdmin = false,
 }) => {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -461,8 +463,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({
         </div>
       </section>
 
-      {/* BANNER AMMINISTRATORE: Dashboard Insight & WordPress Plugin */}
-      {onOpenWpPanel && (
+      {/* BANNER AMMINISTRATORE: Dashboard Insight & WordPress Plugin (Visibile solo a chi è in modalità Admin) */}
+      {isAdmin && onOpenWpPanel && (
         <section className={`p-4 sm:p-5 rounded-3xl border transition-colors ${
           darkMode
             ? 'bg-slate-900/90 border-slate-800 text-slate-200'

@@ -32,6 +32,7 @@ import { ProposteAltroTab } from './components/ProposteAltroTab';
 import { VolunteerContactModal } from './components/VolunteerContactModal';
 import { PhotoLightbox } from './components/PhotoLightbox';
 import { WpPluginPanel } from './components/WpPluginPanel';
+import { AdminAccessModal } from './components/AdminAccessModal';
 
 import {
   Home,
@@ -99,12 +100,55 @@ export default function App() {
   const [wpPanelOpen, setWpPanelOpen] = useState(false);
   const [wpConfig, setWpConfig] = useState(getWpConfig);
 
+  // Modalità Amministratore Riservata (Opzione A): Nascosta di default per i normali cittadini
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        if (
+          params.get('admin') === 'true' ||
+          params.get('admin') === '1' ||
+          window.location.hash === '#admin'
+        ) {
+          localStorage.setItem('cdq_admin_mode', 'true');
+          return true;
+        }
+        return localStorage.getItem('cdq_admin_mode') === 'true';
+      }
+    } catch {
+      // ignore
+    }
+    return false;
+  });
+  const [adminAccessModalOpen, setAdminAccessModalOpen] = useState(false);
+
   // Toast feedback
   const [toast, setToast] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3500);
+  };
+
+  const handleActivateAdmin = () => {
+    setIsAdmin(true);
+    try {
+      localStorage.setItem('cdq_admin_mode', 'true');
+    } catch {
+      // ignore
+    }
+    showToast('🛠️ Modalità Amministratore attivata!');
+  };
+
+  const handleDeactivateAdmin = () => {
+    setIsAdmin(false);
+    try {
+      localStorage.removeItem('cdq_admin_mode');
+    } catch {
+      // ignore
+    }
+    setWpPanelOpen(false);
+    showToast('Modalità Amministratore disattivata. Vista cittadino attiva.');
   };
 
   const loadData = async () => {
@@ -118,6 +162,26 @@ export default function App() {
 
   useEffect(() => {
     loadData();
+
+    // Rileva parametro ?admin=true o #admin nell'URL all'avvio
+    try {
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        if (
+          params.get('admin') === 'true' ||
+          params.get('admin') === '1' ||
+          window.location.hash === '#admin'
+        ) {
+          setIsAdmin(true);
+          localStorage.setItem('cdq_admin_mode', 'true');
+          showToast('🛠️ Benvenuto Amministratore! Dashboard sbloccata.');
+          // Pulisce l'URL senza ricaricare la pagina
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      }
+    } catch {
+      // ignore
+    }
   }, []);
 
   const addPunti = (punti: number, motivazione: string) => {
@@ -324,6 +388,8 @@ export default function App() {
         darkMode={darkMode}
         onToggleDarkMode={toggleDarkMode}
         onOpenWpPanel={() => setWpPanelOpen(true)}
+        isAdmin={isAdmin}
+        onOpenAdminAccessModal={() => setAdminAccessModalOpen(true)}
       />
 
       {/* Contenuto Principale */}
@@ -339,6 +405,7 @@ export default function App() {
             onRequestJoinEvento={handleRequestJoinEvento}
             darkMode={darkMode}
             onOpenWpPanel={() => setWpPanelOpen(true)}
+            isAdmin={isAdmin}
           />
         )}
 
@@ -511,6 +578,17 @@ export default function App() {
           loadData();
           showToast('Nuova attività volontariato pubblicata!');
         }}
+        onDeactivateAdmin={handleDeactivateAdmin}
+      />
+
+      {/* Modal Segreta Accesso Amministratore (PIN) */}
+      <AdminAccessModal
+        isOpen={adminAccessModalOpen}
+        onClose={() => setAdminAccessModalOpen(false)}
+        isAdmin={isAdmin}
+        onActivateAdmin={handleActivateAdmin}
+        onDeactivateAdmin={handleDeactivateAdmin}
+        darkMode={darkMode}
       />
     </div>
   );

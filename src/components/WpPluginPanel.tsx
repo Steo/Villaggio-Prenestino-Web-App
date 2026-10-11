@@ -36,6 +36,7 @@ import {
   Sliders,
   ChevronRight,
   Sparkles,
+  LogOut,
 } from 'lucide-react';
 
 interface WpPluginPanelProps {
@@ -53,6 +54,7 @@ interface WpPluginPanelProps {
   onUpdateSegnalazioneStato?: (id: number, stato: StatoSegnalazione) => void;
   onCreateEvento?: (evento: Omit<EventoQuartiere, 'id'>) => void;
   onCreateRichiesta?: (richiesta: Omit<RichiestaVolontariato, 'id' | 'have'>) => void;
+  onDeactivateAdmin?: () => void;
 }
 
 export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
@@ -70,6 +72,7 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
   onUpdateSegnalazioneStato,
   onCreateEvento,
   onCreateRichiesta,
+  onDeactivateAdmin,
 }) => {
   const [activeTab, setActiveTab] = useState<
     'insights' | 'eventi' | 'segnalazioni' | 'volontari' | 'proposte' | 'config'
@@ -82,6 +85,24 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
   const [copiato, setCopiato] = useState(false);
+
+  const downloadBlobFile = async (url: string, filename: string) => {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('File non trovato');
+      const blob = await res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1500);
+    } catch {
+      window.open(url, '_blank');
+    }
+  };
 
   // Insights State
   const [insights, setInsights] = useState<InsightData | null>(null);
@@ -297,6 +318,17 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {onDeactivateAdmin && (
+              <button
+                type="button"
+                onClick={onDeactivateAdmin}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 active:scale-95 border border-rose-500/30 text-rose-300 text-xs font-semibold cursor-pointer transition"
+                title="Disattiva modalità Amministratore e torna alla vista normale da cittadino"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Esci da Admin</span>
+              </button>
+            )}
             <button
               onClick={onClose}
               className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
@@ -1277,14 +1309,14 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
-                  <a
-                    href="/vp-quartiere.zip"
-                    download="vp-quartiere.zip"
-                    className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-emerald-700/20 transition flex items-center justify-center gap-2"
+                  <button
+                    type="button"
+                    onClick={() => downloadBlobFile('/vp-quartiere.zip', 'vp-quartiere.zip')}
+                    className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-emerald-700/20 transition flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <Download className="w-4 h-4" />
-                    Scarica ZIP (v1.3.0)
-                  </a>
+                    <span>Scarica ZIP (v1.3.0)</span>
+                  </button>
                   <button
                     onClick={handleCopiaCodice}
                     className="py-2.5 px-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-semibold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
@@ -1323,6 +1355,56 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
                     Troverai nel menu principale la nuova voce <strong>"📊 VP Quartiere (Insight)"</strong>, insieme a <strong>"Eventi Quartiere"</strong>, <strong>"Serve una Mano"</strong>, <strong>"Segnalazioni"</strong> e <strong>"Albo Volontari"</strong>.
                   </li>
                 </ol>
+              </div>
+
+              {/* Pubblicazione della Web App su /app */}
+              <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-amber-50/40 p-5 rounded-2xl border-2 border-blue-200 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-600 text-white uppercase tracking-wider mb-1">
+                      Pubblicazione Web App
+                    </span>
+                    <h4 className="text-base font-bold text-slate-900 leading-tight">
+                      Come pubblicare l'app su <code className="text-blue-700 bg-blue-100/80 px-1.5 py-0.5 rounded">www.villaggioprenestino.it/app</code>
+                    </h4>
+                    <p className="text-xs text-slate-600 mt-1">
+                      Pacchetto già compilato e configurato con percorsi relativi e file <code>.htaccess</code> ottimizzato per Apache.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => downloadBlobFile('/villaggioprenestino-app.zip', 'villaggioprenestino-app.zip')}
+                    className="py-2.5 px-4 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-blue-700/20 transition flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Scarica Web App ZIP (Pronta)</span>
+                  </button>
+                </div>
+
+                <div className="bg-white/90 p-4 rounded-xl border border-blue-100 space-y-2 text-xs text-slate-700">
+                  <h5 className="font-bold text-slate-900 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    I 4 passaggi per pubblicarla nel tuo hosting (Ergonet):
+                  </h5>
+                  <ol className="list-decimal list-inside space-y-1.5 text-slate-600 leading-relaxed pl-1">
+                    <li>
+                      Scarica il file <strong>villaggioprenestino-app.zip</strong> con il pulsante qui sopra.
+                    </li>
+                    <li>
+                      Accedi al pannello di controllo del tuo hosting (es. <strong>cPanel &gt; Gestione File</strong> o tramite <strong>FTP / FileZilla</strong>).
+                    </li>
+                    <li>
+                      Entra nella cartella radice del sito (di solito <code>public_html</code>) e crea una nuova cartella denominata <code>app</code>.
+                    </li>
+                    <li>
+                      Carica ed estrai il contenuto dello zip dentro la cartella <code>app</code> (ci saranno <code>index.html</code>, <code>assets</code>, <code>.htaccess</code> e le icone).
+                    </li>
+                  </ol>
+                  <p className="pt-1 text-[11px] text-emerald-700 font-semibold">
+                    ✓ Fatto! Aprendo <code>https://www.villaggioprenestino.it/app</code> la Web App sarà subito online per tutti i cittadini!
+                  </p>
+                </div>
               </div>
 
               {/* Connessione API */}
