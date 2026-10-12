@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, KeyRound, X, Check, AlertCircle, LogOut } from 'lucide-react';
+import { Shield, KeyRound, X, Check, AlertCircle, LogOut, Download } from 'lucide-react';
 
 interface AdminAccessModalProps {
   isOpen: boolean;
@@ -7,6 +7,7 @@ interface AdminAccessModalProps {
   isAdmin: boolean;
   onActivateAdmin: () => void;
   onDeactivateAdmin: () => void;
+  onOpenExportModal?: () => void;
   darkMode: boolean;
 }
 
@@ -16,6 +17,7 @@ export const AdminAccessModal: React.FC<AdminAccessModalProps> = ({
   isAdmin,
   onActivateAdmin,
   onDeactivateAdmin,
+  onOpenExportModal,
   darkMode,
 }) => {
   const [pin, setPin] = useState('');
@@ -77,6 +79,20 @@ export const AdminAccessModal: React.FC<AdminAccessModalProps> = ({
                 I comandi di gestione, la Dashboard Insight e i link WordPress sono attualmente visibili su questo dispositivo.
               </p>
             </div>
+
+            {onOpenExportModal && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenExportModal();
+                }}
+                className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-98 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition cursor-pointer"
+              >
+                <Download className="w-4 h-4" />
+                <span>📦 Esporta Plugin WordPress & Web App (.zip)</span>
+              </button>
+            )}
 
             <button
               type="button"

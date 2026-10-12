@@ -91,12 +91,12 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* Tasto Esporta Plugin & Web App ZIP */}
-            {onOpenExportModal && (
+            {/* Tasto Esporta Plugin & Web App ZIP: VISIBILE SOLO PER L'AMMINISTRATORE */}
+            {isAdmin && onOpenExportModal && (
               <button
                 type="button"
                 onClick={onOpenExportModal}
-                title="Esporta il Plugin WordPress (.zip) e la Web App (.zip) da testare sul tuo sito web"
+                title="Esporta il Plugin WordPress (.zip) e la Web App (.zip) da testare sul tuo sito web (Modalità Admin)"
                 aria-label="Esporta Plugin WordPress e Web App per il tuo sito"
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-500/25 hover:bg-emerald-500/40 active:scale-95 border border-emerald-400/50 text-white text-xs font-semibold cursor-pointer transition shadow-xs group focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
               >

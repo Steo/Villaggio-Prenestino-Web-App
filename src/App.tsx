@@ -847,6 +847,7 @@ export default function App() {
         isAdmin={isAdmin}
         onActivateAdmin={handleActivateAdmin}
         onDeactivateAdmin={handleDeactivateAdmin}
+        onOpenExportModal={() => setExportModalOpen(true)}
         darkMode={darkMode}
       />
 

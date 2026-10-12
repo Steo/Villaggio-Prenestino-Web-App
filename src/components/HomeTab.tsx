@@ -481,8 +481,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({
         </div>
       </section>
 
-      {/* BANNER ESPORTAZIONE: Scarica Plugin WordPress (.zip) e Web App (.zip) */}
-      {onOpenExportModal && (
+      {/* BANNER ESPORTAZIONE: Scarica Plugin WordPress (.zip) e Web App (.zip) - VISIBILE SOLO SE AMMINISTRATORE */}
+      {isAdmin && onOpenExportModal && (
         <section className={`p-4 sm:p-5 rounded-3xl border transition-all ${
           darkMode
             ? 'bg-gradient-to-r from-emerald-950/40 via-teal-950/30 to-slate-900 border-emerald-500/30 text-slate-200'
