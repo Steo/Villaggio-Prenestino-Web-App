@@ -323,7 +323,7 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                villaggioprenestino.it • Plugin VP Quartiere v1.3.0
+                villaggioprenestino.it • Plugin VP Quartiere v1.3.2
               </p>
             </div>
           </div>
@@ -1302,13 +1302,18 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
               </div>
 
               <div className="space-y-2.5">
-                {proposte.map((p) => (
+                {[...proposte].sort((a, b) => b.v - a.v).map((p, idx) => (
                   <div
                     key={p.id}
                     className="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-3"
                   >
                     <div className="space-y-0.5">
-                      <h4 className="text-xs sm:text-sm font-bold text-slate-900">{p.t}</h4>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                          #{idx + 1}
+                        </span>
+                        <h4 className="text-xs sm:text-sm font-bold text-slate-900">{p.t}</h4>
+                      </div>
                       <span className="text-[10px] text-slate-400">ID #{p.id}</span>
                     </div>
 
@@ -1331,13 +1336,13 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
               <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-50 via-teal-50 to-amber-50/50 border-2 border-emerald-300 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                   <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-600 text-white uppercase tracking-wider mb-1.5">
-                    Versione 1.3.1: Menu Unificato & Navigazione a Schede (Tab)
+                    Versione 1.3.2: Dashboard & Tab Hub (Zero Dati Fittizi)
                   </span>
                   <h3 className="text-base font-bold text-slate-900 leading-snug">
                     Scarica il Plugin WordPress: <code className="text-emerald-800">vp-quartiere.zip</code>
                   </h3>
                   <p className="text-xs text-slate-600 mt-1 max-w-md">
-                    Menu verticale di WordPress ordinato sotto l'unica voce <strong>"🏡 VP Quartiere"</strong> con comoda navigazione a Schede (Tab), data completa con anno per gli eventi (passati/attivi), segnalazioni e Albo Volontari protetto.
+                    Menu verticale di WordPress ordinato sotto l'unica voce <strong>"🏡 VP Quartiere"</strong>: apre come prima scheda la <strong>"Dashboard & Tab Hub"</strong> con statistiche immediate, schede ordinate e installazione pulita azzerata senza dati fittizi, pronta per caricare i dati reali dalla Web App.
                   </p>
                 </div>
 
@@ -1348,7 +1353,7 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
                     className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-emerald-700/20 transition flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <Download className="w-4 h-4" />
-                    <span>Scarica ZIP (v1.3.1)</span>
+                    <span>Scarica ZIP (v1.3.2)</span>
                   </button>
                   <button
                     onClick={handleCopiaCodice}
@@ -1532,7 +1537,7 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
         {/* Footer */}
         <div className="bg-slate-100 px-6 py-3 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 shrink-0">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-700">Plugin WordPress VP Quartiere v1.3.0</span>
+            <span className="font-semibold text-slate-700">Plugin WordPress VP Quartiere v1.3.2</span>
             <span className="text-slate-300">•</span>
             <span>Comitato di Quartiere Villaggio Prenestino</span>
           </div>

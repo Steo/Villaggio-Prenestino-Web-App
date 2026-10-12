@@ -11,6 +11,7 @@ interface HeaderProps {
   onOpenWpPanel?: () => void;
   isAdmin?: boolean;
   onOpenAdminAccessModal?: () => void;
+  onOpenPuntiModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -20,6 +21,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenWpPanel,
   isAdmin = false,
   onOpenAdminAccessModal,
+  onOpenPuntiModal,
 }) => {
   const [isPuntiModalOpen, setIsPuntiModalOpen] = useState(false);
   const logoTapCountRef = useRef(0);
@@ -86,7 +88,13 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Tasto Contatore Punti Civici - Apre il popup esplicativo */}
             <button
               type="button"
-              onClick={() => setIsPuntiModalOpen(true)}
+              onClick={() => {
+                if (onOpenPuntiModal) {
+                  onOpenPuntiModal();
+                } else {
+                  setIsPuntiModalOpen(true);
+                }
+              }}
               title={`Hai ${interactions.puntiCivici} punti civici (${getLivello(interactions.puntiCivici)}) - Clicca per vedere come funziona`}
               aria-label={`Punti Civici: ${interactions.puntiCivici}. Livello: ${getLivello(interactions.puntiCivici)}. Tocca per aprire la guida al sistema punti`}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-black/20 hover:bg-black/35 active:scale-95 border border-white/20 hover:border-amber-400/50 text-amber-300 text-xs font-semibold cursor-pointer transition shadow-xs group focus:outline-none focus:ring-2 focus:ring-amber-400/50"

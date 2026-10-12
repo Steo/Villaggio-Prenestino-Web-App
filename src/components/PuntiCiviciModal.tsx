@@ -447,8 +447,8 @@ export const PuntiCiviciModal: React.FC<PuntiCiviciModalProps> = ({
             onClick={onClose}
             className={`w-full sm:w-auto px-6 py-2.5 rounded-xl font-bold text-xs active:scale-95 transition shadow-sm cursor-pointer text-center ${
               darkMode
-                ? 'bg-white text-slate-950 hover:bg-slate-100'
-                : 'bg-slate-950 text-white hover:bg-slate-850'
+                ? 'bg-amber-400 text-slate-950 hover:bg-amber-300'
+                : 'bg-[#781816] hover:bg-[#601311] text-white shadow-xs'
             }`}
           >
             Ho capito, chiudi

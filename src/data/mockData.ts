@@ -207,12 +207,42 @@ export const INITIAL_PROPOSTE: PropostaCittadina[] = [
   {
     id: 2,
     t: 'Richiesta di un dosso o dissuasore di velocità in Via Fosso dell\'Osa',
-    v: 83,
+    v: 95,
   },
   {
     id: 3,
     t: 'Creazione di un orto sociale didattico curato insieme ai ragazzi delle scuole',
     v: 62,
+  },
+  {
+    id: 4,
+    t: 'Nuova area cani recintata e attrezzata con fontanella nel Parco delle Cerquete',
+    v: 78,
+  },
+  {
+    id: 5,
+    t: 'Ripristino della pista ciclabile e messa in sicurezza dei marciapiedi di Via Roccaravindola',
+    v: 54,
+  },
+  {
+    id: 6,
+    t: 'Cestini per la raccolta differenziata e distributori di sacchetti lungo Via Prenestina',
+    v: 39,
+  },
+  {
+    id: 7,
+    t: 'Cinema all\'aperto gratuito estivo e serate teatrali per bambini e famiglie in piazza',
+    v: 71,
+  },
+  {
+    id: 8,
+    t: 'Stazione con colonnina di ricarica per bici elettriche e punto attrezzi manutenzione',
+    v: 31,
+  },
+  {
+    id: 9,
+    t: 'Mercatino periodico del baratto e riuso solidale tra vicini di quartiere',
+    v: 25,
   },
 ];
 

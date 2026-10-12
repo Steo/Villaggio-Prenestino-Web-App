@@ -133,6 +133,15 @@ function getLocalDataStore(): LocalDataStore {
           localStorage.setItem(LOCAL_STORE_KEY, JSON.stringify(parsed));
         }
       }
+      // Sincronizza INITIAL_PROPOSTE per includere la lista completa di proposte per la paginazione a schede
+      if (parsed.proposte) {
+        const storedPropIds = new Set(parsed.proposte.map((p: any) => p.id));
+        const missingProp = INITIAL_PROPOSTE.filter((p) => !storedPropIds.has(p.id));
+        if (missingProp.length > 0) {
+          parsed.proposte = [...parsed.proposte, ...missingProp];
+          localStorage.setItem(LOCAL_STORE_KEY, JSON.stringify(parsed));
+        }
+      }
       return parsed;
     }
   } catch (e) {
@@ -188,7 +197,7 @@ export async function fetchAllData(): Promise<{
         const json = await resp.json();
         if (json.success) {
           connected = true;
-          if (Array.isArray(json.eventi) && json.eventi.length > 0) {
+          if (Array.isArray(json.eventi)) {
             const today = new Date().toISOString().slice(0, 10);
             const mapM: Record<string, string> = {
               'GEN': '01', 'FEB': '02', 'MAR': '03', 'APR': '04', 'MAG': '05', 'GIU': '06',
@@ -209,13 +218,13 @@ export async function fetchAllData(): Promise<{
               };
             });
           }
-          if (Array.isArray(json.richieste) && json.richieste.length > 0) {
+          if (Array.isArray(json.richieste)) {
             liveRichieste = json.richieste;
           }
-          if (Array.isArray(json.segnalazioni) && json.segnalazioni.length > 0) {
+          if (Array.isArray(json.segnalazioni)) {
             liveSegnalazioni = json.segnalazioni;
           }
-          if (Array.isArray(json.proposte) && json.proposte.length > 0) {
+          if (Array.isArray(json.proposte)) {
             liveProposte = json.proposte;
           }
           if (Array.isArray(json.news) && json.news.length > 0) {
@@ -660,60 +669,88 @@ export async function adminCreateRichiesta(
 }
 
 export async function adminGetInsightStats(): Promise<import('../types').InsightData> {
+  const cfg = getWpConfig();
+  const apiBase = getEffectiveBaseUrl();
+
+  // Se la sincronizzazione live è attiva, interroga l'endpoint reale di WordPress
+  if (cfg.useLiveApi) {
+    try {
+      const resp = await fetch(`${apiBase}/wp-json/vp/v1/insights`, {
+        headers: {
+          'X-VP-Key': cfg.apiKey,
+        },
+      });
+      if (resp.ok) {
+        const json = await resp.json();
+        if (json.success) {
+          const totSegnalazioni = Number(json.totaleSegnalazioni) || 0;
+          const ris = Number(json.segnalazioniRisolte) || 0;
+          const inoltr = Number(json.segnalazioniInoltrate) || 0;
+          const ric = Number(json.segnalazioniRicevute) || 0;
+          const tasso = totSegnalazioni > 0 ? Math.round((ris / totSegnalazioni) * 100) : 0;
+          const vol = Number(json.volontariTotali) || 0;
+          const id = Number(json.ideeTotali) || 0;
+          const vot = Number(json.votiTotali) || 0;
+          const ev = Number(json.eventiTotali) || 0;
+          const part = Number(json.partecipantiEventi) || 0;
+
+          return {
+            totaleSegnalazioni: totSegnalazioni,
+            segnalazioniRisolte: ris,
+            segnalazioniInoltrate: inoltr,
+            segnalazioniRicevute: ric,
+            tassoRisoluzione: tasso,
+            trendMese: [],
+            categorieSegnalazioni: [],
+            volontariTotali: vol,
+            volontariAttivi: vol,
+            oreCivicheStimate: vol * 3,
+            volontariPerAttivita: [],
+            ideeTotali: id,
+            votiTotali: vot,
+            topProposte: [],
+            eventiTotali: ev,
+            partecipantiEventi: part,
+            tassoRiempimentoEventi: ev > 0 ? Math.round((part / Math.max(1, ev * 15)) * 100) : 0,
+          };
+        }
+      }
+    } catch (e) {
+      console.warn('Recupero insight live non riuscito, uso dati locali reali:', e);
+    }
+  }
+
   const store = getLocalDataStore();
 
-  const totaleSegnalazioni = Math.max(store.segnalazioni.length, 28);
-  const segnalazioniRisolte = store.segnalazioni.filter((s) => s.s === 3).length + 18;
-  const segnalazioniInoltrate = store.segnalazioni.filter((s) => s.s === 2).length + 5;
-  const segnalazioniRicevute = Math.max(2, totaleSegnalazioni - segnalazioniRisolte - segnalazioniInoltrate);
-  const tassoRisoluzione = Math.round((segnalazioniRisolte / Math.max(1, totaleSegnalazioni)) * 100);
+  const totaleSegnalazioni = store.segnalazioni.length;
+  const segnalazioniRisolte = store.segnalazioni.filter((s) => s.s === 3).length;
+  const segnalazioniInoltrate = store.segnalazioni.filter((s) => s.s === 2).length;
+  const segnalazioniRicevute = Math.max(0, totaleSegnalazioni - segnalazioniRisolte - segnalazioniInoltrate);
+  const tassoRisoluzione = totaleSegnalazioni > 0 ? Math.round((segnalazioniRisolte / totaleSegnalazioni) * 100) : 0;
 
-  // Trend mensile
-  const trendMese: import('../types').TrendMese[] = [
-    { mese: 'Mag', inviate: 3, risolte: 2, volontari: 8 },
-    { mese: 'Giu', inviate: 5, risolte: 4, volontari: 12 },
-    { mese: 'Lug', inviate: 4, risolte: 3, volontari: 15 },
-    { mese: 'Ago', inviate: 2, risolte: 2, volontari: 9 },
-    { mese: 'Set', inviate: 6, risolte: 5, volontari: 22 },
-    { mese: 'Ott', inviate: Math.max(8, store.segnalazioni.length), risolte: 6, volontari: 28 },
-  ];
+  // Volontari reali dalle adesioni
+  const volontariTotali = store.richieste.reduce((acc, r) => acc + (r.have || 0), 0);
+  const volontariAttivi = volontariTotali;
+  const oreCivicheStimate = volontariTotali * 3;
 
-  // Ripartizione categorie segnalazioni
-  const categorieSegnalazioni: import('../types').CategoriaInsight[] = [
-    { nome: 'Buche, Asfalto e Marciapiedi', count: 11, perc: 39, color: '#f59e0b' },
-    { nome: 'Parchi, Verde e Potature', count: 8, perc: 29, color: '#10b981' },
-    { nome: 'Illuminazione & Guasti Elettrici', count: 5, perc: 18, color: '#3b82f6' },
-    { nome: 'Rifiuti e Decoro Urbano', count: 4, perc: 14, color: '#ef4444' },
-  ];
+  // Proposte e voti reali
+  const ideeTotali = store.proposte.length;
+  const votiTotali = store.proposte.reduce((acc, p) => acc + (p.v || 0), 0);
+  const topProposte: import('../types').PropostaInsight[] = [...store.proposte]
+    .sort((a, b) => b.v - a.v)
+    .slice(0, 5)
+    .map((p) => ({
+      id: p.id,
+      titolo: p.t,
+      voti: p.v,
+      stato: 'In votazione',
+    }));
 
-  // Volontariato
-  const volontariTotali = 34;
-  const volontariAttivi = 28;
-  const oreCivicheStimate = 96;
-  const volontariPerAttivita: import('../types').AttivitaVolontariInsight[] = [
-    { nome: 'Cura del verde e parchi', count: 14, perc: 41 },
-    { nome: 'Eventi e feste di quartiere', count: 11, perc: 32 },
-    { nome: 'Decoro Urbano', count: 9, perc: 26 },
-    { nome: 'Raccolta beni e solidarietà', count: 8, perc: 24 },
-    { nome: 'Logistica e piccoli lavori manuali', count: 7, perc: 21 },
-    { nome: 'Comunicazione foto e social', count: 5, perc: 15 },
-  ];
-
-  // Idee e proposte
-  const ideeTotali = Math.max(store.proposte.length, 14);
-  const votiTotali = store.proposte.reduce((acc, p) => acc + p.v, 0) + 120;
-  const topProposte: import('../types').PropostaInsight[] = store.proposte.map((p, idx) => ({
-    id: p.id,
-    titolo: p.t,
-    voti: p.v,
-    stato: idx === 1 ? 'Inoltrata' : idx === 0 ? 'Approvata' : 'In votazione',
-  }));
-
-  // Eventi
+  // Eventi reali
   const eventiTotali = store.eventi.length;
   const partecipantiEventi = store.eventi.reduce((acc, e) => acc + (e.n || 0), 0);
   const targetTotale = store.eventi.reduce((acc, e) => acc + (e.target || 10), 0);
-  const tassoRiempimentoEventi = targetTotale > 0 ? Math.round((partecipantiEventi / targetTotale) * 100) : 80;
+  const tassoRiempimentoEventi = targetTotale > 0 ? Math.round((partecipantiEventi / targetTotale) * 100) : 0;
 
   return {
     totaleSegnalazioni,
@@ -721,12 +758,12 @@ export async function adminGetInsightStats(): Promise<import('../types').Insight
     segnalazioniInoltrate,
     segnalazioniRicevute,
     tassoRisoluzione,
-    trendMese,
-    categorieSegnalazioni,
+    trendMese: [],
+    categorieSegnalazioni: [],
     volontariTotali,
     volontariAttivi,
     oreCivicheStimate,
-    volontariPerAttivita,
+    volontariPerAttivita: [],
     ideeTotali,
     votiTotali,
     topProposte,

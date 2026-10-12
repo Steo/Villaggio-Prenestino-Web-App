@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { PropostaCittadina } from '../types';
 import { NUMERI_UTILI } from '../data/mockData';
 import {
@@ -8,6 +8,10 @@ import {
   PhoneCall,
   ShieldAlert,
   CheckCircle2,
+  Trophy,
+  ChevronLeft,
+  ChevronRight,
+  TrendingUp,
 } from 'lucide-react';
 
 interface ProposteAltroTabProps {
@@ -26,6 +30,22 @@ export const ProposteAltroTab: React.FC<ProposteAltroTabProps> = ({
   const [nuovaIdea, setNuovaIdea] = useState('');
   const [loading, setLoading] = useState(false);
   const [inviataSuccesso, setInviataSuccesso] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
+
+  const ITEMS_PER_PAGE = 3;
+
+  // Ordina le proposte per numero di "Mi piace" decrescente (più votate per prime)
+  const sortedProposte = useMemo(() => {
+    return [...proposte].sort((a, b) => b.v - a.v);
+  }, [proposte]);
+
+  const totalPages = Math.ceil(sortedProposte.length / ITEMS_PER_PAGE) || 1;
+  const safeActiveTab = Math.min(activeTab, Math.max(0, totalPages - 1));
+
+  const visibleProposte = useMemo(() => {
+    const start = safeActiveTab * ITEMS_PER_PAGE;
+    return sortedProposte.slice(start, start + ITEMS_PER_PAGE);
+  }, [sortedProposte, safeActiveTab]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,57 +118,177 @@ export const ProposteAltroTab: React.FC<ProposteAltroTabProps> = ({
         </div>
       </section>
 
-      {/* BOX 2: IDEE DA VOTARE (Mantiene lo stile card attuale con votazione) */}
-      <section className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-3">
-        <div className="flex items-center justify-between">
+      {/* BOX 2: IDEE DA VOTARE CON NAVIGAZIONE A TAB (3 IDEE PER PAGINA ORDINATE PER MI PIACE) */}
+      <section className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div>
             <h3 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#781816' }} />
-              Idee già proposte dai cittadini
+              Idee dei cittadini
+              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                <TrendingUp className="w-3 h-3 text-emerald-600" />
+                Ordinate per "Mi piace"
+              </span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Vota con un "Mi piace" per sostenere le proposte che ritieni più utili
+              Sostieni le proposte che ritieni prioritarie per la crescita del quartiere
             </p>
           </div>
-          <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
-            {proposte.length} idee
-          </span>
+          <div className="flex items-center gap-1.5 self-start sm:self-auto">
+            <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
+              {sortedProposte.length} idee totali
+            </span>
+          </div>
         </div>
 
-        {/* Elenco Proposte */}
-        <div className="space-y-2 pt-1">
-          {proposte.map((p) => {
+        {/* BARRA DI NAVIGAZIONE A TAB (3 Idee per Scheda/Pagina) */}
+        {totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-slate-50/80 p-2 rounded-xl border border-slate-200/80">
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mr-1 shrink-0 hidden sm:inline">
+                Schede:
+              </span>
+              {Array.from({ length: totalPages }, (_, idx) => {
+                const isActive = idx === safeActiveTab;
+                const startNum = idx * ITEMS_PER_PAGE + 1;
+                const endNum = Math.min((idx + 1) * ITEMS_PER_PAGE, sortedProposte.length);
+
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setActiveTab(idx)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                      isActive
+                        ? 'bg-[#781816] text-white shadow-xs'
+                        : 'bg-white hover:bg-slate-200/80 text-slate-700 border border-slate-200/80'
+                    }`}
+                  >
+                    {idx === 0 && <Trophy className={`w-3 h-3 ${isActive ? 'text-amber-300' : 'text-amber-500'}`} />}
+                    <span>
+                      {idx === 0 ? `Top ${startNum}-${endNum}` : `${startNum} - ${endNum}`}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Frecce Rapide Precedente / Successiva */}
+            <div className="flex items-center justify-between sm:justify-end gap-1.5 shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-200">
+              <button
+                type="button"
+                disabled={safeActiveTab === 0}
+                onClick={() => setActiveTab((prev) => Math.max(0, prev - 1))}
+                className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition cursor-pointer"
+                title="Scheda precedente"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Prec.</span>
+              </button>
+
+              <span className="text-[11px] font-bold text-slate-500 px-1">
+                {safeActiveTab + 1} / {totalPages}
+              </span>
+
+              <button
+                type="button"
+                disabled={safeActiveTab >= totalPages - 1}
+                onClick={() => setActiveTab((prev) => Math.min(totalPages - 1, prev + 1))}
+                className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition cursor-pointer"
+                title="Scheda successiva"
+              >
+                <span className="hidden sm:inline">Succ.</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Elenco Proposte (3 per pagina / tab ordinate per Mi piace) */}
+        <div className="space-y-2.5 pt-0.5">
+          {visibleProposte.map((p) => {
             const hasVoted = votedProposte.includes(p.id);
+            // Posizione in classifica generale
+            const rank = sortedProposte.findIndex((item) => item.id === p.id) + 1;
 
             return (
               <div
                 key={p.id}
-                className="p-3.5 rounded-xl border border-slate-200 bg-white transition flex items-center justify-between gap-3 hover:border-slate-300"
+                className="p-3.5 rounded-xl border border-slate-200 bg-white transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-slate-300 shadow-2xs"
               >
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Badge Posizione Classifica */}
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
+                        rank === 1
+                          ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                          : rank === 2
+                          ? 'bg-slate-100 text-slate-800 border border-slate-300'
+                          : rank === 3
+                          ? 'bg-orange-100 text-orange-900 border border-orange-300'
+                          : 'bg-slate-50 text-slate-600 border border-slate-200'
+                      }`}
+                    >
+                      {rank === 1 && <Trophy className="w-3 h-3 text-amber-600" />}
+                      #{rank} {rank === 1 ? 'Più votata' : 'Classifica'}
+                    </span>
+
+                    <span className="text-[11px] text-slate-500 font-semibold inline-block">
+                      <strong className="text-slate-900 font-bold">{p.v}</strong> {p.v === 1 ? 'cittadino d\'accordo' : 'cittadini d\'accordo'}
+                    </span>
+                  </div>
+
                   <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
                     {p.t}
                   </h4>
-                  <span className="text-[11px] text-slate-500 font-semibold mt-0.5 inline-block">
-                    <strong className="text-slate-800">{p.v}</strong> cittadini d'accordo
-                  </span>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => onVoteProposta(p)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                    hasVoted
-                      ? 'bg-amber-100 text-amber-950 border border-amber-300'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                  }`}
-                >
-                  <ThumbsUp className={`w-3.5 h-3.5 ${hasVoted ? 'fill-amber-600 text-amber-600' : ''}`} />
-                  {hasVoted ? 'Votato ✓' : 'Mi piace'}
-                </button>
+                {/* Pulsante Mi Piace (Il contatore si ferma al primo click) */}
+                <div className="shrink-0 flex items-center justify-between sm:justify-end gap-2 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                  <button
+                    type="button"
+                    disabled={hasVoted}
+                    onClick={() => onVoteProposta(p)}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 ${
+                      hasVoted
+                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 cursor-default opacity-95 shadow-2xs'
+                        : 'bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 cursor-pointer shadow-2xs'
+                    }`}
+                    title={
+                      hasVoted
+                        ? 'Hai già votato questa idea (il tuo voto è registrato)'
+                        : 'Clicca per votare con un "Mi piace"'
+                    }
+                  >
+                    {hasVoted ? (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>Votato ✓</span>
+                      </>
+                    ) : (
+                      <>
+                        <ThumbsUp className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                        <span>Mi piace</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             );
           })}
+        </div>
+
+        {/* Dettaglio footer con indicazione paginazione */}
+        <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium pt-1 px-1">
+          <span>
+            Visualizzate {visibleProposte.length} di {sortedProposte.length} proposte (3 per scheda)
+          </span>
+          {totalPages > 1 && (
+            <span className="text-slate-500 font-semibold">
+              Scheda {safeActiveTab + 1} di {totalPages}
+            </span>
+          )}
         </div>
       </section>
 
@@ -201,12 +341,6 @@ export const ProposteAltroTab: React.FC<ProposteAltroTabProps> = ({
           })}
         </div>
       </section>
-
-      {/* Info Associazione */}
-      <footer className="text-center text-xs text-slate-500 py-2">
-        <p>Comunità di Quartiere Villaggio Prenestino (Roma Municipio VI)</p>
-        <p className="text-[11px] text-slate-400 mt-0.5">www.villaggioprenestino.it</p>
-      </footer>
     </div>
   );
 };

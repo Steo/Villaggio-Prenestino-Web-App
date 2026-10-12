@@ -20,6 +20,7 @@ import {
   CreditCard,
   Ticket,
 } from 'lucide-react';
+import { ClassificaCittadini } from './ClassificaCittadini';
 
 interface HomeTabProps {
   news: WpArticle[];
@@ -32,6 +33,8 @@ interface HomeTabProps {
   darkMode?: boolean;
   onOpenWpPanel?: () => void;
   isAdmin?: boolean;
+  onOpenPuntiModal?: () => void;
+  onUpdateUserNome?: (nome: string) => void;
 }
 
 export const HomeTab: React.FC<HomeTabProps> = ({
@@ -45,6 +48,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   darkMode,
   onOpenWpPanel,
   isAdmin = false,
+  onOpenPuntiModal,
+  onUpdateUserNome,
 }) => {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -423,6 +428,15 @@ export const HomeTab: React.FC<HomeTabProps> = ({
           })}
         </div>
       </section>
+
+      {/* SEZIONE: Classifica dei Cittadini Attivi (Top 5 con più Punti Civici) */}
+      <ClassificaCittadini
+        interactions={interactions}
+        onSelectTab={onSelectTab}
+        onOpenPuntiModal={onOpenPuntiModal}
+        onUpdateUserNome={onUpdateUserNome}
+        darkMode={darkMode}
+      />
 
       {/* BANNER: Canale WhatsApp Ufficiale del Quartiere */}
       <section className="relative overflow-hidden rounded-3xl p-5 sm:p-6 shadow-md border border-emerald-600/30 text-white bg-gradient-to-br from-emerald-900 via-emerald-950 to-slate-950">

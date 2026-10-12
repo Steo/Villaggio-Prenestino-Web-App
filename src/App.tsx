@@ -33,6 +33,7 @@ import { VolunteerContactModal } from './components/VolunteerContactModal';
 import { PhotoLightbox } from './components/PhotoLightbox';
 import { WpPluginPanel } from './components/WpPluginPanel';
 import { AdminAccessModal } from './components/AdminAccessModal';
+import { PuntiCiviciModal } from './components/PuntiCiviciModal';
 
 import {
   Home,
@@ -121,6 +122,7 @@ export default function App() {
     return false;
   });
   const [adminAccessModalOpen, setAdminAccessModalOpen] = useState(false);
+  const [puntiModalOpen, setPuntiModalOpen] = useState(false);
 
   // Toast feedback
   const [toast, setToast] = useState<string | null>(null);
@@ -128,6 +130,19 @@ export default function App() {
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3500);
+  };
+
+  const handleUpdateUserNome = (nome: string) => {
+    const updated: UserInteractions = {
+      ...interactions,
+      contattiSalvati: {
+        nome,
+        telefono: interactions.contattiSalvati?.telefono || '',
+      },
+    };
+    setInteractions(updated);
+    saveUserInteractions(updated);
+    showToast(`Nome salvato per la classifica: ${nome}`);
   };
 
   const handleActivateAdmin = () => {
@@ -302,36 +317,27 @@ export default function App() {
     setPendingAction(null);
   };
 
-  // Votazione Proposta
+  // Votazione Proposta (il contatore si ferma al primo click e non incrementa oltre)
   const handleVoteProposta = (proposta: PropostaCittadina) => {
     const alreadyVoted = interactions.proposteVotate.includes(proposta.id);
 
+    // Se l'utente ha già votato questa proposta, il click non fa aumentare ulteriormente il contatore
     if (alreadyVoted) {
-      submitInteraction({ tipo: 'proposta_vota', postId: proposta.id, annulla: true });
-      const updated = {
-        ...interactions,
-        proposteVotate: interactions.proposteVotate.filter((id) => id !== proposta.id),
-      };
-      setInteractions(updated);
-      saveUserInteractions(updated);
-
-      setProposte((prev) =>
-        prev.map((p) => (p.id === proposta.id ? { ...p, v: Math.max(0, p.v - 1) } : p))
-      );
-    } else {
-      submitInteraction({ tipo: 'proposta_vota', postId: proposta.id });
-      const updated = {
-        ...interactions,
-        proposteVotate: [...interactions.proposteVotate, proposta.id],
-      };
-      setInteractions(updated);
-      saveUserInteractions(updated);
-
-      setProposte((prev) =>
-        prev.map((p) => (p.id === proposta.id ? { ...p, v: p.v + 1 } : p))
-      );
-      addPunti(2, 'Voto proposta');
+      return;
     }
+
+    submitInteraction({ tipo: 'proposta_vota', postId: proposta.id });
+    const updated = {
+      ...interactions,
+      proposteVotate: [...interactions.proposteVotate, proposta.id],
+    };
+    setInteractions(updated);
+    saveUserInteractions(updated);
+
+    setProposte((prev) =>
+      prev.map((p) => (p.id === proposta.id ? { ...p, v: p.v + 1 } : p))
+    );
+    addPunti(2, 'Voto proposta');
   };
 
   // Nuova Segnalazione
@@ -390,6 +396,7 @@ export default function App() {
         onOpenWpPanel={() => setWpPanelOpen(true)}
         isAdmin={isAdmin}
         onOpenAdminAccessModal={() => setAdminAccessModalOpen(true)}
+        onOpenPuntiModal={() => setPuntiModalOpen(true)}
       />
 
       {/* Contenuto Principale */}
@@ -406,6 +413,8 @@ export default function App() {
             darkMode={darkMode}
             onOpenWpPanel={() => setWpPanelOpen(true)}
             isAdmin={isAdmin}
+            onOpenPuntiModal={() => setPuntiModalOpen(true)}
+            onUpdateUserNome={handleUpdateUserNome}
           />
         )}
 
@@ -588,6 +597,14 @@ export default function App() {
         isAdmin={isAdmin}
         onActivateAdmin={handleActivateAdmin}
         onDeactivateAdmin={handleDeactivateAdmin}
+        darkMode={darkMode}
+      />
+
+      {/* Modal Sistema Punti Civici Gamification */}
+      <PuntiCiviciModal
+        isOpen={puntiModalOpen}
+        onClose={() => setPuntiModalOpen(false)}
+        puntiCivici={interactions.puntiCivici}
         darkMode={darkMode}
       />
     </div>
