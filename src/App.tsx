@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   WpArticle,
   EventoQuartiere,
@@ -8,6 +8,8 @@ import {
   CandidaturaVolontario,
   UserInteractions,
   TipoEvento,
+  AppNotification,
+  StatoSegnalazione,
 } from './types';
 import {
   fetchAllData,
@@ -23,6 +25,15 @@ import {
   adminUpdateSegnalazioneStato,
   adminCreateRichiesta,
 } from './services/wpService';
+import {
+  triggerNotification,
+  getStoredNotifications,
+  markAllNotificationsAsRead,
+  clearAllNotifications,
+  isNotificationSupported,
+  getNotificationPermission,
+  requestBrowserNotificationPermission,
+} from './services/notificationService';
 import { Header } from './components/Header';
 import { HomeTab } from './components/HomeTab';
 import { EventiTab } from './components/EventiTab';
@@ -34,6 +45,13 @@ import { PhotoLightbox } from './components/PhotoLightbox';
 import { WpPluginPanel } from './components/WpPluginPanel';
 import { AdminAccessModal } from './components/AdminAccessModal';
 import { PuntiCiviciModal } from './components/PuntiCiviciModal';
+import { NotificationCenterModal } from './components/NotificationCenterModal';
+import {
+  NuovoLivelloModal,
+  LivelloCommunity,
+  getLivelloFromPunti,
+  LIVELLO_RANKS,
+} from './components/NuovoLivelloModal';
 
 import {
   Home,
@@ -123,6 +141,154 @@ export default function App() {
   });
   const [adminAccessModalOpen, setAdminAccessModalOpen] = useState(false);
   const [puntiModalOpen, setPuntiModalOpen] = useState(false);
+  const [levelUpModalOpen, setLevelUpModalOpen] = useState(false);
+  const [unlockedLevel, setUnlockedLevel] = useState<LivelloCommunity>('Vicino Attivo');
+  const [unlockedLevelPoints, setUnlockedLevelPoints] = useState<number>(0);
+
+  // Centro Notifiche del Browser
+  const [notificationModalOpen, setNotificationModalOpen] = useState(false);
+  const [notifications, setNotifications] = useState<AppNotification[]>(getStoredNotifications);
+
+  // Snapshot precedenti per rilevare variazioni sui dati salvati / sincronizzati
+  const prevProposalVotesRef = useRef<Record<number, number>>({});
+  const prevReportStatusesRef = useRef<Record<number, StatoSegnalazione>>({});
+  const isInitialProposteLoad = useRef(true);
+  const isInitialSegnalazioniLoad = useRef(true);
+
+  // Sincronizzazione notifiche all'evento globale
+  useEffect(() => {
+    const handleNewNotif = () => {
+      setNotifications(getStoredNotifications());
+    };
+    window.addEventListener('cdq:new-notification', handleNewNotif);
+    return () => {
+      window.removeEventListener('cdq:new-notification', handleNewNotif);
+    };
+  }, []);
+
+  // Monitoraggio variazioni voti su "le mie proposte"
+  useEffect(() => {
+    if (proposte.length === 0) return;
+
+    if (isInitialProposteLoad.current) {
+      proposte.forEach((p) => {
+        prevProposalVotesRef.current[p.id] = p.v;
+      });
+      isInitialProposteLoad.current = false;
+      return;
+    }
+
+    const miePropIds = interactions.mieProposte || [];
+    proposte.forEach((p) => {
+      if (miePropIds.includes(p.id)) {
+        const prevVotes = prevProposalVotesRef.current[p.id];
+        if (prevVotes !== undefined && p.v > prevVotes) {
+          const delta = p.v - prevVotes;
+          triggerNotification({
+            tipo: 'proposta_voti',
+            titolo: '🎉 Nuovi voti per la tua proposta!',
+            messaggio: `La tua proposta "${p.t}" ha ricevuto ${delta === 1 ? '1 nuovo voto' : `${delta} nuovi voti`} dalla comunità! (Totale: ${p.v} voti)`,
+            targetId: p.id,
+          });
+          showToast(`🔔 Notifica browser: Nuovi voti per "${p.t.substring(0, 26)}..."`);
+        }
+      }
+      prevProposalVotesRef.current[p.id] = p.v;
+    });
+  }, [proposte, interactions.mieProposte]);
+
+  // Monitoraggio variazioni stato su "le mie segnalazioni"
+  useEffect(() => {
+    if (segnalazioni.length === 0) return;
+
+    if (isInitialSegnalazioniLoad.current) {
+      segnalazioni.forEach((s) => {
+        prevReportStatusesRef.current[s.id] = s.s;
+      });
+      isInitialSegnalazioniLoad.current = false;
+      return;
+    }
+
+    const mieSegnIds = interactions.mieSegnalazioni || [];
+    segnalazioni.forEach((s) => {
+      if (mieSegnIds.includes(s.id)) {
+        const prevStato = prevReportStatusesRef.current[s.id];
+        if (prevStato !== undefined && s.s !== prevStato) {
+          const statoTesto =
+            s.s === 1
+              ? 'Ricevuta dall\'Associazione'
+              : s.s === 2
+              ? 'Inoltrata all\'ente preposto (Municipio VI)'
+              : 'Risolta con successo!';
+          triggerNotification({
+            tipo: 'segnalazione_stato',
+            titolo: '📋 Aggiornamento Segnalazione!',
+            messaggio: `La tua segnalazione "${s.t}" è passata allo stato: ${statoTesto}.`,
+            targetId: s.id,
+          });
+          showToast(`🔔 Notifica browser: Segnalazione passata a "${statoTesto}"`);
+        }
+      }
+      prevReportStatusesRef.current[s.id] = s.s;
+    });
+  }, [segnalazioni, interactions.mieSegnalazioni]);
+
+  // Simulazione Nuovo Voto per una proposta dell'utente (per test rapido notifiche)
+  const handleSimulateProposalVote = (targetProposalId?: number) => {
+    const targetId =
+      targetProposalId ||
+      (interactions.mieProposte && interactions.mieProposte[0]) ||
+      (proposte[0] ? proposte[0].id : 1);
+
+    if (!interactions.mieProposte?.includes(targetId)) {
+      const updated = {
+        ...interactions,
+        mieProposte: [...(interactions.mieProposte || []), targetId],
+      };
+      setInteractions(updated);
+      saveUserInteractions(updated);
+    }
+
+    setProposte((prev) =>
+      prev.map((p) => (p.id === targetId ? { ...p, v: p.v + 1 } : p))
+    );
+  };
+
+  // Simulazione Avanzamento Stato per una segnalazione dell'utente (per test rapido notifiche)
+  const handleSimulateReportStatusChange = async (targetReportId?: number) => {
+    const targetId =
+      targetReportId ||
+      (interactions.mieSegnalazioni && interactions.mieSegnalazioni[0]) ||
+      (segnalazioni[0] ? segnalazioni[0].id : 1);
+
+    if (!interactions.mieSegnalazioni?.includes(targetId)) {
+      const updated = {
+        ...interactions,
+        mieSegnalazioni: [...(interactions.mieSegnalazioni || []), targetId],
+      };
+      setInteractions(updated);
+      saveUserInteractions(updated);
+    }
+
+    const segCorrente = segnalazioni.find((s) => s.id === targetId);
+    const prossimoStato: StatoSegnalazione =
+      !segCorrente || segCorrente.s === 3 ? 1 : ((segCorrente.s + 1) as StatoSegnalazione);
+
+    await adminUpdateSegnalazioneStato(targetId, prossimoStato);
+    setSegnalazioni((prev) =>
+      prev.map((s) => (s.id === targetId ? { ...s, s: prossimoStato } : s))
+    );
+  };
+
+  // Test invio notifica generica di prova
+  const handleTestNotification = () => {
+    triggerNotification({
+      tipo: 'sistema',
+      titolo: '🔔 Test Notifiche Quartiere',
+      messaggio: 'Il sistema di notifica è attivo e sincronizzato con il tuo browser!',
+    });
+    showToast('🔔 Notifica di test inviata!');
+  };
 
   // Toast feedback
   const [toast, setToast] = useState<string | null>(null);
@@ -197,16 +363,55 @@ export default function App() {
     } catch {
       // ignore
     }
+
+    // Inizializza il livello noto al primo avvio per evitare popup non richiesti
+    try {
+      const stored = localStorage.getItem('vp_last_known_level');
+      if (!stored) {
+        const currentLevel = getLivelloFromPunti(interactions.puntiCivici);
+        localStorage.setItem('vp_last_known_level', currentLevel);
+      }
+    } catch {
+      // ignore
+    }
   }, []);
 
   const addPunti = (punti: number, motivazione: string) => {
+    const oldPunti = interactions.puntiCivici;
+    const newPunti = oldPunti + punti;
     const updated = {
       ...interactions,
-      puntiCivici: interactions.puntiCivici + punti,
+      puntiCivici: newPunti,
     };
     setInteractions(updated);
     saveUserInteractions(updated);
     showToast(`+${punti} punti: ${motivazione}`);
+
+    // Verifica se il volontario raggiunge un nuovo livello della community
+    const oldLevel = getLivelloFromPunti(oldPunti);
+    const newLevel = getLivelloFromPunti(newPunti);
+
+    let lastKnownLevel: LivelloCommunity = oldLevel;
+    try {
+      const stored = localStorage.getItem('vp_last_known_level') as LivelloCommunity | null;
+      if (stored && LIVELLO_RANKS[stored] !== undefined) {
+        lastKnownLevel = stored;
+      }
+    } catch {
+      // ignore
+    }
+
+    if (LIVELLO_RANKS[newLevel] > LIVELLO_RANKS[lastKnownLevel]) {
+      // Passaggio di livello: mostra il pop up congratulazioni con i colori del livello raggiunto
+      setUnlockedLevel(newLevel);
+      setUnlockedLevelPoints(newPunti);
+      setLevelUpModalOpen(true);
+      try {
+        localStorage.setItem('vp_last_known_level', newLevel);
+      } catch {
+        // ignore
+      }
+    }
   };
 
   // Gestione Adesione a Richiesta di Volontariato ("Serve una mano")
@@ -349,15 +554,41 @@ export default function App() {
     nome?: string;
     telefono?: string;
   }) => {
-    await submitSegnalazione(data);
+    const res = await submitSegnalazione(data);
+    const updatedMie = Array.from(new Set([...(interactions.mieSegnalazioni || []), res.newId]));
+    const updated = {
+      ...interactions,
+      mieSegnalazioni: updatedMie,
+    };
+    setInteractions(updated);
+    saveUserInteractions(updated);
     addPunti(5, 'Segnalazione inviata');
+
+    // Richiedi permessi notifiche browser se in stato default per avvisarlo dei futuri cambi di stato
+    if (isNotificationSupported() && getNotificationPermission() === 'default') {
+      requestBrowserNotificationPermission();
+    }
+
     loadData();
   };
 
   // Nuova Proposta
   const handleSubmitProposta = async (titolo: string) => {
-    await submitProposta(titolo);
+    const res = await submitProposta(titolo);
+    const updatedMie = Array.from(new Set([...(interactions.mieProposte || []), res.newId]));
+    const updated = {
+      ...interactions,
+      mieProposte: updatedMie,
+    };
+    setInteractions(updated);
+    saveUserInteractions(updated);
     addPunti(5, 'Proposta inviata');
+
+    // Richiedi permessi notifiche browser se in stato default per avvisarlo di nuovi voti
+    if (isNotificationSupported() && getNotificationPermission() === 'default') {
+      requestBrowserNotificationPermission();
+    }
+
     loadData();
   };
 
@@ -397,6 +628,8 @@ export default function App() {
         isAdmin={isAdmin}
         onOpenAdminAccessModal={() => setAdminAccessModalOpen(true)}
         onOpenPuntiModal={() => setPuntiModalOpen(true)}
+        unreadNotificationsCount={notifications.filter((n) => !n.letta).length}
+        onOpenNotifications={() => setNotificationModalOpen(true)}
       />
 
       {/* Contenuto Principale */}
@@ -429,8 +662,10 @@ export default function App() {
         {activeTab === 'segnalazioni' && (
           <SegnalazioniTab
             segnalazioni={segnalazioni}
+            mieSegnalazioni={interactions.mieSegnalazioni}
             onSubmitSegnalazione={handleSubmitSegnalazione}
             onOpenPhoto={(url) => setLightboxPhoto(url)}
+            onAdvanceSegnalazioneStato={handleSimulateReportStatusChange}
           />
         )}
 
@@ -449,8 +684,10 @@ export default function App() {
           <ProposteAltroTab
             proposte={proposte}
             votedProposte={interactions.proposteVotate}
+            mieProposte={interactions.mieProposte}
             onVoteProposta={handleVoteProposta}
             onSubmitProposta={handleSubmitProposta}
+            onSimulateVoteForProposal={handleSimulateProposalVote}
           />
         )}
       </main>
@@ -606,6 +843,44 @@ export default function App() {
         onClose={() => setPuntiModalOpen(false)}
         puntiCivici={interactions.puntiCivici}
         darkMode={darkMode}
+        onPreviewLevel={(liv) => {
+          setUnlockedLevel(liv);
+          setUnlockedLevelPoints(interactions.puntiCivici);
+          setLevelUpModalOpen(true);
+        }}
+      />
+
+      {/* Pop up Celebrativo Passaggio di Livello della Community */}
+      <NuovoLivelloModal
+        isOpen={levelUpModalOpen}
+        onClose={() => setLevelUpModalOpen(false)}
+        livello={unlockedLevel}
+        punti={unlockedLevelPoints || interactions.puntiCivici}
+        darkMode={darkMode}
+      />
+
+      {/* Centro Notifiche del Browser */}
+      <NotificationCenterModal
+        isOpen={notificationModalOpen}
+        onClose={() => setNotificationModalOpen(false)}
+        notifications={notifications}
+        onMarkAllAsRead={() => {
+          markAllNotificationsAsRead();
+          setNotifications(getStoredNotifications());
+          showToast('Tutte le notifiche contrassegnate come lette');
+        }}
+        onClearAll={() => {
+          clearAllNotifications();
+          setNotifications([]);
+          showToast('Storico notifiche svuotato');
+        }}
+        onTestNotification={handleTestNotification}
+        onSimulateProposalVote={handleSimulateProposalVote}
+        onSimulateReportStatusChange={handleSimulateReportStatusChange}
+        darkMode={darkMode}
+        onPermissionChange={() => {
+          showToast('Stato permessi notifiche aggiornato!');
+        }}
       />
     </div>
   );

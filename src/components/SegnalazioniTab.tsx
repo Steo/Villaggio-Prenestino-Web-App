@@ -11,10 +11,13 @@ import {
   Filter,
   Image as ImageIcon,
   Info,
+  Sparkles,
+  BellRing,
 } from 'lucide-react';
 
 interface SegnalazioniTabProps {
   segnalazioni: SegnalazioneCittadina[];
+  mieSegnalazioni?: number[];
   onSubmitSegnalazione: (data: {
     titolo: string;
     luogo: string;
@@ -24,12 +27,15 @@ interface SegnalazioniTabProps {
     telefono?: string;
   }) => Promise<void>;
   onOpenPhoto: (url: string) => void;
+  onAdvanceSegnalazioneStato?: (id: number) => void;
 }
 
 export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
   segnalazioni,
+  mieSegnalazioni = [],
   onSubmitSegnalazione,
   onOpenPhoto,
+  onAdvanceSegnalazioneStato,
 }) => {
   const [mostraForm, setMostraForm] = useState(false);
   const [filtroStato, setFiltroStato] = useState<number>(0);
@@ -454,7 +460,15 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
               className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-xs space-y-2.5"
             >
               <div className="flex flex-wrap items-center justify-between gap-1.5">
-                {getStatoBadge(seg.s)}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {getStatoBadge(seg.s)}
+                  {mieSegnalazioni.includes(seg.id) && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-300">
+                      <Sparkles className="w-3 h-3 text-rose-600" />
+                      La tua segnalazione
+                    </span>
+                  )}
+                </div>
                 <span className="text-[11px] text-slate-400">{seg.data}</span>
               </div>
 
@@ -472,6 +486,21 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
                 <p className="text-xs text-slate-600 leading-relaxed">
                   {seg.desc}
                 </p>
+              )}
+
+              {/* Pulsante di avanzamento stato per testare la notifica del browser */}
+              {mieSegnalazioni.includes(seg.id) && onAdvanceSegnalazioneStato && (
+                <div className="pt-1 flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => onAdvanceSegnalazioneStato(seg.id)}
+                    title="Simula il passaggio di stato di questa tua segnalazione per testare l'avviso del browser"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-sky-50 hover:bg-sky-100 border border-sky-300 text-sky-900 transition active:scale-95 shadow-2xs cursor-pointer"
+                  >
+                    <BellRing className="w-3 h-3 text-sky-600" />
+                    <span>Simula cambio stato segnalazione (Notifica)</span>
+                  </button>
+                </div>
               )}
 
               {/* Foto allegate */}

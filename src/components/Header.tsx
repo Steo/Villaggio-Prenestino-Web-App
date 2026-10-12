@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Award, Moon, Sun, ShieldCheck } from 'lucide-react';
+import { Award, Moon, Sun, ShieldCheck, Bell } from 'lucide-react';
 import { UserInteractions } from '../types';
 import { LogoCdq } from './LogoCdq';
 import { PuntiCiviciModal } from './PuntiCiviciModal';
@@ -12,6 +12,8 @@ interface HeaderProps {
   isAdmin?: boolean;
   onOpenAdminAccessModal?: () => void;
   onOpenPuntiModal?: () => void;
+  unreadNotificationsCount?: number;
+  onOpenNotifications?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -22,6 +24,8 @@ export const Header: React.FC<HeaderProps> = ({
   isAdmin = false,
   onOpenAdminAccessModal,
   onOpenPuntiModal,
+  unreadNotificationsCount = 0,
+  onOpenNotifications,
 }) => {
   const [isPuntiModalOpen, setIsPuntiModalOpen] = useState(false);
   const logoTapCountRef = useRef(0);
@@ -84,6 +88,26 @@ export const Header: React.FC<HeaderProps> = ({
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
               </button>
             )}
+
+            {/* Tasto Notifiche Browser & Centro Avvisi */}
+            <button
+              type="button"
+              onClick={onOpenNotifications}
+              title={
+                unreadNotificationsCount > 0
+                  ? `Hai ${unreadNotificationsCount} nuove notifiche sul quartiere`
+                  : 'Centro Notifiche: ricevi avvisi su voti e stato segnalazioni'
+              }
+              aria-label={`Notifiche. ${unreadNotificationsCount} non lette`}
+              className="relative flex items-center justify-center w-8 h-8 rounded-xl bg-black/20 hover:bg-black/35 active:scale-95 border border-white/20 hover:border-amber-400/50 text-white transition-all shadow-xs cursor-pointer group focus:outline-none focus:ring-2 focus:ring-amber-400/50"
+            >
+              <Bell className="w-4 h-4 text-white/90 group-hover:text-amber-300 transition-colors" />
+              {unreadNotificationsCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-amber-400 text-slate-950 font-black text-[9px] shadow-md animate-pulse">
+                  {unreadNotificationsCount}
+                </span>
+              )}
+            </button>
 
             {/* Tasto Contatore Punti Civici - Apre il popup esplicativo */}
             <button

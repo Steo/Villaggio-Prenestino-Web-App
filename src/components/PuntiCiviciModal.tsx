@@ -20,6 +20,7 @@ interface PuntiCiviciModalProps {
   onClose: () => void;
   puntiCivici: number;
   darkMode?: boolean;
+  onPreviewLevel?: (livello: 'Nuovo Vicino' | 'Vicino Attivo' | 'Pilastro' | 'Custode') => void;
 }
 
 interface LivelloInfo {
@@ -133,6 +134,7 @@ export const PuntiCiviciModal: React.FC<PuntiCiviciModalProps> = ({
   onClose,
   puntiCivici,
   darkMode = false,
+  onPreviewLevel,
 }) => {
   // Chiudi con il tasto ESC
   useEffect(() => {
@@ -378,20 +380,38 @@ export const PuntiCiviciModal: React.FC<PuntiCiviciModalProps> = ({
                         Tuo livello
                       </span>
                     )}
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-2xl leading-none">{liv.badge}</span>
-                      <div>
-                        <div
-                          className={`font-extrabold text-sm ${
-                            darkMode ? 'text-white' : 'text-slate-950'
-                          }`}
-                        >
-                          {liv.nome}
-                        </div>
-                        <div className={`inline-block px-2 py-0.5 rounded-md text-[11px] font-bold mt-0.5 border ${liv.badgeBg}`}>
-                          {liv.max === null ? `${liv.min}+ punti` : `${liv.min} - ${liv.max} punti`}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-2xl leading-none">{liv.badge}</span>
+                        <div>
+                          <div
+                            className={`font-extrabold text-sm ${
+                              darkMode ? 'text-white' : 'text-slate-950'
+                            }`}
+                          >
+                            {liv.nome}
+                          </div>
+                          <div className={`inline-block px-2 py-0.5 rounded-md text-[11px] font-bold mt-0.5 border ${liv.badgeBg}`}>
+                            {liv.max === null ? `${liv.min}+ punti` : `${liv.min} - ${liv.max} punti`}
+                          </div>
                         </div>
                       </div>
+
+                      {onPreviewLevel && (
+                        <button
+                          type="button"
+                          onClick={() => onPreviewLevel(liv.nome as any)}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-bold transition flex items-center gap-1 cursor-pointer shrink-0 border ${
+                            darkMode
+                              ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                              : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-2xs'
+                          }`}
+                          title={`Visualizza popup congratulazioni per il livello ${liv.nome}`}
+                        >
+                          <Sparkles className="w-3 h-3 text-amber-500" />
+                          <span>Vedi popup</span>
+                        </button>
+                      )}
                     </div>
                     <p
                       className={`mt-2 text-xs leading-relaxed font-medium ${

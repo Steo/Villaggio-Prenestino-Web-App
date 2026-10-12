@@ -64,6 +64,17 @@ export interface CandidaturaVolontario {
   note?: string;
 }
 
+export interface AppNotification {
+  id: string;
+  tipo: 'proposta_voti' | 'segnalazione_stato' | 'sistema';
+  titolo: string;
+  messaggio: string;
+  timestamp: number;
+  dataOra: string;
+  letta: boolean;
+  targetId?: number;
+}
+
 export interface UserInteractions {
   eventiPartecipati: number[];   // IDs degli eventi a cui ha aderito
   richiesteAderite: number[];    // IDs delle richieste a cui ha fatto "Ci sono"
@@ -74,6 +85,9 @@ export interface UserInteractions {
     nome: string;
     telefono: string;
   };
+  mieProposte?: number[];        // IDs delle proposte create dall'utente
+  mieSegnalazioni?: number[];    // IDs delle segnalazioni inviate dall'utente
+  notificheAbilitate?: boolean;  // Preferenza abilitazione notifiche
 }
 
 export interface WpPluginConfig {

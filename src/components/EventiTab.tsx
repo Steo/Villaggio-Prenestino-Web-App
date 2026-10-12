@@ -12,7 +12,10 @@ import {
   Ticket,
   HeartHandshake,
   History,
+  LayoutList,
+  CalendarDays,
 } from 'lucide-react';
+import { CalendarioMensileEventi } from './CalendarioMensileEventi';
 
 interface EventiTabProps {
   eventi: EventoQuartiere[];
@@ -25,6 +28,7 @@ export const EventiTab: React.FC<EventiTabProps> = ({
   interactions,
   onRequestJoinEvento,
 }) => {
+  const [vista, setVista] = useState<'lista' | 'calendario'>('lista');
   const [filtro, setFiltro] = useState<'tutti' | 'miei'>('tutti');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -33,6 +37,14 @@ export const EventiTab: React.FC<EventiTabProps> = ({
   const eventiPassati = eventi.filter((ev) => ev.passato);
 
   const eventiInProgrammaFiltrati = eventiInProgramma.filter((ev) => {
+    if (filtro === 'miei') {
+      return interactions.eventiPartecipati.includes(ev.id);
+    }
+    return true;
+  });
+
+  // Eventi per il calendario (tutti o solo i propri in base al filtro)
+  const eventiCalendario = eventi.filter((ev) => {
     if (filtro === 'miei') {
       return interactions.eventiPartecipati.includes(ev.id);
     }
@@ -164,7 +176,61 @@ export const EventiTab: React.FC<EventiTabProps> = ({
         </div>
       </section>
 
-      {/* Lista Eventi in programma */}
+      {/* Barra selettore Vista: Lista vs Calendario Mensile */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-2 sm:p-2.5 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-2xs">
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={() => setVista('lista')}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+              vista === 'lista'
+                ? 'bg-white dark:bg-slate-900 text-slate-950 dark:text-white shadow-xs border border-slate-200/80 dark:border-slate-700'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <LayoutList className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <span>Vista Elenco</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setVista('calendario')}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+              vista === 'calendario'
+                ? 'bg-white dark:bg-slate-900 text-slate-950 dark:text-white shadow-xs border border-slate-200/80 dark:border-slate-700'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <CalendarDays className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <span>Calendario Mensile</span>
+          </button>
+        </div>
+
+        <div className="text-xs text-slate-500 dark:text-slate-400 px-2 flex items-center justify-between sm:justify-end gap-2">
+          <span>
+            {vista === 'lista'
+              ? `${eventiInProgrammaFiltrati.length} eventi in programma`
+              : `${eventiCalendario.length} appuntamenti totali`}
+          </span>
+          {filtro === 'miei' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 dark:bg-amber-950/80 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+              I miei appuntamenti
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* RENDERIZZAZIONE VISTA: CALENDARIO MENSILE OPPURE LISTA ELENCO */}
+      {vista === 'calendario' ? (
+        <CalendarioMensileEventi
+          eventi={eventiCalendario}
+          interactions={interactions}
+          onRequestJoinEvento={onRequestJoinEvento}
+          onShareEvento={handleShare}
+          renderTipoTag={renderTipoTag}
+        />
+      ) : (
+        <>
+          {/* Lista Eventi in programma */}
       {eventiInProgrammaFiltrati.length === 0 ? (
         <div className="bg-white rounded-2xl p-8 text-center border border-slate-200 text-slate-500 text-xs">
           Nessun evento in programma corrispondente al filtro.
@@ -413,6 +479,8 @@ export const EventiTab: React.FC<EventiTabProps> = ({
           </div>
         )}
       </section>
+        </>
+      )}
     </div>
   );
 };

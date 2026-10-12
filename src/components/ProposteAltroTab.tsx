@@ -12,20 +12,26 @@ import {
   ChevronLeft,
   ChevronRight,
   TrendingUp,
+  Sparkles,
+  BellRing,
 } from 'lucide-react';
 
 interface ProposteAltroTabProps {
   proposte: PropostaCittadina[];
   votedProposte: number[];
+  mieProposte?: number[];
   onVoteProposta: (proposta: PropostaCittadina) => void;
   onSubmitProposta: (titolo: string) => Promise<void>;
+  onSimulateVoteForProposal?: (id: number) => void;
 }
 
 export const ProposteAltroTab: React.FC<ProposteAltroTabProps> = ({
   proposte,
   votedProposte,
+  mieProposte = [],
   onVoteProposta,
   onSubmitProposta,
+  onSimulateVoteForProposal,
 }) => {
   const [nuovaIdea, setNuovaIdea] = useState('');
   const [loading, setLoading] = useState(false);
@@ -234,6 +240,13 @@ export const ProposteAltroTab: React.FC<ProposteAltroTabProps> = ({
                       #{rank} {rank === 1 ? 'Più votata' : 'Classifica'}
                     </span>
 
+                    {mieProposte.includes(p.id) && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-300">
+                        <Sparkles className="w-3 h-3 text-rose-600" />
+                        La tua proposta
+                      </span>
+                    )}
+
                     <span className="text-[11px] text-slate-500 font-semibold inline-block">
                       <strong className="text-slate-900 font-bold">{p.v}</strong> {p.v === 1 ? 'cittadino d\'accordo' : 'cittadini d\'accordo'}
                     </span>
@@ -242,6 +255,21 @@ export const ProposteAltroTab: React.FC<ProposteAltroTabProps> = ({
                   <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
                     {p.t}
                   </h4>
+
+                  {/* Pulsante rapido di simulazione nuovo voto (per testare la notifica) se è una proposta dell'utente */}
+                  {mieProposte.includes(p.id) && onSimulateVoteForProposal && (
+                    <div className="pt-1">
+                      <button
+                        type="button"
+                        onClick={() => onSimulateVoteForProposal(p.id)}
+                        title="Simula un voto da parte di un altro residente per testare la notifica del browser"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 transition active:scale-95 shadow-2xs cursor-pointer"
+                      >
+                        <BellRing className="w-3 h-3 text-amber-600" />
+                        <span>Simula ricezione nuovo voto (+1)</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Pulsante Mi Piace (Il contatore si ferma al primo click) */}

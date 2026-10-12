@@ -41,7 +41,13 @@ export function getUserInteractions(): UserInteractions {
   try {
     const raw = localStorage.getItem(INTERACTIONS_KEY);
     if (raw) {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      return {
+        ...parsed,
+        mieProposte: Array.isArray(parsed.mieProposte) ? parsed.mieProposte : [1],
+        mieSegnalazioni: Array.isArray(parsed.mieSegnalazioni) ? parsed.mieSegnalazioni : [1],
+        notificheAbilitate: parsed.notificheAbilitate !== undefined ? parsed.notificheAbilitate : true,
+      };
     }
   } catch (e) {
     console.error('Error loading interactions', e);
@@ -52,6 +58,9 @@ export function getUserInteractions(): UserInteractions {
     proposteVotate: [],
     puntiCivici: 15, // Punti di benvenuto
     token: getOrCreateToken(),
+    mieProposte: [1],      // Di default la prima proposta fa parte delle proposte del cittadino
+    mieSegnalazioni: [1],  // Di default la prima segnalazione fa parte delle segnalazioni del cittadino
+    notificheAbilitate: true,
   };
 }
 
