@@ -19,7 +19,7 @@ jobs:
           node-version: 20
 
       - name: Installa dipendenze
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Compilazione Web App
         run: npm run build
