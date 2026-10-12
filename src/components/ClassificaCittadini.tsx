@@ -102,7 +102,7 @@ export const ClassificaCittadini: React.FC<ClassificaCittadiniProps> = ({
     );
   };
 
-  const isUserInTop5 = leaderboard.currentUserRank <= 5;
+  const isUserInTop5 = leaderboard.currentUserRank > 0 && leaderboard.currentUserRank <= 5;
 
   return (
     <section
@@ -141,7 +141,9 @@ export const ClassificaCittadini: React.FC<ClassificaCittadiniProps> = ({
                     : 'bg-amber-100 text-amber-900 border-amber-300'
                 }`}
               >
-                Top 5
+                {leaderboard.totalCitizens > 0
+                  ? `${leaderboard.totalCitizens} ${leaderboard.totalCitizens === 1 ? 'Cittadino' : 'Cittadini'}`
+                  : 'In attesa'}
               </span>
             </div>
             <p className={`text-xs mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -168,8 +170,34 @@ export const ClassificaCittadini: React.FC<ClassificaCittadiniProps> = ({
         )}
       </div>
 
-      {/* Elenco dei Primi 5 Utenti */}
-      <div className="space-y-2.5">
+      {/* Elenco dei Primi 5 Utenti oppure Stato Vuoto Iniziale */}
+      {leaderboard.top5.length === 0 ? (
+        <div
+          className={`py-8 px-4 sm:px-6 rounded-2xl border border-dashed text-center space-y-3 transition-all ${
+            darkMode
+              ? 'bg-slate-800/40 border-amber-500/30 text-slate-200'
+              : 'bg-amber-50/60 border-amber-300 text-slate-800'
+          }`}
+        >
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center text-3xl shadow-2xs">
+            🏆
+          </div>
+          <div className="max-w-md mx-auto space-y-1">
+            <h4 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">
+              La Classifica del Quartiere è Aperta!
+            </h4>
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              Nessun profilo fittizio o preimpostato: la classifica al lancio è vuota e si popolerà dinamicamente in tempo reale con le azioni reali dei cittadini di Villaggio Prenestino.
+            </p>
+          </div>
+
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs font-bold text-amber-800 dark:text-amber-300">
+            <Sparkles className="w-4 h-4 text-amber-500" />
+            <span>Sii il primo cittadino a comparire nella classifica!</span>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2.5">
         {leaderboard.top5.map((cittadino, idx) => {
           const rank = idx + 1;
           const isUser = cittadino.isCurrentUser;
@@ -277,7 +305,8 @@ export const ClassificaCittadini: React.FC<ClassificaCittadiniProps> = ({
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
 
       {/* Box Stato Personale: se l'utente non è nei primi 5, mostra la sua posizione e quanti punti mancano */}
       {!isUserInTop5 && (
@@ -290,13 +319,13 @@ export const ClassificaCittadini: React.FC<ClassificaCittadiniProps> = ({
         >
           <div className="flex items-center gap-2.5">
             <div
-              className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm shrink-0 border ${
+              className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs sm:text-sm shrink-0 border ${
                 darkMode
                   ? 'bg-amber-500/20 text-amber-300 border-amber-700/50'
                   : 'bg-amber-500/20 text-amber-900 border-amber-300/80'
               }`}
             >
-              #{leaderboard.currentUserRank}
+              {leaderboard.currentUserRank > 0 ? `#${leaderboard.currentUserRank}` : '0 pt'}
             </div>
             <div>
               <div className="flex items-center gap-1.5 flex-wrap">
@@ -305,10 +334,16 @@ export const ClassificaCittadini: React.FC<ClassificaCittadiniProps> = ({
                     darkMode ? 'text-white' : 'text-slate-900'
                   }`}
                 >
-                  La tua posizione attuale:{' '}
-                  <strong className={darkMode ? 'text-amber-400' : 'text-amber-900'}>
-                    #{leaderboard.currentUserRank}
-                  </strong>
+                  {leaderboard.currentUserRank > 0 ? (
+                    <>
+                      La tua posizione attuale:{' '}
+                      <strong className={darkMode ? 'text-amber-400' : 'text-amber-900'}>
+                        #{leaderboard.currentUserRank}
+                      </strong>
+                    </>
+                  ) : (
+                    <span>Non hai ancora accumulato punti civici</span>
+                  )}
                 </span>
                 <span
                   className={`text-xs font-semibold ${
@@ -323,11 +358,19 @@ export const ClassificaCittadini: React.FC<ClassificaCittadiniProps> = ({
                   darkMode ? 'text-slate-300' : 'text-slate-600'
                 }`}
               >
-                Ti mancano solo{' '}
-                <strong className={darkMode ? 'text-amber-300' : 'text-slate-900'}>
-                  {leaderboard.pointsToTop5} punti
-                </strong>{' '}
-                per entrare nella Top 5 dei Cittadini Attivi!
+                {leaderboard.currentUserRank > 0 && leaderboard.pointsToTop5 > 0 ? (
+                  <>
+                    Ti mancano solo{' '}
+                    <strong className={darkMode ? 'text-amber-300' : 'text-slate-900'}>
+                      {leaderboard.pointsToTop5} punti
+                    </strong>{' '}
+                    per entrare nella Top 5 dei Cittadini Attivi!
+                  </>
+                ) : (
+                  <span>
+                    Compi una prima azione (es. una segnalazione o un'idea) per entrare in classifica!
+                  </span>
+                )}
               </p>
             </div>
           </div>
@@ -340,7 +383,9 @@ export const ClassificaCittadini: React.FC<ClassificaCittadiniProps> = ({
                   : 'text-amber-950 bg-amber-200/80 border-amber-300'
               }`}
             >
-              +{leaderboard.pointsToTop5} pts al traguardo
+              {leaderboard.currentUserRank > 0 && leaderboard.pointsToTop5 > 0
+                ? `+${leaderboard.pointsToTop5} pts al traguardo`
+                : 'Partecipa ora'}
             </span>
           </div>
         </div>

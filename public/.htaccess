@@ -2,6 +2,15 @@
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /app/
+
+  # Risoluzione automatica risorse: se richieste in /assets/ ma presenti direttamente in /app/
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^assets/(.*)$ /app/$1 [L]
+
+  # Risoluzione automatica risorse: se richieste in /app/ ma presenti in /app/assets/
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^([^/]+\.(js|css|map|png|svg|jpg|webp))$ /app/assets/$1 [L]
+
   RewriteRule ^index\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Award, Moon, Sun, ShieldCheck, Bell } from 'lucide-react';
+import { Award, Moon, Sun, ShieldCheck, Bell, Download } from 'lucide-react';
 import { UserInteractions } from '../types';
 import { LogoCdq } from './LogoCdq';
 import { PuntiCiviciModal } from './PuntiCiviciModal';
@@ -14,6 +14,7 @@ interface HeaderProps {
   onOpenPuntiModal?: () => void;
   unreadNotificationsCount?: number;
   onOpenNotifications?: () => void;
+  onOpenExportModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -26,6 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenPuntiModal,
   unreadNotificationsCount = 0,
   onOpenNotifications,
+  onOpenExportModal,
 }) => {
   const [isPuntiModalOpen, setIsPuntiModalOpen] = useState(false);
   const logoTapCountRef = useRef(0);
@@ -86,6 +88,21 @@ export const Header: React.FC<HeaderProps> = ({
                 </span>
                 <span className="hidden sm:inline font-bold text-[11px] text-amber-200">Insight WP</span>
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              </button>
+            )}
+
+            {/* Tasto Esporta Plugin & Web App ZIP */}
+            {onOpenExportModal && (
+              <button
+                type="button"
+                onClick={onOpenExportModal}
+                title="Esporta il Plugin WordPress (.zip) e la Web App (.zip) da testare sul tuo sito web"
+                aria-label="Esporta Plugin WordPress e Web App per il tuo sito"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-500/25 hover:bg-emerald-500/40 active:scale-95 border border-emerald-400/50 text-white text-xs font-semibold cursor-pointer transition shadow-xs group focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-300 group-hover:scale-110 transition-transform shrink-0" />
+                <span className="hidden sm:inline font-bold text-[11px] text-emerald-100">Esporta ZIP</span>
+                <span className="sm:hidden font-bold text-[10px] text-emerald-200">ZIP</span>
               </button>
             )}
 

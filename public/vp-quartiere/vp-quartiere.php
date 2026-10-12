@@ -644,6 +644,20 @@ add_action('rest_api_init', function() {
         'callback'            => 'vpq_api_post_segnalazione_stato',
         'permission_callback' => '__return_true',
     ]);
+
+    // 11. GET /wp-json/vp/v1/classifica - Classifica dinamica cittadini
+    register_rest_route($ns, '/classifica', [
+        'methods'             => 'GET',
+        'callback'            => 'vpq_api_get_classifica',
+        'permission_callback' => '__return_true',
+    ]);
+
+    // 12. POST /wp-json/vp/v1/classifica/sync - Sincronizzazione punti utente da app
+    register_rest_route($ns, '/classifica/sync', [
+        'methods'             => 'POST',
+        'callback'            => 'vpq_api_post_classifica_sync',
+        'permission_callback' => '__return_true',
+    ]);
 });
 
 /**
@@ -776,6 +790,7 @@ function vpq_api_get_dati() {
         'richieste'    => $richieste,
         'segnalazioni' => $segnalazioni,
         'proposte'     => $proposte,
+        'classifica'   => vpq_api_get_classifica_data(),
         'news'         => $news,
     ]);
 }
@@ -1163,6 +1178,195 @@ function vpq_api_post_segnalazione_stato(WP_REST_Request $request) {
         'success'   => true,
         'messaggio' => 'Stato segnalazione aggiornato con successo!',
     ]);
+}
+
+/**
+ * 11. CALLBACK: GET /classifica (Classifica dinamica cittadini)
+ */
+function vpq_api_get_classifica() {
+    return rest_ensure_response([
+        'success'    => true,
+        'classifica' => vpq_api_get_classifica_data(),
+    ]);
+}
+
+/**
+ * 12. CALLBACK: POST /classifica/sync (Sincronizzazione punti utente da app)
+ */
+function vpq_api_post_classifica_sync(WP_REST_Request $request) {
+    $token    = sanitize_text_field($request->get_param('token') ?: '');
+    $nome     = sanitize_text_field($request->get_param('nome') ?: '');
+    $punti    = absint($request->get_param('punti'));
+    $attivita = sanitize_text_field($request->get_param('attivitaPrincipale') ?: 'Cittadino attivo');
+
+    if (!$token || !$nome || $punti <= 0) {
+        return rest_ensure_response([
+            'success'   => false,
+            'messaggio' => 'Dati insufficienti per la sincronizzazione.',
+        ]);
+    }
+
+    $synced = get_option('vpq_cittadini_sync', []);
+    if (!is_array($synced)) {
+        $synced = [];
+    }
+
+    $synced[$token] = [
+        'nome'               => $nome,
+        'punti'              => $punti,
+        'attivitaPrincipale' => $attivita,
+        'aggiornato'         => current_time('mysql'),
+    ];
+
+    update_option('vpq_cittadini_sync', $synced);
+
+    return rest_ensure_response([
+        'success'    => true,
+        'messaggio'  => 'Punti cittadino sincronizzati con successo!',
+        'classifica' => vpq_api_get_classifica_data(),
+    ]);
+}
+
+/**
+ * Calcola la classifica reale dei cittadini dai dati attivi su WordPress
+ * (Segnalazioni, Proposte, Volontariato, Eventi e sync App).
+ * Se l'app/plugin è appena installato e non ci sono azioni, restituisce [] (vuota).
+ */
+function vpq_api_get_classifica_data() {
+    global $wpdb;
+    $table_interazioni = $wpdb->prefix . 'vp_interazioni';
+
+    $cittadini_map = [];
+
+    // 1. Segnalazioni inviate dai cittadini (+20 pt per segnalazione)
+    $segnalazioni = get_posts([
+        'post_type'      => 'vp_segnalazione',
+        'post_status'    => 'publish',
+        'posts_per_page' => -1,
+    ]);
+    foreach ($segnalazioni as $s) {
+        $nome = trim(get_post_meta($s->ID, '_vp_cittadino_nome', true));
+        if ($nome && strtolower($nome) !== 'anonimo') {
+            $key = strtolower($nome);
+            if (!isset($cittadini_map[$key])) {
+                $cittadini_map[$key] = [
+                    'id'                 => 'cit_seg_' . substr(md5($key), 0, 10),
+                    'nome'               => $nome,
+                    'punti'              => 0,
+                    'attivitaPrincipale' => 'Segnalazioni decoro urbano',
+                ];
+            }
+            $cittadini_map[$key]['punti'] += 20;
+        }
+    }
+
+    // 2. Proposte inviate dai cittadini (+25 pt per proposta)
+    $proposte = get_posts([
+        'post_type'      => 'vp_proposta',
+        'post_status'    => 'publish',
+        'posts_per_page' => -1,
+    ]);
+    foreach ($proposte as $p) {
+        $nome = trim(get_post_meta($p->ID, '_vp_cittadino_nome', true));
+        if ($nome && strtolower($nome) !== 'anonimo') {
+            $key = strtolower($nome);
+            if (!isset($cittadini_map[$key])) {
+                $cittadini_map[$key] = [
+                    'id'                 => 'cit_prop_' . substr(md5($key), 0, 10),
+                    'nome'               => $nome,
+                    'punti'              => 0,
+                    'attivitaPrincipale' => 'Proposte di quartiere',
+                ];
+            } else {
+                $cittadini_map[$key]['attivitaPrincipale'] = 'Proposte & cura civica';
+            }
+            $cittadini_map[$key]['punti'] += 25;
+        }
+    }
+
+    // 3. Volontari che hanno aderito ad attività (+30 pt per adesione)
+    $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_interazioni'");
+    if ($table_exists) {
+        $volontari = $wpdb->get_results("SELECT nome, COUNT(*) as count FROM $table_interazioni WHERE tipo IN ('cisono', 'volontario_cisono') AND nome != '' GROUP BY nome");
+        if ($volontari) {
+            foreach ($volontari as $v) {
+                $nome = trim($v->nome);
+                if ($nome && strtolower($nome) !== 'anonimo') {
+                    $key = strtolower($nome);
+                    if (!isset($cittadini_map[$key])) {
+                        $cittadini_map[$key] = [
+                            'id'                 => 'cit_vol_' . substr(md5($key), 0, 10),
+                            'nome'               => $nome,
+                            'punti'              => 0,
+                            'attivitaPrincipale' => 'Volontariato attivo',
+                        ];
+                    } else {
+                        $cittadini_map[$key]['attivitaPrincipale'] = 'Volontariato & iniziative';
+                    }
+                    $cittadini_map[$key]['punti'] += ((int) $v->count * 30);
+                }
+            }
+        }
+    }
+
+    // 4. Cittadini sincronizzati dall'App
+    $synced = get_option('vpq_cittadini_sync', []);
+    if (is_array($synced)) {
+        foreach ($synced as $token => $data) {
+            $nome = trim($data['nome'] ?? '');
+            $punti = (int) ($data['punti'] ?? 0);
+            if ($nome && $punti > 0 && strtolower($nome) !== 'anonimo') {
+                $key = strtolower($nome);
+                if (!isset($cittadini_map[$key])) {
+                    $cittadini_map[$key] = [
+                        'id'                 => 'cit_sync_' . substr(md5($token), 0, 10),
+                        'nome'               => $nome,
+                        'punti'              => $punti,
+                        'attivitaPrincipale' => $data['attivitaPrincipale'] ?? 'Cittadino attivo',
+                    ];
+                } else {
+                    $cittadini_map[$key]['punti'] = max($cittadini_map[$key]['punti'], $punti);
+                }
+            }
+        }
+    }
+
+    // Calcolo livelli e badge
+    $colors = ['bg-emerald-600', 'bg-amber-600', 'bg-sky-600', 'bg-purple-600', 'bg-rose-600', 'bg-teal-600', 'bg-indigo-600'];
+    $idx = 0;
+    $classifica = [];
+    foreach ($cittadini_map as $c) {
+        $p = (int) $c['punti'];
+        if ($p <= 0) continue;
+
+        if ($p >= 150) {
+            $liv = 'Custode'; $badge = '⭐';
+        } elseif ($p >= 80) {
+            $liv = 'Pilastro'; $badge = '🏛️';
+        } elseif ($p >= 30) {
+            $liv = 'Vicino Attivo'; $badge = '🤝';
+        } else {
+            $liv = 'Nuovo Vicino'; $badge = '🌱';
+        }
+
+        $classifica[] = [
+            'id'                 => $c['id'],
+            'nome'               => $c['nome'],
+            'punti'              => $p,
+            'badge'              => $badge,
+            'livello'            => $liv,
+            'attivitaPrincipale' => $c['attivitaPrincipale'],
+            'avatarBg'           => $colors[$idx % count($colors)],
+        ];
+        $idx++;
+    }
+
+    // Ordina per punti decrescenti
+    usort($classifica, function($a, $b) {
+        return $b['punti'] - $a['punti'];
+    });
+
+    return $classifica;
 }
 
 /**

@@ -13,6 +13,39 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script>
+      /* Self-healing loader per hosting Apache/cPanel:
+         Se i file compilati vengono estratti senza la cartella 'assets' (es. estratti piatti in /app/),
+         oppure viceversa, intercetta il 404 e carica automaticamente il file dalla posizione corretta. */
+      (function() {
+        var tried = {};
+        window.addEventListener('error', function(e) {
+          var el = e.target || e.srcElement;
+          if (!el) return;
+          var url = el.src || el.href;
+          if (!url || tried[url]) return;
+          tried[url] = true;
+
+          // Se fallisce il caricamento da /assets/, prova la root
+          if (url.indexOf('/assets/') !== -1) {
+            var fallbackUrl = url.replace('/assets/', '/');
+            if (el.tagName === 'SCRIPT') {
+              var s = document.createElement('script');
+              s.type = 'module';
+              s.crossOrigin = 'anonymous';
+              s.src = fallbackUrl;
+              document.head.appendChild(s);
+            } else if (el.tagName === 'LINK' && el.rel === 'stylesheet') {
+              var l = document.createElement('link');
+              l.rel = 'stylesheet';
+              l.crossOrigin = 'anonymous';
+              l.href = fallbackUrl;
+              document.head.appendChild(l);
+            }
+          }
+        }, true);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

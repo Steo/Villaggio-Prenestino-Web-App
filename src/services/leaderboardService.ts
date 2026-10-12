@@ -11,62 +11,13 @@ export interface CittadinoAttivo {
 
 const LEADERBOARD_KEY = 'vp_cittadini_classifica';
 
-export const DEFAULT_COMMUNITY_CITIZENS: Omit<CittadinoAttivo, 'isCurrentUser'>[] = [
-  {
-    id: 'cit_1',
-    nome: 'Roberto S.',
-    punti: 165,
-    badge: '⭐',
-    livello: 'Custode',
-    attivitaPrincipale: 'Cura del verde & parchi',
-    avatarBg: 'bg-emerald-600',
-  },
-  {
-    id: 'cit_2',
-    nome: 'Elena V.',
-    punti: 130,
-    badge: '🏛️',
-    livello: 'Pilastro',
-    attivitaPrincipale: 'Eventi & accoglienza',
-    avatarBg: 'bg-amber-600',
-  },
-  {
-    id: 'cit_3',
-    nome: 'Marco R.',
-    punti: 95,
-    badge: '🏛️',
-    livello: 'Pilastro',
-    attivitaPrincipale: 'Decoro urbano & segnalazioni',
-    avatarBg: 'bg-sky-600',
-  },
-  {
-    id: 'cit_4',
-    nome: 'Giulia T.',
-    punti: 60,
-    badge: '🤝',
-    livello: 'Vicino Attivo',
-    attivitaPrincipale: 'Iniziative solidali & libri',
-    avatarBg: 'bg-purple-600',
-  },
-  {
-    id: 'cit_5',
-    nome: 'Davide M.',
-    punti: 45,
-    badge: '🤝',
-    livello: 'Vicino Attivo',
-    attivitaPrincipale: 'Supporto logistico assemblee',
-    avatarBg: 'bg-rose-600',
-  },
-  {
-    id: 'cit_6',
-    nome: 'Chiara B.',
-    punti: 25,
-    badge: '🌱',
-    livello: 'Nuovo Vicino',
-    attivitaPrincipale: 'Mobilità & viabilità',
-    avatarBg: 'bg-teal-600',
-  },
-];
+// All'avvio dell'applicazione la classifica è VUOTA (zero profili fittizi).
+// Si popolerà dinamicamente e in tempo reale con l'utilizzo da parte dei cittadini.
+export const DEFAULT_COMMUNITY_CITIZENS: Omit<CittadinoAttivo, 'isCurrentUser'>[] = [];
+
+// Lista dei vecchi dati mock di sviluppo da rimuovere automaticamente
+const LEGACY_MOCK_NAMES = ['Roberto S.', 'Elena V.', 'Marco R.', 'Giulia T.', 'Davide M.', 'Chiara B.'];
+const LEGACY_MOCK_IDS = ['cit_1', 'cit_2', 'cit_3', 'cit_4', 'cit_5', 'cit_6'];
 
 export function getCalcolatoLivello(punti: number): {
   livello: 'Nuovo Vicino' | 'Vicino Attivo' | 'Pilastro' | 'Custode';
@@ -83,18 +34,27 @@ export function getStoredCommunityCitizens(): Omit<CittadinoAttivo, 'isCurrentUs
     const raw = localStorage.getItem(LEADERBOARD_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+      if (Array.isArray(parsed)) {
+        // Elimina residui di profili fittizi di test
+        const puliti = parsed.filter(
+          (c) =>
+            c &&
+            typeof c.punti === 'number' &&
+            c.punti > 0 &&
+            c.nome &&
+            !LEGACY_MOCK_IDS.includes(c.id) &&
+            !LEGACY_MOCK_NAMES.includes(c.nome)
+        );
+        if (puliti.length !== parsed.length) {
+          saveStoredCommunityCitizens(puliti);
+        }
+        return puliti;
       }
     }
   } catch (e) {
     console.error('Errore nel recupero della classifica salvata in locale:', e);
   }
-  // Se non presente, salva i dati iniziali di comunità
-  try {
-    localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(DEFAULT_COMMUNITY_CITIZENS));
-  } catch {}
-  return DEFAULT_COMMUNITY_CITIZENS;
+  return [];
 }
 
 export function saveStoredCommunityCitizens(citizens: Omit<CittadinoAttivo, 'isCurrentUser'>[]): void {
@@ -105,6 +65,29 @@ export function saveStoredCommunityCitizens(citizens: Omit<CittadinoAttivo, 'isC
   }
 }
 
+/**
+ * Sincronizza la classifica locale con quella restituita dall'API REST di WordPress
+ */
+export function syncRemoteLeaderboard(remoteCitizens: any[]): void {
+  if (!Array.isArray(remoteCitizens)) return;
+  const valid: Omit<CittadinoAttivo, 'isCurrentUser'>[] = remoteCitizens
+    .filter((c) => c && typeof c.punti === 'number' && c.punti > 0 && c.nome)
+    .map((c) => {
+      const punti = Number(c.punti);
+      const calc = getCalcolatoLivello(punti);
+      return {
+        id: String(c.id || `cit_rem_${Math.random()}`),
+        nome: String(c.nome),
+        punti,
+        badge: c.badge || calc.badge,
+        livello: c.livello || calc.livello,
+        attivitaPrincipale: c.attivitaPrincipale || 'Cittadino attivo',
+        avatarBg: c.avatarBg || 'bg-slate-600',
+      };
+    });
+  saveStoredCommunityCitizens(valid);
+}
+
 export interface LeaderboardResult {
   top5: CittadinoAttivo[];
   fullRanking: CittadinoAttivo[];
@@ -112,6 +95,7 @@ export interface LeaderboardResult {
   currentUserEntry: CittadinoAttivo;
   pointsToTop5: number;
   pointsToNext: number;
+  totalCitizens: number;
 }
 
 export function getFullLeaderboard(
@@ -127,26 +111,30 @@ export function getFullLeaderboard(
     punti: userPunti,
     badge: userBadge,
     livello: userLivello,
-    attivitaPrincipale: 'Cittadino partecipe',
+    attivitaPrincipale: userPunti > 0 ? 'Cittadino partecipe' : 'In attesa della prima azione',
     isCurrentUser: true,
     avatarBg: 'bg-[#781816]',
   };
 
-  // Unione lista locale e utente corrente
   const allCitizens: CittadinoAttivo[] = [
     ...communityList.map((c) => ({ ...c, isCurrentUser: false })),
-    currentUserEntry,
   ];
+
+  // L'utente entra formalmente in classifica non appena accumula punti (> 0)
+  if (userPunti > 0) {
+    allCitizens.push(currentUserEntry);
+  }
 
   // Ordina per punti decrescenti
   allCitizens.sort((a, b) => b.punti - a.punti);
 
-  const currentUserRank = allCitizens.findIndex((c) => c.isCurrentUser) + 1;
+  const userIndex = allCitizens.findIndex((c) => c.isCurrentUser);
+  const currentUserRank = userIndex !== -1 ? userIndex + 1 : 0;
   const top5 = allCitizens.slice(0, 5);
 
   // Calcolo punti necessari per entrare in Top 5 o superare il precedente
   let pointsToTop5 = 0;
-  if (currentUserRank > 5) {
+  if (currentUserRank > 5 && allCitizens.length >= 5) {
     const fifth = allCitizens[4];
     pointsToTop5 = Math.max(1, fifth.punti - userPunti + 1);
   }
@@ -164,5 +152,6 @@ export function getFullLeaderboard(
     currentUserEntry,
     pointsToTop5,
     pointsToNext,
+    totalCitizens: allCitizens.length,
   };
 }

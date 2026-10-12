@@ -19,6 +19,8 @@ import {
   ExternalLink,
   CreditCard,
   Ticket,
+  Download,
+  FolderArchive,
 } from 'lucide-react';
 import { ClassificaCittadini } from './ClassificaCittadini';
 
@@ -35,6 +37,7 @@ interface HomeTabProps {
   isAdmin?: boolean;
   onOpenPuntiModal?: () => void;
   onUpdateUserNome?: (nome: string) => void;
+  onOpenExportModal?: () => void;
 }
 
 export const HomeTab: React.FC<HomeTabProps> = ({
@@ -50,6 +53,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   isAdmin = false,
   onOpenPuntiModal,
   onUpdateUserNome,
+  onOpenExportModal,
 }) => {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -476,6 +480,45 @@ export const HomeTab: React.FC<HomeTabProps> = ({
           </div>
         </div>
       </section>
+
+      {/* BANNER ESPORTAZIONE: Scarica Plugin WordPress (.zip) e Web App (.zip) */}
+      {onOpenExportModal && (
+        <section className={`p-4 sm:p-5 rounded-3xl border transition-all ${
+          darkMode
+            ? 'bg-gradient-to-r from-emerald-950/40 via-teal-950/30 to-slate-900 border-emerald-500/30 text-slate-200'
+            : 'bg-gradient-to-r from-emerald-50 via-teal-50/60 to-white border-emerald-200 text-slate-800 shadow-xs'
+        }`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black shadow-xs shrink-0">
+                <FolderArchive className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="text-sm font-bold leading-tight text-slate-900 dark:text-white">
+                    Esporta per il tuo Sito Web & Hosting
+                  </h4>
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-600 text-white">
+                    v1.3.2
+                  </span>
+                </div>
+                <p className={`text-xs mt-0.5 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                  Scarica subito il <strong>Plugin WordPress</strong> (<code className="font-mono text-emerald-600 dark:text-emerald-400">vp-quartiere.zip</code>) e lo <strong>ZIP della Web App</strong> da testare su Ergonet, cPanel o FTP.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onOpenExportModal}
+              className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl shadow-sm transition flex items-center justify-center gap-2 cursor-pointer shrink-0"
+            >
+              <Download className="w-4 h-4" />
+              <span>Esporta Plugin & ZIP</span>
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* BANNER AMMINISTRATORE: Dashboard Insight & WordPress Plugin (Visibile solo a chi è in modalità Admin) */}
       {isAdmin && onOpenWpPanel && (

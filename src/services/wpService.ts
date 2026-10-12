@@ -16,6 +16,7 @@ import {
   INITIAL_SEGNALAZIONI,
   INITIAL_PROPOSTE,
 } from '../data/mockData';
+import { syncRemoteLeaderboard } from './leaderboardService';
 
 const CONFIG_KEY = 'vp_config_v1';
 const INTERACTIONS_KEY = 'vp_interactions_v1';
@@ -42,10 +43,21 @@ export function getUserInteractions(): UserInteractions {
     const raw = localStorage.getItem(INTERACTIONS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
+      // Se l'utente aveva solo i vecchi 15 punti di benvenuto fittizi senza aver mai partecipato ad attività
+      let punti = typeof parsed.puntiCivici === 'number' ? parsed.puntiCivici : 0;
+      const noActionsYet =
+        (!parsed.eventiPartecipati || parsed.eventiPartecipati.length === 0) &&
+        (!parsed.richiesteAderite || parsed.richiesteAderite.length === 0) &&
+        (!parsed.proposteVotate || parsed.proposteVotate.length === 0);
+      if (punti === 15 && noActionsYet) {
+        punti = 0;
+      }
+
       return {
         ...parsed,
-        mieProposte: Array.isArray(parsed.mieProposte) ? parsed.mieProposte : [1],
-        mieSegnalazioni: Array.isArray(parsed.mieSegnalazioni) ? parsed.mieSegnalazioni : [1],
+        puntiCivici: punti,
+        mieProposte: Array.isArray(parsed.mieProposte) ? parsed.mieProposte.filter((id: number) => id !== 1 || !noActionsYet) : [],
+        mieSegnalazioni: Array.isArray(parsed.mieSegnalazioni) ? parsed.mieSegnalazioni.filter((id: number) => id !== 1 || !noActionsYet) : [],
         notificheAbilitate: parsed.notificheAbilitate !== undefined ? parsed.notificheAbilitate : true,
       };
     }
@@ -56,10 +68,10 @@ export function getUserInteractions(): UserInteractions {
     eventiPartecipati: [],
     richiesteAderite: [],
     proposteVotate: [],
-    puntiCivici: 15, // Punti di benvenuto
+    puntiCivici: 0, // Al lancio l'app parte da 0 punti e la classifica si riempie con l'uso reale
     token: getOrCreateToken(),
-    mieProposte: [1],      // Di default la prima proposta fa parte delle proposte del cittadino
-    mieSegnalazioni: [1],  // Di default la prima segnalazione fa parte delle segnalazioni del cittadino
+    mieProposte: [],
+    mieSegnalazioni: [],
     notificheAbilitate: true,
   };
 }
@@ -235,6 +247,9 @@ export async function fetchAllData(): Promise<{
           }
           if (Array.isArray(json.proposte)) {
             liveProposte = json.proposte;
+          }
+          if (Array.isArray(json.classifica)) {
+            syncRemoteLeaderboard(json.classifica);
           }
           if (Array.isArray(json.news) && json.news.length > 0) {
             liveNews = json.news.map((item: any) => ({
@@ -781,4 +796,42 @@ export async function adminGetInsightStats(): Promise<import('../types').Insight
     tassoRiempimentoEventi,
   };
 }
+
+/**
+ * Sincronizza i punti civici e il nome del cittadino con l'API REST di WordPress
+ */
+export async function syncCitizenPointsToWp(
+  nome: string,
+  punti: number,
+  attivitaPrincipale: string = 'Cittadino attivo'
+): Promise<void> {
+  const cfg = getWpConfig();
+  if (!cfg.useLiveApi || punti <= 0) return;
+  const apiBase = cfg.baseUrl.replace(/\/+$/, '');
+  try {
+    const res = await fetch(`${apiBase}/wp-json/vp/v1/classifica/sync`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-VP-Key': cfg.apiKey,
+        'X-VP-Token': getOrCreateToken(),
+      },
+      body: JSON.stringify({
+        token: getOrCreateToken(),
+        nome: nome && nome.trim() ? nome.trim() : 'Cittadino',
+        punti,
+        attivitaPrincipale,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.classifica && Array.isArray(data.classifica)) {
+        syncRemoteLeaderboard(data.classifica);
+      }
+    }
+  } catch {
+    // Continua localmente in modalità offline
+  }
+}
+
 

@@ -100,7 +100,12 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
       document.body.removeChild(a);
       setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1500);
     } catch {
-      window.open(url, '_blank');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     }
   };
 

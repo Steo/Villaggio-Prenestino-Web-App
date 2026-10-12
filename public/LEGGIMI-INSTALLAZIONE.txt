@@ -1,0 +1,45 @@
+========================================================================
+GUIDA ALL'INSTALLAZIONE: WEB APP VILLAGGIO PRENESTINO (V1.3.2)
+========================================================================
+
+Questa cartella contiene i file di produzione della Web App del Comitato
+di Quartiere Villaggio Prenestino, pronta per essere caricata su qualsiasi
+hosting Apache/PHP (es. Ergonet, cPanel, Plesk) o server web.
+
+------------------------------------------------------------------------
+ISTRUZIONI RAPIDE PER ERGONET / cPANEL / FILEZILLA (3 MINUTI)
+------------------------------------------------------------------------
+
+1. ACCESSO AL TUO HOSTING:
+   - Apri cPanel -> "Gestione File" (File Manager)
+     oppure collegati con FileZilla (FTP / SFTP).
+
+2. CARICAMENTO NELLA CARTELLA /app:
+   - Vai nella cartella radice del tuo dominio (di solito 'public_html').
+   - Se non esiste già, crea una nuova cartella chiamata 'app'.
+   - Carica tutti i file di questo archivio dentro 'public_html/app/':
+       - index.html
+       - assets/ (con i file CSS e JS compilati)
+       - logo-cdq.svg
+       - logoo-cdq-2019-BIANCO-ORIZZONTALE.png
+       - .htaccess (importante per il routing Apache!)
+
+3. VERIFICA ONLINE:
+   - Apri nel browser: https://www.villaggioprenestino.it/app
+   - La Web App sarà immediatamente visibile e funzionante!
+
+------------------------------------------------------------------------
+INTEGRAZIONE CON WORDPRESS:
+------------------------------------------------------------------------
+1. Installa e attiva il plugin WordPress 'vp-quartiere.zip' da:
+   WP Admin -> Plugin -> Aggiungi nuovo -> Carica plugin.
+
+2. Nel menu di WordPress apparirà la voce '🏡 VP Quartiere' con la
+   Dashboard & Tab Hub.
+
+3. La Web App e il plugin dialogheranno automaticamente tramite le
+   API REST di WordPress su:
+   https://www.villaggioprenestino.it/wp-json/vp/v1/
+
+Buon lavoro dal Comitato di Quartiere Villaggio Prenestino!
+========================================================================

@@ -24,6 +24,7 @@ import {
   adminCreateEvento,
   adminUpdateSegnalazioneStato,
   adminCreateRichiesta,
+  syncCitizenPointsToWp,
 } from './services/wpService';
 import {
   triggerNotification,
@@ -46,6 +47,7 @@ import { WpPluginPanel } from './components/WpPluginPanel';
 import { AdminAccessModal } from './components/AdminAccessModal';
 import { PuntiCiviciModal } from './components/PuntiCiviciModal';
 import { NotificationCenterModal } from './components/NotificationCenterModal';
+import { ExportModal } from './components/ExportModal';
 import {
   NuovoLivelloModal,
   LivelloCommunity,
@@ -148,6 +150,9 @@ export default function App() {
   // Centro Notifiche del Browser
   const [notificationModalOpen, setNotificationModalOpen] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>(getStoredNotifications);
+
+  // Modale Esportazione Plugin & Web App ZIP
+  const [exportModalOpen, setExportModalOpen] = useState(false);
 
   // Snapshot precedenti per rilevare variazioni sui dati salvati / sincronizzati
   const prevProposalVotesRef = useRef<Record<number, number>>({});
@@ -309,6 +314,7 @@ export default function App() {
     setInteractions(updated);
     saveUserInteractions(updated);
     showToast(`Nome salvato per la classifica: ${nome}`);
+    syncCitizenPointsToWp(nome, interactions.puntiCivici, 'Cittadino attivo');
   };
 
   const handleActivateAdmin = () => {
@@ -386,6 +392,11 @@ export default function App() {
     setInteractions(updated);
     saveUserInteractions(updated);
     showToast(`+${punti} punti: ${motivazione}`);
+    syncCitizenPointsToWp(
+      updated.contattiSalvati?.nome || '',
+      newPunti,
+      motivazione
+    );
 
     // Verifica se il volontario raggiunge un nuovo livello della community
     const oldLevel = getLivelloFromPunti(oldPunti);
@@ -630,6 +641,7 @@ export default function App() {
         onOpenPuntiModal={() => setPuntiModalOpen(true)}
         unreadNotificationsCount={notifications.filter((n) => !n.letta).length}
         onOpenNotifications={() => setNotificationModalOpen(true)}
+        onOpenExportModal={() => setExportModalOpen(true)}
       />
 
       {/* Contenuto Principale */}
@@ -648,6 +660,7 @@ export default function App() {
             isAdmin={isAdmin}
             onOpenPuntiModal={() => setPuntiModalOpen(true)}
             onUpdateUserNome={handleUpdateUserNome}
+            onOpenExportModal={() => setExportModalOpen(true)}
           />
         )}
 
@@ -881,6 +894,14 @@ export default function App() {
         onPermissionChange={() => {
           showToast('Stato permessi notifiche aggiornato!');
         }}
+      />
+
+      {/* Finestra Esportazione Plugin WordPress & Web App ZIP */}
+      <ExportModal
+        isOpen={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        darkMode={darkMode}
+        onOpenWpPanel={() => setWpPanelOpen(true)}
       />
     </div>
   );
