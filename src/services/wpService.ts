@@ -8,6 +8,8 @@ import {
   UserInteractions,
   WpPluginConfig,
   StatoSegnalazione,
+  AttivitaCommercio,
+  NuovaAttivitaForm,
 } from '../types';
 import {
   INITIAL_NEWS,
@@ -58,6 +60,8 @@ export function getUserInteractions(): UserInteractions {
         puntiCivici: punti,
         mieProposte: Array.isArray(parsed.mieProposte) ? parsed.mieProposte.filter((id: number) => id !== 1 || !noActionsYet) : [],
         mieSegnalazioni: Array.isArray(parsed.mieSegnalazioni) ? parsed.mieSegnalazioni.filter((id: number) => id !== 1 || !noActionsYet) : [],
+        mieAttivita: Array.isArray(parsed.mieAttivita) ? parsed.mieAttivita : [],
+        negoziVotati: Array.isArray(parsed.negoziVotati) ? parsed.negoziVotati : [],
         notificheAbilitate: parsed.notificheAbilitate !== undefined ? parsed.notificheAbilitate : true,
       };
     }
@@ -68,10 +72,12 @@ export function getUserInteractions(): UserInteractions {
     eventiPartecipati: [],
     richiesteAderite: [],
     proposteVotate: [],
+    negoziVotati: [],
     puntiCivici: 0, // Al lancio l'app parte da 0 punti e la classifica si riempie con l'uso reale
     token: getOrCreateToken(),
     mieProposte: [],
     mieSegnalazioni: [],
+    mieAttivita: [],
     notificheAbilitate: true,
   };
 }
@@ -570,6 +576,70 @@ export async function submitProposta(titolo: string): Promise<{ success: boolean
   }
 
   return { success: true, newId };
+}
+
+/**
+ * Invia nuova attività commerciale al plugin di WordPress con moderazione admin
+ */
+export async function submitAttivitaCommercio(data: NuovaAttivitaForm & {
+  lat?: number;
+  lng?: number;
+  immagine?: string;
+}): Promise<{
+  success: boolean;
+  newId: number;
+  status: 'in_attesa';
+  messaggio: string;
+}> {
+  const cfg = getWpConfig();
+  const token = getOrCreateToken();
+  const newId = Date.now();
+
+  let responseMsg = 'Attività commerciale ricevuta con successo! È stata inoltrata al moderatore del sito WordPress e verrà pubblicata nell\'app dopo l\'approvazione dell\'amministratore.';
+
+  if (cfg.useLiveApi) {
+    try {
+      const apiBase = getEffectiveBaseUrl();
+      const resp = await fetch(`${apiBase}/wp-json/vp/v1/commercio`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-VP-Key': cfg.apiKey,
+          'X-VP-Token': token,
+        },
+        body: JSON.stringify({
+          nome: data.nome,
+          categoria: data.categoria,
+          indirizzo: data.indirizzo,
+          telefono: data.telefono,
+          whatsapp: data.whatsapp,
+          orari: data.orari,
+          descrizione: data.descrizione,
+          offerta_titolo: data.offertaTitolo,
+          offerta_dettaglio: data.offertaDettaglio,
+          nome_referente: data.nomeReferente || '',
+          email_referente: data.emailReferente || '',
+          lat: data.lat || 41.8902,
+          lng: data.lng || 12.6715,
+          immagine: data.immagine || '',
+          logo: data.logo || '',
+        }),
+      });
+      if (resp.ok) {
+        const json = await resp.json();
+        if (json.messaggio) responseMsg = json.messaggio;
+      }
+    } catch (e) {
+      console.warn('Invio commercio a WP fallito, salvata localmente come in attesa:', e);
+    }
+  }
+
+  return {
+    success: true,
+    newId,
+    status: 'in_attesa',
+    messaggio: responseMsg,
+  };
 }
 
 /**

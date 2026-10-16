@@ -9,7 +9,9 @@ import {
   ShieldCheck,
   Send,
   MapPin,
+  Share2,
 } from 'lucide-react';
+import { shareToWhatsApp } from '../utils/shareUtils';
 
 interface VolontariatoTabProps {
   richieste: RichiestaVolontariato[];
@@ -139,26 +141,39 @@ export const VolontariatoTab: React.FC<VolontariatoTabProps> = ({
                     />
                   </div>
 
-                  <button
-                    onClick={() => onRequestJoinVolunteer(r)}
-                    className={`w-full py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                      hasJoined
-                        ? 'bg-amber-100 text-amber-950 border border-amber-300'
-                        : 'bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 shadow-xs'
-                    }`}
-                  >
-                    {hasJoined ? (
-                      <>
-                        <CheckCircle2 className="w-4 h-4 text-emerald-700" />
-                        Hai aderito (Annulla)
-                      </>
-                    ) : (
-                      <>
-                        <HeartHandshake className="w-4 h-4" />
-                        Ci sono anche io (+10 pts)
-                      </>
-                    )}
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const msg = `🤝 *Appello Volontari a Villaggio Prenestino*:\n"${r.t}"\n📍 Luogo: ${r.w}\n👥 Mancano ${Math.max(1, r.need - r.have)} volontari!\n\n${r.desc}`;
+                        shareToWhatsApp(msg, 'https://www.villaggioprenestino.it');
+                      }}
+                      title="Condividi appello sui gruppi WhatsApp"
+                      className="p-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition cursor-pointer shrink-0"
+                    >
+                      <Share2 className="w-4 h-4 text-emerald-700" />
+                    </button>
+                    <button
+                      onClick={() => onRequestJoinVolunteer(r)}
+                      className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                        hasJoined
+                          ? 'bg-amber-100 text-amber-950 border border-amber-300'
+                          : 'bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 shadow-xs'
+                      }`}
+                    >
+                      {hasJoined ? (
+                        <>
+                          <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                          Hai aderito (Annulla)
+                        </>
+                      ) : (
+                        <>
+                          <HeartHandshake className="w-4 h-4" />
+                          Ci sono anche io (+10 pts)
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             );

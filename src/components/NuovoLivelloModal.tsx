@@ -93,7 +93,7 @@ const LIVELLO_CONFIGS: Record<LivelloCommunity, LivelloThemeConfig> = {
     privilegi: [
       'Distintivo onorario 🏛️ Pilastro in cima alla Classifica dei Cittadini Attivi',
       'Voce autorevole nelle consultazioni e proposte per il Municipio VI',
-      'Riconoscimento speciale e ringraziamento pubblico nelle assemblee CdQ',
+      'Riconoscimento speciale e ringraziamento pubblico nelle assemblee dell\'Associazione',
     ],
     // Colori tema ORO / AMBRA CALDA
     gradientHeader: 'linear-gradient(135deg, #d97706 0%, #b45309 50%, #78350f 100%)',
@@ -120,7 +120,7 @@ const LIVELLO_CONFIGS: Record<LivelloCommunity, LivelloThemeConfig> = {
     privilegi: [
       'Stella d’oro ⭐ Custode e primo piano assoluto nella Classifica Cittadini',
       'Massimo credito civico per il coordinamento delle iniziative di volontariato',
-      'Attestato simbolico di benemerenza civica da parte dell’Associazione CdQ',
+      'Attestato simbolico di benemerenza civica da parte dell’Associazione di Quartiere',
     ],
     // Colori tema BORDEAUX VILLAGGIO PRENESTINO / RUBINO (#781816)
     gradientHeader: 'linear-gradient(135deg, #781816 0%, #9f1239 50%, #4c0519 100%)',

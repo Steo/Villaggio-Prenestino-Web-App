@@ -25,6 +25,66 @@ export interface EventoQuartiere {
   tipo?: TipoEvento;   // 'volontariato' | 'pagamento' | 'gratuito' (default: 'volontariato')
   passato?: boolean;   // true se evento terminato/passato
   quota?: string;      // eventuale quota per eventi a pagamento (es. "15€")
+  lat?: number;        // Coordinate georeferenziate per Google Maps
+  lng?: number;
+}
+
+export type CategoriaCommercio = 
+  | 'tutti' 
+  | 'alimentari' 
+  | 'ristorazione' 
+  | 'salute' 
+  | 'servizi' 
+  | 'casa';
+
+export interface OffertaCommercio {
+  titolo: string;
+  dettaglio: string;
+  scadenza?: string;
+  scontoPercentuale?: number;
+}
+
+export interface AttivitaCommercio {
+  id: number;
+  nome: string;
+  categoria: 'alimentari' | 'ristorazione' | 'salute' | 'servizi' | 'casa';
+  descrizione: string;
+  indirizzo: string;
+  lat: number;
+  lng: number;
+  telefono: string;
+  whatsapp?: string; // Numero WhatsApp senza spazi (es. "393331234567")
+  orari: string;
+  orarioDettagliato?: { [giorno: string]: string };
+  apertoOra?: boolean;
+  offertaAttiva?: OffertaCommercio;
+  immagine: string;
+  logo?: string;
+  sitoWeb?: string;
+  recensioneVoto?: number;
+  verificato?: boolean;
+  miPiace?: number; // Numero di "Mi piace" ricevuti dai residenti
+  statoApprovazione?: 'in_attesa' | 'approvata' | 'rifiutata'; // Moderazione WordPress
+  inviataDaMe?: boolean;
+  dataInserimento?: string;
+  nomeReferente?: string;
+  emailReferente?: string;
+}
+
+export interface NuovaAttivitaForm {
+  nome: string;
+  categoria: 'alimentari' | 'ristorazione' | 'salute' | 'servizi' | 'casa';
+  indirizzo: string;
+  telefono: string;
+  whatsapp: string;
+  orari: string;
+  descrizione: string;
+  offertaTitolo: string;
+  offertaDettaglio: string;
+  immagine?: string; // Foto del negozio o copertina (JPG/PNG/URL)
+  logo?: string;     // Logo del negozio in formato JPG
+  nomeReferente?: string;
+  emailReferente?: string;
 }
 
 export interface RichiestaVolontariato {
@@ -79,6 +139,7 @@ export interface UserInteractions {
   eventiPartecipati: number[];   // IDs degli eventi a cui ha aderito
   richiesteAderite: number[];    // IDs delle richieste a cui ha fatto "Ci sono"
   proposteVotate: number[];      // IDs delle proposte a cui ha messo like
+  negoziVotati?: number[];       // IDs dei commercianti/attività a cui ha messo like
   puntiCivici: number;           // Gamification punti
   token: string;                 // Token anonimo univoco per-device
   contattiSalvati?: {
@@ -87,6 +148,7 @@ export interface UserInteractions {
   };
   mieProposte?: number[];        // IDs delle proposte create dall'utente
   mieSegnalazioni?: number[];    // IDs delle segnalazioni inviate dall'utente
+  mieAttivita?: number[];        // IDs delle attività commerciali inserite dall'utente
   notificheAbilitate?: boolean;  // Preferenza abilitazione notifiche
 }
 

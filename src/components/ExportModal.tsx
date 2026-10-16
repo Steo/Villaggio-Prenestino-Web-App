@@ -69,7 +69,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   };
 
   const handleCopyIframe = () => {
-    const code = `<iframe\n  src="https://www.villaggioprenestino.it/app"\n  width="100%"\n  height="900"\n  style="border:none; border-radius:16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);"\n  allow="geolocation; notifications"\n  title="Web App CdQ Villaggio Prenestino"\n></iframe>`;
+    const code = `<iframe\n  src="https://www.villaggioprenestino.it/app"\n  width="100%"\n  height="900"\n  style="border:none; border-radius:16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);"\n  allow="geolocation; notifications"\n  title="Web App Associazione di Quartiere Villaggio Prenestino"\n></iframe>`;
     navigator.clipboard.writeText(code);
     setCopiatoIframe(true);
     setTimeout(() => setCopiatoIframe(false), 2500);
@@ -165,7 +165,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                       Plugin WordPress Ufficiale
                     </h4>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-600/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                      v1.3.2
+                      v1.4.0
                     </span>
                   </div>
                   <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">

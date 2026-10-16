@@ -81,7 +81,7 @@ const ATTIVITA = [
   {
     icon: UserCheck,
     titolo: 'Candidatura Volontario',
-    descrizione: 'Iscriviti all’albo volontari del CdQ',
+    descrizione: 'Iscriviti all’albo volontari dell’Associazione',
     punti: '+15',
     tag: 'Una tantum',
   },

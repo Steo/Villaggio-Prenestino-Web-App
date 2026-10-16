@@ -16,6 +16,7 @@ import {
   CalendarCheck,
   Tag,
 } from 'lucide-react';
+import { EventDescription } from './EventDescription';
 
 interface CalendarioMensileEventiProps {
   eventi: EventoQuartiere[];
@@ -659,54 +660,58 @@ export const CalendarioMensileEventi: React.FC<CalendarioMensileEventiProps> = (
                       </span>
                     </div>
 
-                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed pt-1">
-                      {ev.p}
-                    </p>
+                    <EventDescription
+                      text={ev.p}
+                      textColor="text-slate-600 dark:text-slate-300"
+                      className="pt-1"
+                    />
 
                     {/* Barra inferiore con partecipanti e bottoni azione */}
                     {!ev.passato && (
-                      <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-                        <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-                          <Users className="w-4 h-4 text-amber-600 shrink-0" />
-                          <span>
-                            <strong>{ev.n}</strong> {isPagamento ? 'iscritti' : 'confermati'}
+                      <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2.5">
+                        {/* Prima riga: contatore e tasto secondario Condividi */}
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                            <Users className="w-4 h-4 text-amber-600 shrink-0" />
+                            <span>
+                              <strong>{ev.n}</strong> {isPagamento ? 'iscritti' : 'confermati'}
+                            </span>
                           </span>
-                        </span>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => onRequestJoinEvento(ev)}
-                            className={`flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0 ${
-                              isAttending
-                                ? 'bg-amber-100 text-amber-950 border border-amber-300 dark:bg-amber-950/80 dark:text-amber-300'
-                                : 'bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 shadow-xs'
-                            }`}
-                          >
-                            {isAttending ? (
-                              <>
-                                <CheckCircle2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
-                                {isPagamento ? 'Iscritto ✓ (Annulla)' : 'Ci sarai ✓ (Annulla)'}
-                              </>
-                            ) : (
-                              <>
-                                <PlusCircle className="w-4 h-4" />
-                                {isPagamento ? 'Iscriviti' : 'Ci sarò (+5 pts)'}
-                              </>
-                            )}
-                          </button>
 
                           <button
                             type="button"
                             onClick={() => onShareEvento(ev)}
-                            className="p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                            className="px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 active:bg-emerald-200 border border-emerald-200 dark:border-emerald-800 shadow-2xs transition flex items-center gap-1.5 cursor-pointer shrink-0"
                             title="Condividi evento su WhatsApp o altre app"
                             aria-label="Condividi evento"
                           >
-                            <Share2 className="w-3.5 h-3.5 text-white stroke-[2.3]" />
-                            <span className="hidden sm:inline">Condividi</span>
+                            <Share2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 stroke-[2.3]" />
+                            <span>Condividi</span>
                           </button>
                         </div>
+
+                        {/* Seconda riga: AZIONE PRINCIPALE - Tasto Iscriviti a tutta larghezza */}
+                        <button
+                          type="button"
+                          onClick={() => onRequestJoinEvento(ev)}
+                          className={`w-full py-2.5 px-4 rounded-xl text-xs sm:text-sm font-black transition flex items-center justify-center gap-2 cursor-pointer shadow-xs hover:shadow-sm active:scale-[0.99] ${
+                            isAttending
+                              ? 'bg-amber-100 text-amber-950 border border-amber-300 hover:bg-amber-200 dark:bg-amber-950/80 dark:text-amber-200 dark:border-amber-700'
+                              : 'bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 shadow-md'
+                          }`}
+                        >
+                          {isAttending ? (
+                            <>
+                              <CheckCircle2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
+                              <span>{isPagamento ? "Iscritto all'evento ✓ (Tocca per annullare)" : "Ci sarai ✓ (Tocca per annullare)"}</span>
+                            </>
+                          ) : (
+                            <>
+                              <PlusCircle className="w-4 h-4" />
+                              <span>{isPagamento ? "Iscriviti all'evento" : "Iscriviti / Ci sarò (+5 pts civici)"}</span>
+                            </>
+                          )}
+                        </button>
                       </div>
                     )}
                   </div>

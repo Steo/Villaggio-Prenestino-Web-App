@@ -25,6 +25,7 @@ import {
   adminUpdateSegnalazioneStato,
   adminCreateRichiesta,
   syncCitizenPointsToWp,
+  submitAttivitaCommercio,
 } from './services/wpService';
 import {
   triggerNotification,
@@ -41,6 +42,7 @@ import { EventiTab } from './components/EventiTab';
 import { SegnalazioniTab } from './components/SegnalazioniTab';
 import { VolontariatoTab } from './components/VolontariatoTab';
 import { ProposteAltroTab } from './components/ProposteAltroTab';
+import { CommercioTab } from './components/CommercioTab';
 import { VolunteerContactModal } from './components/VolunteerContactModal';
 import { PhotoLightbox } from './components/PhotoLightbox';
 import { WpPluginPanel } from './components/WpPluginPanel';
@@ -48,6 +50,10 @@ import { AdminAccessModal } from './components/AdminAccessModal';
 import { PuntiCiviciModal } from './components/PuntiCiviciModal';
 import { NotificationCenterModal } from './components/NotificationCenterModal';
 import { ExportModal } from './components/ExportModal';
+import { PwaInstallBanner } from './components/PwaInstallBanner';
+import { GuidaTourModal } from './components/GuidaTourModal';
+import { INITIAL_ATTIVITA_COMMERCIO } from './data/mockData';
+import { AttivitaCommercio } from './types';
 import {
   NuovoLivelloModal,
   LivelloCommunity,
@@ -62,10 +68,13 @@ import {
   HeartHandshake,
   Lightbulb,
   Sparkles,
+  Store,
 } from 'lucide-react';
 
+export type TabType = 'home' | 'eventi' | 'commercio' | 'segnalazioni' | 'volontariato' | 'proposte';
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'home' | 'eventi' | 'segnalazioni' | 'volontariato' | 'proposte'>('home');
+  const [activeTab, setActiveTab] = useState<TabType>('home');
   const [interactions, setInteractions] = useState<UserInteractions>(getUserInteractions);
 
   // Modalità Scura / Chiara
@@ -104,6 +113,122 @@ export default function App() {
   const [segnalazioni, setSegnalazioni] = useState<SegnalazioneCittadina[]>([]);
   const [proposte, setProposte] = useState<PropostaCittadina[]>([]);
   const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null);
+
+  // Vetrina Commercio & Mappa Attività
+  const [attivitaCommercio, setAttivitaCommercio] = useState<AttivitaCommercio[]>(() => {
+    try {
+      const saved = localStorage.getItem('vp_attivita_commercio');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((item: AttivitaCommercio) => {
+            const init = INITIAL_ATTIVITA_COMMERCIO.find((x) => x.id === item.id);
+            return {
+              ...item,
+              miPiace: typeof item.miPiace === 'number' ? item.miPiace : (init?.miPiace || 10),
+            };
+          });
+        }
+      }
+      return INITIAL_ATTIVITA_COMMERCIO;
+    } catch {
+      return INITIAL_ATTIVITA_COMMERCIO;
+    }
+  });
+
+  // Voto Mi piace per attività commerciale: UNIVOCE, massimo 1 volta per ogni attività per utente
+  const handleVoteAttivita = (attivita: AttivitaCommercio) => {
+    // Controllo se già consigliata sia nello state che nel localStorage
+    const stored = getUserInteractions();
+    const currentVoted = Array.from(new Set([
+      ...(interactions.negoziVotati || []),
+      ...(stored.negoziVotati || []),
+    ]));
+
+    if (currentVoted.includes(attivita.id)) {
+      showToast(`Hai già consigliato "${attivita.nome}"!`);
+      return;
+    }
+
+    const nextVoted = [...currentVoted, attivita.id];
+
+    // Incrementa di 1 il contatore e salva
+    setAttivitaCommercio((prev) => {
+      const next = prev.map((a) =>
+        a.id === attivita.id ? { ...a, miPiace: (a.miPiace || 0) + 1 } : a
+      );
+      try {
+        localStorage.setItem('vp_attivita_commercio', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+
+    // Invia al server se disponibile
+    submitInteraction({ tipo: 'negozio_vota', postId: attivita.id }).catch(() => {});
+
+    // Salva atomicamente la lista dei negozi votati insieme all'accredito di +2 Punti Civici
+    addPunti(2, 'Mi piace a un commerciante', { negoziVotati: nextVoted });
+    showToast(`Hai consigliato "${attivita.nome}"! (+2 punti civici)`);
+  };
+
+  const handleAggiungiAttivita = async (nuova: AttivitaCommercio) => {
+    // Invio sincrono/asincrono verso l'API WordPress (salvata come pending/in attesa)
+    try {
+      await submitAttivitaCommercio({
+        nome: nuova.nome,
+        categoria: nuova.categoria,
+        indirizzo: nuova.indirizzo,
+        telefono: nuova.telefono,
+        whatsapp: nuova.whatsapp || '',
+        orari: nuova.orari,
+        descrizione: nuova.descrizione,
+        offertaTitolo: nuova.offertaAttiva?.titolo || '',
+        offertaDettaglio: nuova.offertaAttiva?.dettaglio || '',
+        nomeReferente: nuova.nomeReferente,
+        emailReferente: nuova.emailReferente,
+        lat: nuova.lat,
+        lng: nuova.lng,
+      });
+    } catch (e) {
+      console.warn('Errore invio commercio a WP:', e);
+    }
+
+    setAttivitaCommercio((prev) => {
+      const updated = [nuova, ...prev];
+      try {
+        localStorage.setItem('vp_attivita_commercio', JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+      return updated;
+    });
+
+    const updatedMie = Array.from(new Set([...(interactions.mieAttivita || []), nuova.id]));
+    addPunti(5, 'Registrazione nuova attività commerciale', { mieAttivita: updatedMie });
+  };
+
+  const handleApprovaAttivita = (id: number) => {
+    setAttivitaCommercio((prev) => {
+      const updated = prev.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              statoApprovazione: 'approvata' as const,
+              verificato: true,
+            }
+          : item
+      );
+      try {
+        localStorage.setItem('vp_attivita_commercio', JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+      return updated;
+    });
+    showToast('Attività commerciale approvata con successo! Ora è pubblica per tutti i residenti.');
+  };
 
   // Volunteer contact modal state
   const [contactModalOpen, setContactModalOpen] = useState(false);
@@ -153,6 +278,24 @@ export default function App() {
 
   // Modale Esportazione Plugin & Web App ZIP
   const [exportModalOpen, setExportModalOpen] = useState(false);
+
+  // Guida Tour Interattiva Onboarding
+  const [tourModalOpen, setTourModalOpen] = useState(false);
+
+  // Controllo primo avvio per mostrare la guida interattiva
+  useEffect(() => {
+    try {
+      const tourCompletato = localStorage.getItem('vp_tour_completato');
+      if (!tourCompletato) {
+        const timer = setTimeout(() => {
+          setTourModalOpen(true);
+        }, 750);
+        return () => clearTimeout(timer);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // Snapshot precedenti per rilevare variazioni sui dati salvati / sincronizzati
   const prevProposalVotesRef = useRef<Record<number, number>>({});
@@ -382,47 +525,56 @@ export default function App() {
     }
   }, []);
 
-  const addPunti = (punti: number, motivazione: string) => {
-    const oldPunti = interactions.puntiCivici;
-    const newPunti = oldPunti + punti;
-    const updated = {
-      ...interactions,
-      puntiCivici: newPunti,
-    };
-    setInteractions(updated);
-    saveUserInteractions(updated);
-    showToast(`+${punti} punti: ${motivazione}`);
-    syncCitizenPointsToWp(
-      updated.contattiSalvati?.nome || '',
-      newPunti,
-      motivazione
-    );
+  const addPunti = (
+    punti: number,
+    motivazione: string,
+    extraUpdates?: Partial<UserInteractions>
+  ) => {
+    setInteractions((prev) => {
+      const oldPunti = prev.puntiCivici;
+      const newPunti = oldPunti + punti;
+      const updated: UserInteractions = {
+        ...prev,
+        ...extraUpdates,
+        puntiCivici: newPunti,
+      };
+      saveUserInteractions(updated);
+      syncCitizenPointsToWp(
+        updated.contattiSalvati?.nome || '',
+        newPunti,
+        motivazione
+      );
 
-    // Verifica se il volontario raggiunge un nuovo livello della community
-    const oldLevel = getLivelloFromPunti(oldPunti);
-    const newLevel = getLivelloFromPunti(newPunti);
+      // Verifica se il volontario raggiunge un nuovo livello della community
+      const oldLevel = getLivelloFromPunti(oldPunti);
+      const newLevel = getLivelloFromPunti(newPunti);
 
-    let lastKnownLevel: LivelloCommunity = oldLevel;
-    try {
-      const stored = localStorage.getItem('vp_last_known_level') as LivelloCommunity | null;
-      if (stored && LIVELLO_RANKS[stored] !== undefined) {
-        lastKnownLevel = stored;
-      }
-    } catch {
-      // ignore
-    }
-
-    if (LIVELLO_RANKS[newLevel] > LIVELLO_RANKS[lastKnownLevel]) {
-      // Passaggio di livello: mostra il pop up congratulazioni con i colori del livello raggiunto
-      setUnlockedLevel(newLevel);
-      setUnlockedLevelPoints(newPunti);
-      setLevelUpModalOpen(true);
+      let lastKnownLevel: LivelloCommunity = oldLevel;
       try {
-        localStorage.setItem('vp_last_known_level', newLevel);
+        const stored = localStorage.getItem('vp_last_known_level') as LivelloCommunity | null;
+        if (stored && LIVELLO_RANKS[stored] !== undefined) {
+          lastKnownLevel = stored;
+        }
       } catch {
         // ignore
       }
-    }
+
+      if (LIVELLO_RANKS[newLevel] > LIVELLO_RANKS[lastKnownLevel]) {
+        // Passaggio di livello: mostra il pop up congratulazioni con i colori del livello raggiunto
+        setUnlockedLevel(newLevel);
+        setUnlockedLevelPoints(newPunti);
+        setLevelUpModalOpen(true);
+        try {
+          localStorage.setItem('vp_last_known_level', newLevel);
+        } catch {
+          // ignore
+        }
+      }
+
+      return updated;
+    });
+
+    showToast(`+${punti} punti: ${motivazione}`);
   };
 
   // Gestione Adesione a Richiesta di Volontariato ("Serve una mano")
@@ -535,25 +687,25 @@ export default function App() {
 
   // Votazione Proposta (il contatore si ferma al primo click e non incrementa oltre)
   const handleVoteProposta = (proposta: PropostaCittadina) => {
-    const alreadyVoted = interactions.proposteVotate.includes(proposta.id);
+    const stored = getUserInteractions();
+    const currentVoted = Array.from(new Set([
+      ...(interactions.proposteVotate || []),
+      ...(stored.proposteVotate || []),
+    ]));
 
     // Se l'utente ha già votato questa proposta, il click non fa aumentare ulteriormente il contatore
-    if (alreadyVoted) {
+    if (currentVoted.includes(proposta.id)) {
+      showToast('Hai già votato questa proposta!');
       return;
     }
 
-    submitInteraction({ tipo: 'proposta_vota', postId: proposta.id });
-    const updated = {
-      ...interactions,
-      proposteVotate: [...interactions.proposteVotate, proposta.id],
-    };
-    setInteractions(updated);
-    saveUserInteractions(updated);
+    const nextVoted = [...currentVoted, proposta.id];
+    submitInteraction({ tipo: 'proposta_vota', postId: proposta.id }).catch(() => {});
 
     setProposte((prev) =>
       prev.map((p) => (p.id === proposta.id ? { ...p, v: p.v + 1 } : p))
     );
-    addPunti(2, 'Voto proposta');
+    addPunti(2, 'Voto proposta', { proposteVotate: nextVoted });
   };
 
   // Nuova Segnalazione
@@ -567,13 +719,7 @@ export default function App() {
   }) => {
     const res = await submitSegnalazione(data);
     const updatedMie = Array.from(new Set([...(interactions.mieSegnalazioni || []), res.newId]));
-    const updated = {
-      ...interactions,
-      mieSegnalazioni: updatedMie,
-    };
-    setInteractions(updated);
-    saveUserInteractions(updated);
-    addPunti(5, 'Segnalazione inviata');
+    addPunti(5, 'Segnalazione inviata', { mieSegnalazioni: updatedMie });
 
     // Richiedi permessi notifiche browser se in stato default per avvisarlo dei futuri cambi di stato
     if (isNotificationSupported() && getNotificationPermission() === 'default') {
@@ -587,13 +733,7 @@ export default function App() {
   const handleSubmitProposta = async (titolo: string) => {
     const res = await submitProposta(titolo);
     const updatedMie = Array.from(new Set([...(interactions.mieProposte || []), res.newId]));
-    const updated = {
-      ...interactions,
-      mieProposte: updatedMie,
-    };
-    setInteractions(updated);
-    saveUserInteractions(updated);
-    addPunti(5, 'Proposta inviata');
+    addPunti(5, 'Proposta inviata', { mieProposte: updatedMie });
 
     // Richiedi permessi notifiche browser se in stato default per avvisarlo di nuovi voti
     if (isNotificationSupported() && getNotificationPermission() === 'default') {
@@ -642,7 +782,11 @@ export default function App() {
         unreadNotificationsCount={notifications.filter((n) => !n.letta).length}
         onOpenNotifications={() => setNotificationModalOpen(true)}
         onOpenExportModal={() => setExportModalOpen(true)}
+        onOpenTour={() => setTourModalOpen(true)}
       />
+
+      {/* Banner PWA: Installazione Rapida guidata su smartphone */}
+      <PwaInstallBanner />
 
       {/* Contenuto Principale */}
       <main className="flex-1 max-w-4xl w-full mx-auto px-3.5 sm:px-4 py-4 sm:py-5">
@@ -661,6 +805,7 @@ export default function App() {
             onOpenPuntiModal={() => setPuntiModalOpen(true)}
             onUpdateUserNome={handleUpdateUserNome}
             onOpenExportModal={() => setExportModalOpen(true)}
+            onOpenTour={() => setTourModalOpen(true)}
           />
         )}
 
@@ -693,6 +838,18 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'commercio' && (
+          <CommercioTab
+            attivita={attivitaCommercio}
+            eventi={eventi}
+            votedAttivita={interactions.negoziVotati || []}
+            onVoteAttivita={handleVoteAttivita}
+            onAggiungiAttivita={handleAggiungiAttivita}
+            onApprovaAttivita={handleApprovaAttivita}
+            darkMode={darkMode}
+          />
+        )}
+
         {activeTab === 'proposte' && (
           <ProposteAltroTab
             proposte={proposte}
@@ -709,10 +866,10 @@ export default function App() {
       <nav className={`fixed bottom-0 left-0 right-0 z-40 backdrop-blur-md border-t shadow-md transition-colors duration-200 ${
         darkMode ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200'
       }`}>
-        <div className="max-w-md mx-auto px-1 py-1 flex items-center justify-around">
+        <div className="max-w-xl mx-auto px-1 py-1 flex items-center justify-around">
           <button
             onClick={() => setActiveTab('home')}
-            className={`flex flex-col items-center py-1.5 px-3 rounded-xl transition text-[11px] font-bold ${
+            className={`flex flex-col items-center py-1.5 px-2 rounded-xl transition text-[10px] sm:text-[11px] font-bold ${
               activeTab === 'home'
                 ? 'scale-105'
                 : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900'
@@ -725,7 +882,7 @@ export default function App() {
 
           <button
             onClick={() => setActiveTab('eventi')}
-            className={`flex flex-col items-center py-1.5 px-3 rounded-xl transition text-[11px] font-bold ${
+            className={`flex flex-col items-center py-1.5 px-2 rounded-xl transition text-[10px] sm:text-[11px] font-bold ${
               activeTab === 'eventi'
                 ? 'scale-105'
                 : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900'
@@ -737,8 +894,26 @@ export default function App() {
           </button>
 
           <button
+            onClick={() => setActiveTab('commercio')}
+            className={`flex flex-col items-center py-1.5 px-2 rounded-xl transition text-[10px] sm:text-[11px] font-bold ${
+              activeTab === 'commercio'
+                ? 'scale-105 text-amber-600'
+                : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900'
+            }`}
+            style={{ color: activeTab === 'commercio' ? (darkMode ? '#fbbf24' : '#d97706') : undefined }}
+          >
+            <div className="relative">
+              <Store className="w-5 h-5 mb-0.5" />
+              {attivitaCommercio.some(a => !!a.offertaAttiva) && (
+                <span className="absolute -top-0.5 -right-1 w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              )}
+            </div>
+            <span>Commercianti</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('segnalazioni')}
-            className={`flex flex-col items-center py-1.5 px-3 rounded-xl transition text-[11px] font-bold ${
+            className={`flex flex-col items-center py-1.5 px-2 rounded-xl transition text-[10px] sm:text-[11px] font-bold ${
               activeTab === 'segnalazioni'
                 ? 'scale-105 text-amber-500'
                 : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900'
@@ -753,7 +928,7 @@ export default function App() {
 
           <button
             onClick={() => setActiveTab('volontariato')}
-            className={`flex flex-col items-center py-1.5 px-3 rounded-xl transition text-[11px] font-bold ${
+            className={`flex flex-col items-center py-1.5 px-2 rounded-xl transition text-[10px] sm:text-[11px] font-bold ${
               activeTab === 'volontariato'
                 ? 'scale-105'
                 : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900'
@@ -766,7 +941,7 @@ export default function App() {
 
           <button
             onClick={() => setActiveTab('proposte')}
-            className={`flex flex-col items-center py-1.5 px-3 rounded-xl transition text-[11px] font-bold ${
+            className={`flex flex-col items-center py-1.5 px-2 rounded-xl transition text-[10px] sm:text-[11px] font-bold ${
               activeTab === 'proposte'
                 ? 'scale-105'
                 : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900'
@@ -903,6 +1078,25 @@ export default function App() {
         onClose={() => setExportModalOpen(false)}
         darkMode={darkMode}
         onOpenWpPanel={() => setWpPanelOpen(true)}
+      />
+
+      {/* Guida Tour Interattivo Onboarding per Nuovi Utenti */}
+      <GuidaTourModal
+        isOpen={tourModalOpen}
+        onClose={() => setTourModalOpen(false)}
+        onSelectTab={(tab) => setActiveTab(tab)}
+        onAddWelcomePoints={() => {
+          try {
+            const welcomed = localStorage.getItem('vp_welcome_pts');
+            if (!welcomed) {
+              localStorage.setItem('vp_welcome_pts', 'true');
+              addPunti(10, 'Benvenuto nel quartiere!');
+            }
+          } catch {
+            // ignore
+          }
+        }}
+        darkMode={darkMode}
       />
     </div>
   );

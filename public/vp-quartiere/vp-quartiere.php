@@ -2,9 +2,9 @@
 /**
  * Plugin Name: VP Quartiere - Gestione Web App Villaggio Prenestino
  * Plugin URI:  https://www.villaggioprenestino.it
- * Description: Plugin ufficiale per la gestione della Web App di quartiere: gestisce segnalazioni con foto, richieste di volontariato con contatti dei cittadini, eventi, proposte, dashboard Insight e REST API.
- * Version:     1.3.2
- * Author:      Comitato di Quartiere Villaggio Prenestino
+ * Description: Plugin ufficiale per la gestione della Web App di quartiere: gestisce commercianti e negozi locali con approvazione moderatore, segnalazioni con foto, richieste di volontariato con contatti dei cittadini, eventi, proposte, dashboard Insight e REST API.
+ * Version:     1.4.0
+ * Author:      Associazione di Quartiere Villaggio Prenestino
  * Author URI:  https://www.villaggioprenestino.it
  * License:     GPL-2.0+
  * Text Domain: vp-quartiere
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('VPQ_VERSION', '1.3.2');
+define('VPQ_VERSION', '1.4.0');
 define('VPQ_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('VPQ_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -150,6 +150,23 @@ function vpq_register_post_types() {
         'show_in_menu' => 'vp-quartiere',
         'supports'     => ['title', 'editor'],
     ]);
+
+    // 6. Commercianti e Negozi di Quartiere (con sistema di approvazione moderatore)
+    register_post_type('vp_commercio', [
+        'labels' => [
+            'name'               => 'Commercianti & Negozi',
+            'singular_name'      => 'Attività Commerciale',
+            'menu_name'          => '🏪 Commercianti',
+            'add_new'            => 'Nuova Attività',
+            'add_new_item'       => 'Aggiungi Attività Commerciale',
+            'edit_item'          => 'Dettagli Attività Commerciale',
+            'all_items'          => 'Tutti i Commercianti',
+        ],
+        'public'       => false,
+        'show_ui'      => true,
+        'show_in_menu' => 'vp-quartiere',
+        'supports'     => ['title', 'editor', 'thumbnail'],
+    ]);
 }
 
 /**
@@ -165,6 +182,8 @@ function vpq_add_meta_boxes() {
     add_meta_box('vpq_segnalazione_meta', 'Stato e Luogo Segnalazione', 'vpq_render_segnalazione_meta', 'vp_segnalazione', 'normal', 'high');
     // Meta box per Volontari
     add_meta_box('vpq_volontario_meta', 'Recapiti Volontario', 'vpq_render_volontario_meta', 'vp_volontario', 'normal', 'high');
+    // Meta box per Commercianti con stato di approvazione
+    add_meta_box('vpq_commercio_meta', 'Dati Attività & Approvazione Moderatore', 'vpq_render_commercio_meta', 'vp_commercio', 'normal', 'high');
 }
 
 /**
@@ -383,6 +402,111 @@ function vpq_render_volontario_meta($post) {
     <?php
 }
 
+function vpq_render_commercio_meta($post) {
+    wp_nonce_field('vpq_save_meta', 'vpq_meta_nonce');
+    $categoria      = get_post_meta($post->ID, '_vp_categoria', true) ?: 'alimentari';
+    $indirizzo      = get_post_meta($post->ID, '_vp_indirizzo', true) ?: '';
+    $telefono       = get_post_meta($post->ID, '_vp_telefono', true) ?: '';
+    $whatsapp       = get_post_meta($post->ID, '_vp_whatsapp', true) ?: '';
+    $orari          = get_post_meta($post->ID, '_vp_orari', true) ?: 'Lun-Sab 09:00 - 19:30';
+    $offerta_titolo = get_post_meta($post->ID, '_vp_offerta_titolo', true) ?: '';
+    $offerta_det    = get_post_meta($post->ID, '_vp_offerta_dettaglio', true) ?: '';
+    $lat            = get_post_meta($post->ID, '_vp_lat', true) ?: '41.8965';
+    $lng            = get_post_meta($post->ID, '_vp_lng', true) ?: '12.6710';
+    $verificato     = (bool) get_post_meta($post->ID, '_vp_verificato', true);
+    $mipiace        = (int) get_post_meta($post->ID, '_vp_mipiace', true) ?: 1;
+    $referente      = get_post_meta($post->ID, '_vp_nome_referente', true) ?: '';
+    $email_ref      = get_post_meta($post->ID, '_vp_email_referente', true) ?: '';
+    $is_pending     = $post->post_status === 'pending';
+    ?>
+    <?php if ($is_pending): ?>
+    <div style="background:#fff3cd; border-left:4px solid #ffba00; padding:12px 15px; margin-bottom:15px; border-radius:4px;">
+        <h3 style="margin:0 0 6px 0; color:#856404; font-size:14px; font-weight:bold;">
+            ⚠️ ATTIVITÀ IN ATTESA DI APPROVAZIONE DALL'AMMINISTRATORE
+        </h3>
+        <p style="margin:0; font-size:12px; color:#856404;">
+            Questa attività è stata inoltrata da un negoziante dal form dell'App. <strong>Non è visibile pubblicamente</strong> ai residenti finché non viene approvata. Per approvarla, clicca sul pulsante <em>"Pubblica"</em> nel box a destra (Stato: Pubblicato).
+        </p>
+    </div>
+    <?php else: ?>
+    <div style="background:#d4edda; border-left:4px solid #28a745; padding:10px 15px; margin-bottom:15px; border-radius:4px;">
+        <p style="margin:0; font-size:12px; color:#155724; font-weight:bold;">
+            ✅ ATTIVITÀ APPROVATA E PUBBLICATA: Visibile a tutti i residenti su Google Maps e nella vetrina commercianti.
+        </p>
+    </div>
+    <?php endif; ?>
+
+    <table class="form-table">
+        <tr>
+            <th><label for="vp_categoria">Categoria Merceologica:</label></th>
+            <td>
+                <select id="vp_categoria" name="vp_categoria">
+                    <option value="alimentari" <?php selected($categoria, 'alimentari'); ?>>🍞 Alimentari & Gastronomia</option>
+                    <option value="ristorazione" <?php selected($categoria, 'ristorazione'); ?>>🍕 Bar & Ristorazione</option>
+                    <option value="salute" <?php selected($categoria, 'salute'); ?>>💊 Salute & Farmacia</option>
+                    <option value="servizi" <?php selected($categoria, 'servizi'); ?>>🔧 Artigiani & Servizi</option>
+                    <option value="casa" <?php selected($categoria, 'casa'); ?>>🏡 Casa, Giardino & Hobby</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="vp_indirizzo">Indirizzo a Villaggio Prenestino:</label></th>
+            <td><input type="text" id="vp_indirizzo" name="vp_indirizzo" value="<?php echo esc_attr($indirizzo); ?>" class="regular-text" placeholder="es. Via Fosso dell'Osa 120" /></td>
+        </tr>
+        <tr>
+            <th><label for="vp_telefono">Telefono Principale:</label></th>
+            <td><input type="text" id="vp_telefono" name="vp_telefono" value="<?php echo esc_attr($telefono); ?>" class="regular-text" /></td>
+        </tr>
+        <tr>
+            <th><label for="vp_whatsapp">WhatsApp Ordini (senza spazi, prefisso 39):</label></th>
+            <td><input type="text" id="vp_whatsapp" name="vp_whatsapp" value="<?php echo esc_attr($whatsapp); ?>" class="regular-text" placeholder="es. 393401234567" /></td>
+        </tr>
+        <tr>
+            <th><label for="vp_orari">Orari di Apertura:</label></th>
+            <td><input type="text" id="vp_orari" name="vp_orari" value="<?php echo esc_attr($orari); ?>" class="regular-text" placeholder="es. Lun-Sab 08:30 - 19:30" /></td>
+        </tr>
+        <tr style="background:#fffbee;">
+            <th><label for="vp_offerta_titolo">Titolo Offerta Residenti:</label></th>
+            <td>
+                <input type="text" id="vp_offerta_titolo" name="vp_offerta_titolo" value="<?php echo esc_attr($offerta_titolo); ?>" class="regular-text" placeholder="es. Sconto 10% sulla spesa del martedì" />
+                <br />
+                <input type="text" id="vp_offerta_dettaglio" name="vp_offerta_dettaglio" value="<?php echo esc_attr($offerta_det); ?>" class="regular-text" style="margin-top:5px;" placeholder="Dettaglio o condizioni coupon" />
+            </td>
+        </tr>
+        <tr>
+            <th>Coordinate Google Maps:</th>
+            <td>
+                <label>Lat: <input type="text" id="vp_lat" name="vp_lat" value="<?php echo esc_attr($lat); ?>" style="width:110px;" /></label>
+                <label style="margin-left:10px;">Lng: <input type="text" id="vp_lng" name="vp_lng" value="<?php echo esc_attr($lng); ?>" style="width:110px;" /></label>
+            </td>
+        </tr>
+        <tr>
+            <th>Badge & Consensi:</th>
+            <td>
+                <label>
+                    <input type="checkbox" id="vp_verificato" name="vp_verificato" value="1" <?php checked($verificato, true); ?> />
+                    <strong>Attività Verificata</strong> (mostra la spunta verde di garanzia CdQ)
+                </label>
+                <br /><br />
+                <label>
+                    Numero "Mi piace" ricevuti: 
+                    <input type="number" id="vp_mipiace" name="vp_mipiace" value="<?php echo esc_attr($mipiace); ?>" style="width:70px;" min="0" />
+                </label>
+            </td>
+        </tr>
+        <?php if ($referente || $email_ref): ?>
+        <tr style="background:#f9f9f9;">
+            <th>Contatto Richiedente / Titolare:</th>
+            <td>
+                <strong>Nome:</strong> <?php echo esc_html($referente ?: '—'); ?> | 
+                <strong>Recapito / Email:</strong> <?php echo esc_html($email_ref ?: '—'); ?>
+            </td>
+        </tr>
+        <?php endif; ?>
+    </table>
+    <?php
+}
+
 add_action('save_post', 'vpq_save_meta');
 function vpq_save_meta($post_id) {
     if (!isset($_POST['vpq_meta_nonce']) || !wp_verify_nonce($_POST['vpq_meta_nonce'], 'vpq_save_meta')) {
@@ -422,6 +546,18 @@ function vpq_save_meta($post_id) {
     update_post_meta($post_id, '_vp_urgente', isset($_POST['vp_urgente']) ? '1' : '0');
     if (isset($_POST['vp_stato'])) update_post_meta($post_id, '_vp_stato', sanitize_text_field($_POST['vp_stato']));
     if (isset($_POST['vp_telefono'])) update_post_meta($post_id, '_vp_telefono', sanitize_text_field($_POST['vp_telefono']));
+
+    // Metadati Commercianti
+    if (isset($_POST['vp_categoria'])) update_post_meta($post_id, '_vp_categoria', sanitize_text_field($_POST['vp_categoria']));
+    if (isset($_POST['vp_indirizzo'])) update_post_meta($post_id, '_vp_indirizzo', sanitize_text_field($_POST['vp_indirizzo']));
+    if (isset($_POST['vp_whatsapp'])) update_post_meta($post_id, '_vp_whatsapp', sanitize_text_field($_POST['vp_whatsapp']));
+    if (isset($_POST['vp_orari'])) update_post_meta($post_id, '_vp_orari', sanitize_text_field($_POST['vp_orari']));
+    if (isset($_POST['vp_offerta_titolo'])) update_post_meta($post_id, '_vp_offerta_titolo', sanitize_text_field($_POST['vp_offerta_titolo']));
+    if (isset($_POST['vp_offerta_dettaglio'])) update_post_meta($post_id, '_vp_offerta_dettaglio', sanitize_text_field($_POST['vp_offerta_dettaglio']));
+    if (isset($_POST['vp_lat'])) update_post_meta($post_id, '_vp_lat', sanitize_text_field($_POST['vp_lat']));
+    if (isset($_POST['vp_lng'])) update_post_meta($post_id, '_vp_lng', sanitize_text_field($_POST['vp_lng']));
+    update_post_meta($post_id, '_vp_verificato', isset($_POST['vp_verificato']) ? '1' : '0');
+    if (isset($_POST['vp_mipiace'])) update_post_meta($post_id, '_vp_mipiace', absint($_POST['vp_mipiace']));
 }
 
 /**
@@ -546,6 +682,59 @@ add_action('manage_vp_evento_posts_custom_column', function($col, $post_id) {
     }
 }, 10, 2);
 
+// 5. Commercianti e Negozi (con stato di approvazione e contatti)
+add_filter('manage_vp_commercio_posts_columns', function($cols) {
+    $new_cols = [];
+    foreach ($cols as $k => $v) {
+        $new_cols[$k] = $v;
+        if ($k === 'title') {
+            $new_cols['vp_cat_col']          = 'Categoria';
+            $new_cols['vp_indirizzo_col']    = 'Indirizzo';
+            $new_cols['vp_contatti_col']     = 'Telefono & WhatsApp';
+            $new_cols['vp_approvazione_col'] = 'Stato Moderazione';
+            $new_cols['vp_mipiace_col']      = 'Mi Piace';
+        }
+    }
+    return $new_cols;
+});
+add_action('manage_vp_commercio_posts_custom_column', function($col, $post_id) {
+    if ($col === 'vp_cat_col') {
+        $cat = get_post_meta($post_id, '_vp_categoria', true) ?: 'alimentari';
+        $labels = [
+            'alimentari'   => '🍞 Alimentari',
+            'ristorazione' => '🍕 Ristorazione',
+            'salute'       => '💊 Salute & Farmacia',
+            'servizi'      => '🔧 Servizi & Artigiani',
+            'casa'         => '🏡 Casa & Hobby',
+        ];
+        echo isset($labels[$cat]) ? esc_html($labels[$cat]) : esc_html($cat);
+    }
+    if ($col === 'vp_indirizzo_col') {
+        echo esc_html(get_post_meta($post_id, '_vp_indirizzo', true) ?: '—');
+    }
+    if ($col === 'vp_contatti_col') {
+        $tel = get_post_meta($post_id, '_vp_telefono', true);
+        $wa  = get_post_meta($post_id, '_vp_whatsapp', true);
+        if ($tel) echo '<div>📞 <a href="tel:' . esc_attr($tel) . '">' . esc_html($tel) . '</a></div>';
+        if ($wa) echo '<div>💬 <a href="https://wa.me/' . esc_attr($wa) . '" target="_blank">WhatsApp</a></div>';
+        if (!$tel && !$wa) echo '—';
+    }
+    if ($col === 'vp_approvazione_col') {
+        $status = get_post_status($post_id);
+        if ($status === 'pending') {
+            echo '<span style="background:#fff3cd;color:#856404;padding:3px 8px;border-radius:12px;font-weight:bold;font-size:11px;">⏳ In Attesa Approvazione</span>';
+        } elseif ($status === 'publish') {
+            echo '<span style="background:#d4edda;color:#155724;padding:3px 8px;border-radius:12px;font-weight:bold;font-size:11px;">✅ Pubblicata su App</span>';
+        } else {
+            echo esc_html($status);
+        }
+    }
+    if ($col === 'vp_mipiace_col') {
+        $mp = (int) get_post_meta($post_id, '_vp_mipiace', true) ?: 0;
+        echo '<strong>' . $mp . '</strong> 👍';
+    }
+}, 10, 2);
+
 
 /**
  * Gestione CORS per Web App
@@ -656,6 +845,20 @@ add_action('rest_api_init', function() {
     register_rest_route($ns, '/classifica/sync', [
         'methods'             => 'POST',
         'callback'            => 'vpq_api_post_classifica_sync',
+        'permission_callback' => '__return_true',
+    ]);
+
+    // 13. POST /wp-json/vp/v1/commercio - Registrazione nuova attività commerciale (Stato: Pending per approvazione admin)
+    register_rest_route($ns, '/commercio', [
+        'methods'             => 'POST',
+        'callback'            => 'vpq_api_post_commercio',
+        'permission_callback' => '__return_true',
+    ]);
+
+    // 14. POST /wp-json/vp/v1/commercio/vota - Voto mi piace commerciante
+    register_rest_route($ns, '/commercio/vota', [
+        'methods'             => 'POST',
+        'callback'            => 'vpq_api_post_commercio_vota',
         'permission_callback' => '__return_true',
     ]);
 });
@@ -781,6 +984,49 @@ function vpq_api_get_dati() {
         return $b['v'] - $a['v'];
     });
 
+    // Commercianti e Negozi (Solo quelli approvati e pubblicati dal moderatore!)
+    $commercio_query = new WP_Query([
+        'post_type'      => 'vp_commercio',
+        'post_status'    => 'publish', // Esclude categoricamente quelli pending/in attesa
+        'posts_per_page' => 60,
+        'orderby'        => 'date',
+        'order'          => 'DESC',
+    ]);
+    $commercio = [];
+    foreach ($commercio_query->posts as $p) {
+        $thumb      = get_post_meta($p->ID, '_vp_immagine', true) ?: get_the_post_thumbnail_url($p->ID, 'large');
+        $logo       = get_post_meta($p->ID, '_vp_logo', true) ?: '';
+        $off_titolo = get_post_meta($p->ID, '_vp_offerta_titolo', true);
+        $off_det    = get_post_meta($p->ID, '_vp_offerta_dettaglio', true);
+        $cat        = get_post_meta($p->ID, '_vp_categoria', true) ?: 'alimentari';
+        $voti_mp    = (int) ($wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE tipo='commercio_vota' AND post_id=%d", $p->ID)) ?: 0);
+        $meta_mp    = (int) get_post_meta($p->ID, '_vp_mipiace', true) ?: 1;
+        $tot_mp     = max($meta_mp, $voti_mp);
+
+        $commercio[] = [
+            'id'             => $p->ID,
+            'nome'           => $p->post_title,
+            'categoria'      => $cat,
+            'descrizione'    => wp_strip_all_tags($p->post_content),
+            'indirizzo'      => get_post_meta($p->ID, '_vp_indirizzo', true) ?: 'Villaggio Prenestino',
+            'lat'            => floatval(get_post_meta($p->ID, '_vp_lat', true) ?: 41.8965),
+            'lng'            => floatval(get_post_meta($p->ID, '_vp_lng', true) ?: 12.6710),
+            'telefono'       => get_post_meta($p->ID, '_vp_telefono', true) ?: '',
+            'whatsapp'       => get_post_meta($p->ID, '_vp_whatsapp', true) ?: '',
+            'orari'          => get_post_meta($p->ID, '_vp_orari', true) ?: 'Lun-Sab 09:00 - 19:30',
+            'apertoOra'      => true,
+            'verificato'     => (bool) get_post_meta($p->ID, '_vp_verificato', true),
+            'miPiace'        => $tot_mp,
+            'immagine'       => $thumb ?: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=800&q=80',
+            'logo'           => $logo,
+            'offertaAttiva'  => $off_titolo ? [
+                'titolo'   => $off_titolo,
+                'dettaglio'=> $off_det ?: 'Offerta per i residenti del quartiere',
+                'scadenza' => 'Promozione attiva',
+            ] : null,
+        ];
+    }
+
     // News/Articoli
     $news = vpq_get_ultimi_articoli();
 
@@ -790,6 +1036,7 @@ function vpq_api_get_dati() {
         'richieste'    => $richieste,
         'segnalazioni' => $segnalazioni,
         'proposte'     => $proposte,
+        'commercio'    => $commercio,
         'classifica'   => vpq_api_get_classifica_data(),
         'news'         => $news,
     ]);
@@ -1228,6 +1475,100 @@ function vpq_api_post_classifica_sync(WP_REST_Request $request) {
 }
 
 /**
+ * 13. CALLBACK: POST /commercio (Registrazione nuova attività commerciale con moderazione)
+ */
+function vpq_api_post_commercio(WP_REST_Request $request) {
+    $nome              = sanitize_text_field($request->get_param('nome') ?: 'Nuova Attività Commerciale');
+    $categoria         = sanitize_key($request->get_param('categoria') ?: 'alimentari');
+    $indirizzo         = sanitize_text_field($request->get_param('indirizzo') ?: 'Villaggio Prenestino');
+    $telefono          = sanitize_text_field($request->get_param('telefono') ?: '');
+    $whatsapp          = sanitize_text_field($request->get_param('whatsapp') ?: '');
+    $orari             = sanitize_text_field($request->get_param('orari') ?: 'Lun-Sab 09:00 - 19:30');
+    $descrizione       = sanitize_textarea_field($request->get_param('descrizione') ?: '');
+    $offerta_titolo    = sanitize_text_field($request->get_param('offerta_titolo') ?: '');
+    $offerta_dettaglio = sanitize_text_field($request->get_param('offerta_dettaglio') ?: '');
+    $nome_referente    = sanitize_text_field($request->get_param('nome_referente') ?: '');
+    $email_referente   = sanitize_text_field($request->get_param('email_referente') ?: '');
+    $lat               = floatval($request->get_param('lat') ?: 41.8965);
+    $lng               = floatval($request->get_param('lng') ?: 12.6710);
+    $immagine          = sanitize_text_field($request->get_param('immagine') ?: '');
+    $logo              = sanitize_text_field($request->get_param('logo') ?: '');
+
+    // Creazione del post in stato PENDING (in attesa di revisione e approvazione da parte dell'amministratore del sito)
+    $post_id = wp_insert_post([
+        'post_type'    => 'vp_commercio',
+        'post_title'   => $nome,
+        'post_content' => $descrizione,
+        'post_status'  => 'pending', // Esattamente come le segnalazioni cittadine!
+    ]);
+
+    if (is_wp_error($post_id)) {
+        return new WP_Error('vpq_save_error', 'Impossibile registrare l\'attività commerciale.', ['status' => 500]);
+    }
+
+    update_post_meta($post_id, '_vp_categoria', $categoria);
+    update_post_meta($post_id, '_vp_indirizzo', $indirizzo);
+    update_post_meta($post_id, '_vp_telefono', $telefono);
+    update_post_meta($post_id, '_vp_whatsapp', $whatsapp);
+    update_post_meta($post_id, '_vp_orari', $orari);
+    update_post_meta($post_id, '_vp_offerta_titolo', $offerta_titolo);
+    update_post_meta($post_id, '_vp_offerta_dettaglio', $offerta_dettaglio);
+    update_post_meta($post_id, '_vp_nome_referente', $nome_referente);
+    update_post_meta($post_id, '_vp_email_referente', $email_referente);
+    update_post_meta($post_id, '_vp_lat', $lat);
+    update_post_meta($post_id, '_vp_lng', $lng);
+    update_post_meta($post_id, '_vp_mipiace', 1);
+    update_post_meta($post_id, '_vp_verificato', '0');
+    if ($immagine) {
+        update_post_meta($post_id, '_vp_immagine', $immagine);
+    }
+    if ($logo) {
+        update_post_meta($post_id, '_vp_logo', $logo);
+    }
+
+    return rest_ensure_response([
+        'success'   => true,
+        'post_id'   => $post_id,
+        'status'    => 'pending',
+        'messaggio' => 'Attività commerciale registrata con successo! È ora in attesa di approvazione da parte dell\'amministratore prima della pubblicazione.',
+    ]);
+}
+
+/**
+ * 14. CALLBACK: POST /commercio/vota (Mi piace attività commerciale)
+ */
+function vpq_api_post_commercio_vota(WP_REST_Request $request) {
+    global $wpdb;
+    $table = $wpdb->prefix . 'vp_interazioni';
+
+    $post_id = absint($request->get_param('id') ?: $request->get_param('post_id'));
+    $token   = sanitize_text_field($request->get_header('X-VP-Token') ?: $request->get_param('token') ?: 'anon_' . wp_generate_password(12, false));
+
+    if (!$post_id) {
+        return new WP_Error('vpq_bad_data', 'ID attività mancante.', ['status' => 400]);
+    }
+
+    $wpdb->replace($table, [
+        'tipo'    => 'commercio_vota',
+        'post_id' => $post_id,
+        'token'   => $token,
+        'creato'  => current_time('mysql'),
+    ]);
+
+    $count = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE tipo='commercio_vota' AND post_id=%d", $post_id));
+    $current_meta = (int) get_post_meta($post_id, '_vp_mipiace', true) ?: 0;
+    $new_mipiace = max($current_meta + 1, $count);
+    update_post_meta($post_id, '_vp_mipiace', $new_mipiace);
+
+    return rest_ensure_response([
+        'success'   => true,
+        'azione'    => 'votato',
+        'conteggio' => $new_mipiace,
+        'messaggio' => 'Grazie per aver consigliato questa attività ai tuoi vicini!',
+    ]);
+}
+
+/**
  * Calcola la classifica reale dei cittadini dai dati attivi su WordPress
  * (Segnalazioni, Proposte, Volontariato, Eventi e sync App).
  * Se l'app/plugin è appena installato e non ci sono azioni, restituisce [] (vuota).
@@ -1467,7 +1808,7 @@ function vpq_render_admin_hub($preset_tab = '') {
     }
 
     // Tab attiva (di default sempre la Dashboard / Panoramica)
-    $allowed_tabs = ['panoramica', 'eventi', 'volontari', 'segnalazioni', 'impostazioni', 'webapp'];
+    $allowed_tabs = ['panoramica', 'eventi', 'volontari', 'segnalazioni', 'commercianti', 'impostazioni', 'webapp'];
     $active_tab   = !empty($preset_tab) ? $preset_tab : (isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'panoramica');
     if (!in_array($active_tab, $allowed_tabs)) {
         $active_tab = 'panoramica';
@@ -1486,6 +1827,10 @@ function vpq_render_admin_hub($preset_tab = '') {
     $tot_voti         = (int) ($wpdb->get_var("SELECT COUNT(*) FROM $table WHERE tipo='proposta_vota'") ?: 0);
     $tot_eventi       = (int) wp_count_posts('vp_evento')->publish;
     $tot_partecipanti = (int) ($wpdb->get_var("SELECT COUNT(*) FROM $table WHERE tipo='evento_vengo'") ?: 0);
+
+    // Statistiche Commercianti
+    $tot_commercio     = (int) wp_count_posts('vp_commercio')->publish;
+    $pending_commercio = (int) wp_count_posts('vp_commercio')->pending;
 
     // Configurazione API
     $api_key       = get_option('vpq_api_key');
@@ -1508,7 +1853,7 @@ function vpq_render_admin_hub($preset_tab = '') {
             </div>
             <div style="display:flex;align-items:center;gap:10px;">
                 <span style="background:#dcfce7;color:#166534;font-weight:bold;padding:6px 12px;border-radius:20px;font-size:12px;border:1px solid #bbf7d0;">
-                    ● Sincronizzazione Live Attiva (v1.3.2)
+                    ● Sincronizzazione Live Attiva (v1.4.0)
                 </span>
                 <a href="<?php echo esc_url($app_url); ?>" target="_blank" class="button button-secondary" style="font-size:12px;">
                     📱 Apri Web App &rarr;
@@ -1520,6 +1865,9 @@ function vpq_render_admin_hub($preset_tab = '') {
         <h2 class="nav-tab-wrapper" style="margin-bottom:20px;border-bottom:1px solid #cbd5e1;padding-bottom:0;">
             <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=panoramica'); ?>" class="nav-tab <?php echo $active_tab === 'panoramica' ? 'nav-tab-active' : ''; ?>" style="font-weight:600;font-size:13px;">
                 📊 Dashboard & Tab Hub
+            </a>
+            <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=commercianti'); ?>" class="nav-tab <?php echo $active_tab === 'commercianti' ? 'nav-tab-active' : ''; ?>" style="font-weight:600;font-size:13px;">
+                🏪 Commercianti <?php if ($pending_commercio > 0): ?><span style="background:#e11d48;color:#fff;padding:2px 7px;border-radius:10px;font-size:10px;margin-left:4px;font-weight:bold;"><?php echo $pending_commercio; ?> in attesa</span><?php endif; ?>
             </a>
             <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=eventi'); ?>" class="nav-tab <?php echo $active_tab === 'eventi' ? 'nav-tab-active' : ''; ?>" style="font-weight:600;font-size:13px;">
                 📅 Eventi del Quartiere
@@ -1556,8 +1904,22 @@ function vpq_render_admin_hub($preset_tab = '') {
                 </div>
             <?php endif; ?>
 
-            <!-- 4 KPI Cards (Dati Reali da Database) -->
-            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:16px;margin-bottom:25px;">
+            <?php if ($pending_commercio > 0): ?>
+                <div style="background:#fffbeb;border:1px solid #fde68a;border-left:4px solid #f59e0b;border-radius:12px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap;">
+                    <div>
+                        <strong style="color:#92400e;font-size:14px;">🔔 Attività Commerciali in Attesa di Approvazione (<?php echo $pending_commercio; ?>)</strong>
+                        <p style="margin:2px 0 0 0;font-size:12px;color:#b45309;">
+                            Ci sono commercianti che hanno registrato la propria attività tramite la Web App. Revisiona e approva le schede per renderle visibili su Google Maps e nella vetrina pubblica.
+                        </p>
+                    </div>
+                    <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=commercianti'); ?>" class="button button-primary" style="background:#d97706;border-color:#b45309;font-weight:bold;">
+                        Revisiona e Approva (<?php echo $pending_commercio; ?>) &rarr;
+                    </a>
+                </div>
+            <?php endif; ?>
+
+            <!-- 5 KPI Cards (Dati Reali da Database) -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:16px;margin-bottom:25px;">
                 <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
                     <div style="display:flex;justify-content:space-between;align-items:center;color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;">
                         <span>Segnalazioni Cittadini</span>
@@ -1648,6 +2010,26 @@ function vpq_render_admin_hub($preset_tab = '') {
                             Inserisci il primo evento dalla scheda "Eventi"
                         </div>
                     <?php endif; ?>
+                </div>
+
+                <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;">
+                        <span>Commercianti & Negozi</span>
+                        <span class="dashicons dashicons-store" style="color:#059669;"></span>
+                    </div>
+                    <div style="font-size:32px;font-weight:900;color:#0f172a;margin:8px 0 4px 0;"><?php echo $tot_commercio; ?></div>
+                    <?php if ($pending_commercio > 0): ?>
+                        <div style="font-size:12px;color:#d97706;font-weight:700;">
+                            ⚠️ <?php echo $pending_commercio; ?> in attesa di approvazione
+                        </div>
+                    <?php else: ?>
+                        <div style="font-size:12px;color:#16a34a;font-weight:600;">
+                            Tutte le schede approvate
+                        </div>
+                    <?php endif; ?>
+                    <div style="font-size:11px;color:#94a3b8;margin-top:6px;border-top:1px solid #f1f5f9;padding-top:6px;">
+                        <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=commercianti'); ?>" style="text-decoration:none;font-weight:600;color:#059669;">Gestisci commercianti &rarr;</a>
+                    </div>
                 </div>
             </div>
 
@@ -2136,7 +2518,165 @@ function vpq_render_admin_hub($preset_tab = '') {
             </div>
 
         <!-- ========================================== -->
-        <!-- TAB 5: IMPOSTAZIONI & API                  -->
+        <!-- TAB 5: COMMERCIANTI & NEGOZI DI QUARTIERE  -->
+        <!-- ========================================== -->
+        <?php elseif ($active_tab === 'commercianti'): ?>
+            <?php
+            // Gestione azione approvazione rapida
+            if (isset($_GET['action']) && $_GET['action'] === 'vpq_approva_commercio' && isset($_GET['post_id']) && check_admin_referer('vpq_approva_commercio_' . $_GET['post_id'])) {
+                $pid = absint($_GET['post_id']);
+                wp_update_post([
+                    'ID'          => $pid,
+                    'post_status' => 'publish',
+                ]);
+                update_post_meta($pid, '_vp_verificato', '1');
+                echo '<div class="notice notice-success is-dismissible" style="margin:15px 0;"><p><strong>Attività commerciale approvata con successo! È ora pubblicata e visibile a tutti i residenti su Google Maps e nella vetrina.</strong></p></div>';
+            }
+
+            $filtro_stato = isset($_GET['stato_filtro']) ? sanitize_key($_GET['stato_filtro']) : 'tutti';
+            $query_args = [
+                'post_type'      => 'vp_commercio',
+                'posts_per_page' => 50,
+                'orderby'        => 'date',
+                'order'          => 'DESC',
+            ];
+            if ($filtro_stato === 'pending') {
+                $query_args['post_status'] = 'pending';
+            } elseif ($filtro_stato === 'publish') {
+                $query_args['post_status'] = 'publish';
+            } else {
+                $query_args['post_status'] = ['publish', 'pending', 'draft'];
+            }
+            $commercio_admin_query = new WP_Query($query_args);
+            ?>
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:15px;">
+                <div>
+                    <h2 style="margin:0;font-size:18px;font-weight:800;color:#0f172a;">
+                        🏪 Commercianti e Negozi di Quartiere
+                    </h2>
+                    <p style="margin:2px 0 0 0;font-size:12px;color:#64748b;">
+                        Controlla le attività inserite dai commercianti dall'app, approva la pubblicazione e gestisci promozioni e recapiti WhatsApp.
+                    </p>
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <a href="<?php echo admin_url('post-new.php?post_type=vp_commercio'); ?>" class="button button-primary">
+                        ➕ Aggiungi Nuova Attività
+                    </a>
+                </div>
+            </div>
+
+            <!-- Filtri rapidi -->
+            <div style="margin-bottom:15px;display:flex;gap:10px;align-items:center;">
+                <span style="font-size:12px;font-weight:600;color:#64748b;">Filtra:</span>
+                <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=commercianti&stato_filtro=tutti'); ?>" class="button <?php echo $filtro_stato === 'tutti' ? 'button-primary' : 'button-secondary'; ?>" style="font-size:12px;">
+                    Tutti (<?php echo $tot_commercio + $pending_commercio; ?>)
+                </a>
+                <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=commercianti&stato_filtro=pending'); ?>" class="button <?php echo $filtro_stato === 'pending' ? 'button-primary' : 'button-secondary'; ?>" style="font-size:12px;<?php echo $pending_commercio > 0 ? 'border-color:#f59e0b;color:#b45309;font-weight:bold;' : ''; ?>">
+                    ⏳ In Attesa di Approvazione (<?php echo $pending_commercio; ?>)
+                </a>
+                <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=commercianti&stato_filtro=publish'); ?>" class="button <?php echo $filtro_stato === 'publish' ? 'button-primary' : 'button-secondary'; ?>" style="font-size:12px;">
+                    ✅ Pubblicati su App (<?php echo $tot_commercio; ?>)
+                </a>
+            </div>
+
+            <!-- Tabella Attività -->
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05);margin-bottom:25px;">
+                <table class="wp-list-table widefat fixed striped" style="border:none;">
+                    <thead>
+                        <tr>
+                            <th style="font-weight:700;width:65px;text-align:center;">Foto/Logo</th>
+                            <th style="font-weight:700;padding:12px 16px;">Nome Attività</th>
+                            <th style="font-weight:700;width:140px;">Categoria</th>
+                            <th style="font-weight:700;width:220px;">Indirizzo a Villaggio Prenestino</th>
+                            <th style="font-weight:700;width:180px;">Telefono & WhatsApp</th>
+                            <th style="font-weight:700;width:160px;">Stato Moderazione</th>
+                            <th style="font-weight:700;width:90px;text-align:center;">Mi Piace</th>
+                            <th style="font-weight:700;width:160px;text-align:right;padding-right:16px;">Azioni Moderatore</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if ($commercio_admin_query->have_posts()): ?>
+                            <?php while ($commercio_admin_query->have_posts()): $commercio_admin_query->the_post();
+                                $cid        = get_the_ID();
+                                $status     = get_post_status($cid);
+                                $cat        = get_post_meta($cid, '_vp_categoria', true) ?: 'alimentari';
+                                $ind        = get_post_meta($cid, '_vp_indirizzo', true) ?: '—';
+                                $tel        = get_post_meta($cid, '_vp_telefono', true);
+                                $wa         = get_post_meta($cid, '_vp_whatsapp', true);
+                                $mp         = (int) get_post_meta($cid, '_vp_mipiace', true) ?: 0;
+                                $ref        = get_post_meta($cid, '_vp_nome_referente', true);
+                                $img        = get_post_meta($cid, '_vp_immagine', true) ?: get_the_post_thumbnail_url($cid, 'thumbnail') ?: get_post_meta($cid, '_vp_logo', true);
+                                $approva_url = wp_nonce_url(admin_url('admin.php?page=vp-quartiere&tab=commercianti&action=vpq_approva_commercio&post_id=' . $cid), 'vpq_approva_commercio_' . $cid);
+                            ?>
+                            <tr style="<?php echo $status === 'pending' ? 'background:#fffdf5;' : ''; ?>">
+                                <td style="text-align:center;padding:8px 10px;vertical-align:middle;">
+                                    <?php if ($img): ?>
+                                        <img src="<?php echo esc_url($img); ?>" alt="Logo/Foto" style="width:44px;height:44px;object-fit:cover;border-radius:10px;border:1px solid #cbd5e1;display:inline-block;" />
+                                    <?php else: ?>
+                                        <div style="width:44px;height:44px;border-radius:10px;background:#f1f5f9;display:inline-flex;align-items:center;justify-content:center;font-size:20px;">🏪</div>
+                                    <?php endif; ?>
+                                </td>
+                                <td style="padding:12px 16px;vertical-align:middle;">
+                                    <strong>
+                                        <a href="<?php echo esc_url(get_edit_post_link($cid)); ?>" style="color:#0f172a;text-decoration:none;">
+                                            <?php the_title(); ?>
+                                        </a>
+                                    </strong>
+                                    <?php if ($ref): ?>
+                                        <div style="font-size:11px;color:#64748b;">Referente: <?php echo esc_html($ref); ?></div>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <span style="font-size:11px;font-weight:600;background:#f1f5f9;padding:2px 8px;border-radius:10px;text-transform:capitalize;">
+                                        <?php echo esc_html($cat); ?>
+                                    </span>
+                                </td>
+                                <td style="font-size:12px;color:#334155;"><?php echo esc_html($ind); ?></td>
+                                <td style="font-size:12px;">
+                                    <?php if ($tel): ?><div>📞 <a href="tel:<?php echo esc_attr($tel); ?>"><?php echo esc_html($tel); ?></a></div><?php endif; ?>
+                                    <?php if ($wa): ?><div>💬 <a href="https://wa.me/<?php echo esc_attr($wa); ?>" target="_blank" style="color:#16a34a;font-weight:bold;">WhatsApp</a></div><?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php if ($status === 'pending'): ?>
+                                        <span style="background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:12px;font-weight:bold;font-size:11px;display:inline-block;">
+                                            ⏳ In Attesa Approvazione
+                                        </span>
+                                    <?php elseif ($status === 'publish'): ?>
+                                        <span style="background:#dcfce7;color:#166534;padding:3px 10px;border-radius:12px;font-weight:bold;font-size:11px;display:inline-block;">
+                                            ✅ Pubblicata su App
+                                        </span>
+                                    <?php else: ?>
+                                        <span style="font-size:11px;color:#64748b;"><?php echo esc_html($status); ?></span>
+                                    <?php endif; ?>
+                                </td>
+                                <td style="text-align:center;font-weight:bold;font-size:12px;color:#0f172a;">
+                                    <?php echo $mp; ?> 👍
+                                </td>
+                                <td style="text-align:right;padding-right:16px;">
+                                    <?php if ($status === 'pending'): ?>
+                                        <a href="<?php echo esc_url($approva_url); ?>" class="button button-small button-primary" style="background:#16a34a;border-color:#15803d;font-weight:bold;margin-right:4px;">
+                                            ✓ Approva
+                                        </a>
+                                    <?php endif; ?>
+                                    <a href="<?php echo esc_url(get_edit_post_link($cid)); ?>" class="button button-small">
+                                        Modifica
+                                    </a>
+                                </td>
+                            </tr>
+                            <?php endwhile; wp_reset_postdata(); ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="7" style="text-align:center;padding:30px;color:#64748b;">
+                                    Nessuna attività commerciale trovata per il filtro selezionato.
+                                </td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 6: IMPOSTAZIONI & API                  -->
         <!-- ========================================== -->
         <?php elseif ($active_tab === 'impostazioni'): ?>
             <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:25px;box-shadow:0 1px 3px rgba(0,0,0,0.05);max-width:850px;">

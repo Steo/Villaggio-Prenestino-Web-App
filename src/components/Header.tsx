@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Award, Moon, Sun, ShieldCheck, Bell, Download } from 'lucide-react';
+import { Award, Moon, Sun, ShieldCheck, Bell, Download, HelpCircle } from 'lucide-react';
 import { UserInteractions } from '../types';
 import { LogoCdq } from './LogoCdq';
 import { PuntiCiviciModal } from './PuntiCiviciModal';
@@ -15,6 +15,7 @@ interface HeaderProps {
   unreadNotificationsCount?: number;
   onOpenNotifications?: () => void;
   onOpenExportModal?: () => void;
+  onOpenTour?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -28,6 +29,7 @@ export const Header: React.FC<HeaderProps> = ({
   unreadNotificationsCount = 0,
   onOpenNotifications,
   onOpenExportModal,
+  onOpenTour,
 }) => {
   const [isPuntiModalOpen, setIsPuntiModalOpen] = useState(false);
   const logoTapCountRef = useRef(0);
@@ -67,7 +69,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div
             className="min-w-0 flex items-center cursor-pointer select-none"
             onClick={handleLogoTap}
-            title="CdQ Villaggio Prenestino"
+            title="Associazione di Quartiere Villaggio Prenestino"
           >
             <LogoCdq className="h-10 sm:h-11" />
           </div>
@@ -125,6 +127,19 @@ export const Header: React.FC<HeaderProps> = ({
                 </span>
               )}
             </button>
+
+            {/* Tasto Guida Interattiva / Tour */}
+            {onOpenTour && (
+              <button
+                type="button"
+                onClick={onOpenTour}
+                title="Guida Interattiva dell'App (Tour)"
+                aria-label="Apri la guida interattiva dell'App"
+                className="flex items-center justify-center w-8 h-8 rounded-xl bg-black/20 hover:bg-black/35 active:scale-95 border border-white/20 hover:border-amber-400/50 text-white transition-all shadow-xs cursor-pointer group focus:outline-none focus:ring-2 focus:ring-amber-400/50"
+              >
+                <HelpCircle className="w-4 h-4 text-white/90 group-hover:text-amber-300 transition-colors" />
+              </button>
+            )}
 
             {/* Tasto Contatore Punti Civici - Apre il popup esplicativo */}
             <button

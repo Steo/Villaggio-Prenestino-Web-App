@@ -8,6 +8,7 @@ import {
   StatoSegnalazione,
   InsightData,
   TipoEvento,
+  AttivitaCommercio,
 } from '../types';
 import { adminGetInsightStats } from '../services/wpService';
 import {
@@ -37,6 +38,9 @@ import {
   ChevronRight,
   Sparkles,
   LogOut,
+  Store,
+  Phone,
+  Tag,
 } from 'lucide-react';
 
 interface WpPluginPanelProps {
@@ -50,10 +54,12 @@ interface WpPluginPanelProps {
   segnalazioni?: SegnalazioneCittadina[];
   richieste?: RichiestaVolontariato[];
   proposte?: PropostaCittadina[];
+  attivitaCommercio?: AttivitaCommercio[];
   onRefreshData?: () => void;
   onUpdateSegnalazioneStato?: (id: number, stato: StatoSegnalazione) => void;
   onCreateEvento?: (evento: Omit<EventoQuartiere, 'id'>) => void;
   onCreateRichiesta?: (richiesta: Omit<RichiestaVolontariato, 'id' | 'have'>) => void;
+  onApprovaAttivita?: (id: number) => void;
   onDeactivateAdmin?: () => void;
 }
 
@@ -68,15 +74,18 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
   segnalazioni = [],
   richieste = [],
   proposte = [],
+  attivitaCommercio = [],
   onRefreshData,
   onUpdateSegnalazioneStato,
   onCreateEvento,
   onCreateRichiesta,
+  onApprovaAttivita,
   onDeactivateAdmin,
 }) => {
   const [activeTab, setActiveTab] = useState<
-    'insights' | 'eventi' | 'segnalazioni' | 'volontari' | 'proposte' | 'config'
+    'insights' | 'commercianti' | 'eventi' | 'segnalazioni' | 'volontari' | 'proposte' | 'config'
   >('insights');
+  const [commercioStatoFiltro, setCommercioStatoFiltro] = useState<'tutti' | 'pending' | 'publish'>('tutti');
 
   // Config fields
   const [baseUrl, setBaseUrl] = useState(config.baseUrl);
@@ -214,7 +223,7 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
       ['Segnalazioni Totali', insights.totaleSegnalazioni.toString(), 'Territorio e Manutenzione'],
       ['Segnalazioni Risolte', insights.segnalazioniRisolte.toString(), `${insights.tassoRisoluzione}% del totale`],
       ['Segnalazioni Inoltrate Municipio VI', insights.segnalazioniInoltrate.toString(), 'Pratiche aperte'],
-      ['Segnalazioni in Lavorazione', insights.segnalazioniRicevute.toString(), 'Presa in carico CdQ'],
+      ['Segnalazioni in Lavorazione', insights.segnalazioniRicevute.toString(), 'Presa in carico Associazione'],
       ['Volontari Registrati', insights.volontariTotali.toString(), 'Cittadini disponibili'],
       ['Ore Civiche Donate Stimate', insights.oreCivicheStimate.toString(), 'Lavori di quartiere'],
       ['Idee & Proposte Cittadini', insights.ideeTotali.toString(), 'Democrazia partecipata'],
@@ -255,7 +264,7 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
     if (onCreateEvento) {
       onCreateEvento({
         t: newEvent.t.trim(),
-        p: newEvent.p.trim() || 'Evento organizzato dal Comitato di Quartiere Villaggio Prenestino.',
+        p: newEvent.p.trim() || 'Evento organizzato dall\'Associazione di Quartiere Villaggio Prenestino.',
         d: newEvent.d.trim(),
         m: newEvent.m.trim().toUpperCase(),
         anno: newEvent.anno.trim(),
@@ -328,7 +337,7 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                villaggioprenestino.it • Plugin VP Quartiere v1.3.2
+                villaggioprenestino.it • Plugin VP Quartiere v1.4.0 (Moderazione Commercianti & Negozi)
               </p>
             </div>
           </div>
@@ -370,6 +379,23 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
             <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-emerald-100 text-emerald-800 font-bold uppercase">
               Nuovo
             </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('commercianti')}
+            className={`py-3 px-3 text-xs font-bold border-b-2 flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
+              activeTab === 'commercianti'
+                ? 'border-[#0073aa] text-[#0073aa] bg-white -mb-px rounded-t-lg'
+                : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+            }`}
+          >
+            <Store className="w-4 h-4 text-amber-600" />
+            <span>Commercianti ({attivitaCommercio.length})</span>
+            {attivitaCommercio.filter(a => a.statoApprovazione === 'in_attesa').length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-rose-500 text-white font-bold animate-pulse">
+                {attivitaCommercio.filter(a => a.statoApprovazione === 'in_attesa').length} in attesa
+              </span>
+            )}
           </button>
 
           <button
@@ -795,6 +821,210 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* TAB: GESTIONE & APPROVAZIONE COMMERCIANTI */}
+          {activeTab === 'commercianti' && (
+            <div className="space-y-4 animate-fadeIn">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <Store className="w-5 h-5 text-amber-600" />
+                    Gestione & Approvazione Commercianti
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Controlla le richieste di inserimento attività, visualizza la foto/logo JPG e approva la pubblicazione su Google Maps e nella vetrina.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-600">
+                    Totale: {attivitaCommercio.length}
+                  </span>
+                  {attivitaCommercio.filter(a => a.statoApprovazione === 'in_attesa').length > 0 && (
+                    <span className="px-2.5 py-1 bg-amber-100 border border-amber-300 text-amber-900 rounded-xl text-xs font-bold flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-amber-600" />
+                      <span>{attivitaCommercio.filter(a => a.statoApprovazione === 'in_attesa').length} in attesa</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Filtri rapidi stato */}
+              <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+                <button
+                  type="button"
+                  onClick={() => setCommercioStatoFiltro('tutti')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    commercioStatoFiltro === 'tutti'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Tutti ({attivitaCommercio.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCommercioStatoFiltro('pending')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                    commercioStatoFiltro === 'pending'
+                      ? 'bg-amber-600 text-white shadow-xs'
+                      : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
+                  }`}
+                >
+                  <span>In Attesa di Approvazione</span>
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-200 text-amber-900 font-black">
+                    {attivitaCommercio.filter(a => a.statoApprovazione === 'in_attesa').length}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCommercioStatoFiltro('publish')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                    commercioStatoFiltro === 'publish'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+                  }`}
+                >
+                  <span>Pubblicati su App</span>
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-200 text-emerald-900 font-black">
+                    {attivitaCommercio.filter(a => a.statoApprovazione !== 'in_attesa').length}
+                  </span>
+                </button>
+              </div>
+
+              {/* Elenco Attività Commerciali */}
+              <div className="space-y-3">
+                {attivitaCommercio
+                  .filter((shop) => {
+                    if (commercioStatoFiltro === 'pending') return shop.statoApprovazione === 'in_attesa';
+                    if (commercioStatoFiltro === 'publish') return shop.statoApprovazione !== 'in_attesa';
+                    return true;
+                  })
+                  .length === 0 ? (
+                  <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 p-6 space-y-2">
+                    <Store className="w-10 h-10 text-slate-300 mx-auto" />
+                    <p className="text-sm font-bold text-slate-700">Nessuna attività commerciale trovata</p>
+                    <p className="text-xs text-slate-500">I commercianti possono inserire la propria attività direttamente dalla scheda dell'app.</p>
+                  </div>
+                ) : (
+                  attivitaCommercio
+                    .filter((shop) => {
+                      if (commercioStatoFiltro === 'pending') return shop.statoApprovazione === 'in_attesa';
+                      if (commercioStatoFiltro === 'publish') return shop.statoApprovazione !== 'in_attesa';
+                      return true;
+                    })
+                    .map((shop) => {
+                      const isPending = shop.statoApprovazione === 'in_attesa';
+                      return (
+                        <div
+                          key={shop.id}
+                          className={`bg-white rounded-2xl border p-4 shadow-xs transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
+                            isPending
+                              ? 'border-amber-300 bg-amber-50/30'
+                              : 'border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3.5 flex-1 min-w-0">
+                            {/* Foto o Logo JPG */}
+                            <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0 relative">
+                              {shop.immagine || shop.logo ? (
+                                <img
+                                  src={shop.logo || shop.immagine}
+                                  alt={shop.nome}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-slate-400 font-black text-xl">
+                                  🏪
+                                </div>
+                              )}
+                              {shop.logo && (
+                                <span className="absolute bottom-0.5 right-0.5 px-1 rounded bg-black/70 text-[9px] text-white font-bold">
+                                  JPG
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="space-y-1 min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="font-bold text-slate-900 text-sm sm:text-base leading-tight">
+                                  {shop.nome}
+                                </h4>
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 capitalize border border-slate-200">
+                                  {shop.categoria}
+                                </span>
+                                {isPending ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                                    <Clock className="w-3 h-3 text-amber-600" />
+                                    <span>In Attesa di Approvazione</span>
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                    <span>Pubblicata ({shop.miPiace || 0} 👍)</span>
+                                  </span>
+                                )}
+                              </div>
+
+                              <p className="text-xs text-slate-600 flex items-center gap-1">
+                                <MapPin className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                <span className="truncate">{shop.indirizzo}</span>
+                              </p>
+
+                              <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
+                                {shop.telefono && <span>📞 {shop.telefono}</span>}
+                                {shop.whatsapp && (
+                                  <a
+                                    href={`https://wa.me/${shop.whatsapp}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-emerald-700 font-semibold hover:underline"
+                                  >
+                                    💬 WhatsApp ({shop.whatsapp})
+                                  </a>
+                                )}
+                                {shop.nomeReferente && (
+                                  <span className="text-slate-600">
+                                    👤 Referente: <strong>{shop.nomeReferente}</strong>
+                                    {shop.emailReferente ? ` (${shop.emailReferente})` : ''}
+                                  </span>
+                                )}
+                              </div>
+
+                              {shop.offertaAttiva && (
+                                <div className="text-[11px] text-amber-800 bg-amber-50 rounded-lg px-2 py-1 border border-amber-200 mt-1 inline-flex items-center gap-1">
+                                  <Tag className="w-3 h-3 text-amber-600" />
+                                  <span>Offerta: <strong>{shop.offertaAttiva.titolo}</strong> - {shop.offertaAttiva.dettaglio}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Azioni amministratore */}
+                          <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                            {isPending && onApprovaAttivita && (
+                              <button
+                                type="button"
+                                onClick={() => onApprovaAttivita(shop.id)}
+                                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                              >
+                                <CheckCircle2 className="w-4 h-4" />
+                                <span>Approva e Pubblica</span>
+                              </button>
+                            )}
+                            {!isPending && (
+                              <span className="text-xs text-emerald-700 font-semibold px-2.5 py-1 bg-emerald-50 rounded-lg border border-emerald-200">
+                                Visibile su Mappa e App
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                )}
+              </div>
             </div>
           )}
 
@@ -1341,13 +1571,13 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
               <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-50 via-teal-50 to-amber-50/50 border-2 border-emerald-300 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                   <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-600 text-white uppercase tracking-wider mb-1.5">
-                    Versione 1.3.2: Dashboard & Tab Hub (Zero Dati Fittizi)
+                    Versione 1.4.0: Gestione Commercianti & Approvazione Moderatore
                   </span>
                   <h3 className="text-base font-bold text-slate-900 leading-snug">
                     Scarica il Plugin WordPress: <code className="text-emerald-800">vp-quartiere.zip</code>
                   </h3>
                   <p className="text-xs text-slate-600 mt-1 max-w-md">
-                    Menu verticale di WordPress ordinato sotto l'unica voce <strong>"🏡 VP Quartiere"</strong>: apre come prima scheda la <strong>"Dashboard & Tab Hub"</strong> con statistiche immediate, schede ordinate e installazione pulita azzerata senza dati fittizi, pronta per caricare i dati reali dalla Web App.
+                    Include il modulo <strong>"Commercianti & Negozi"</strong> con flusso di moderazione/approvazione delle attività inserite dall'app, contatori in attesa, bottoni di approvazione rapida e integrazione Google Maps.
                   </p>
                 </div>
 
@@ -1358,7 +1588,7 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
                     className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-emerald-700/20 transition flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <Download className="w-4 h-4" />
-                    <span>Scarica ZIP (v1.3.2)</span>
+                    <span>Scarica ZIP (v1.4.0)</span>
                   </button>
                   <button
                     onClick={handleCopiaCodice}
@@ -1542,9 +1772,9 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
         {/* Footer */}
         <div className="bg-slate-100 px-6 py-3 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 shrink-0">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-700">Plugin WordPress VP Quartiere v1.3.2</span>
+            <span className="font-semibold text-slate-700">Plugin WordPress VP Quartiere v1.4.0</span>
             <span className="text-slate-300">•</span>
-            <span>Comitato di Quartiere Villaggio Prenestino</span>
+            <span>Associazione di Quartiere Villaggio Prenestino</span>
           </div>
           <button
             onClick={onClose}

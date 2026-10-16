@@ -21,15 +21,17 @@ import {
   Ticket,
   Download,
   FolderArchive,
+  HelpCircle,
 } from 'lucide-react';
 import { ClassificaCittadini } from './ClassificaCittadini';
+import { shareWithNativeOrWhatsApp, shareToWhatsApp } from '../utils/shareUtils';
 
 interface HomeTabProps {
   news: WpArticle[];
   eventi: EventoQuartiere[];
   richieste: RichiestaVolontariato[];
   interactions: UserInteractions;
-  onSelectTab: (tab: 'home' | 'eventi' | 'segnalazioni' | 'volontariato' | 'proposte') => void;
+  onSelectTab: (tab: 'home' | 'eventi' | 'segnalazioni' | 'volontariato' | 'proposte' | 'commercio') => void;
   onRequestJoinVolunteer: (richiesta: RichiestaVolontariato) => void;
   onRequestJoinEvento: (evento: EventoQuartiere) => void;
   darkMode?: boolean;
@@ -38,6 +40,7 @@ interface HomeTabProps {
   onOpenPuntiModal?: () => void;
   onUpdateUserNome?: (nome: string) => void;
   onOpenExportModal?: () => void;
+  onOpenTour?: () => void;
 }
 
 export const HomeTab: React.FC<HomeTabProps> = ({
@@ -54,6 +57,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   onOpenPuntiModal,
   onUpdateUserNome,
   onOpenExportModal,
+  onOpenTour,
 }) => {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -63,48 +67,52 @@ export const HomeTab: React.FC<HomeTabProps> = ({
     setTimeout(() => setToastMsg(null), 3000);
   };
 
-  const handleShareNews = async (art: WpArticle) => {
-    const title = art.titolo;
-    const text = `📰 Notizia CdQ Villaggio Prenestino:\n"${art.titolo}"\n${art.estratto}`;
+  const handleShareNews = (art: WpArticle) => {
+    const text = `📰 *Notizia Associazione Villaggio Prenestino*:\n"${art.titolo}"\n\n${art.estratto}`;
     const url = art.link || 'https://www.villaggioprenestino.it';
-
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      try {
-        await navigator.share({
-          title,
-          text,
-          url,
-        });
-      } catch (err: any) {
-        if (err?.name !== 'AbortError') {
-          copyToClipboard(`${text}\n${url}`);
-        }
+    shareWithNativeOrWhatsApp(
+      {
+        title: art.titolo,
+        text,
+        url,
+      },
+      (msg) => {
+        setToastMsg(msg);
+        setTimeout(() => setToastMsg(null), 3000);
       }
-    } else {
-      copyToClipboard(`${text}\n${url}`);
-    }
+    );
   };
 
-  const handleShareEvento = async (ev: EventoQuartiere) => {
-    const title = `Evento CdQ: ${ev.t}`;
-    const text = `📅 Partecipa all'evento "${ev.t}"!\n🗓️ Data: ${ev.d} ${ev.m} alle ore ${ev.ora}\n📍 Luogo: ${ev.luogo}\n\nUnisciti ai vicini di Villaggio Prenestino!`;
+  const handleShareEvento = (ev: EventoQuartiere) => {
+    const text = `📅 *Evento a Villaggio Prenestino*: "${ev.t}"\n🗓️ Data: ${ev.d} ${ev.m} alle ore ${ev.ora}\n📍 Luogo: ${ev.luogo}\n\nUnisciti ai residenti di quartiere!`;
     const url = 'https://www.villaggioprenestino.it';
-
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      try {
-        await navigator.share({
-          title,
-          text,
-          url,
-        });
-      } catch (err: any) {
-        if (err?.name !== 'AbortError') {
-          copyToClipboard(`${text}\n${url}`);
-        }
+    shareWithNativeOrWhatsApp(
+      {
+        title: `Evento Associazione: ${ev.t}`,
+        text,
+        url,
+      },
+      (msg) => {
+        setToastMsg(msg);
+        setTimeout(() => setToastMsg(null), 3000);
       }
-    } else {
-      copyToClipboard(`${text}\n${url}`);
-    }
+    );
+  };
+
+  const handleShareVolunteer = (r: RichiestaVolontariato) => {
+    const text = `🤝 *Appello Volontariato Villaggio Prenestino*:\n"${r.t}"\n📍 Luogo: ${r.w}\n👥 Mancano ${Math.max(1, r.need - r.have)} persone!\n\n${r.desc}`;
+    const url = 'https://www.villaggioprenestino.it';
+    shareWithNativeOrWhatsApp(
+      {
+        title: `Volontariato: ${r.t}`,
+        text,
+        url,
+      },
+      (msg) => {
+        setToastMsg(msg);
+        setTimeout(() => setToastMsg(null), 3000);
+      }
+    );
   };
 
   return (
@@ -134,21 +142,32 @@ export const HomeTab: React.FC<HomeTabProps> = ({
           </p>
 
           {/* Bottoni Principali Arancioni */}
-          <div className="mt-4 flex flex-col sm:flex-row gap-2.5">
+          <div className="mt-4 flex flex-wrap gap-2.5">
             <button
               onClick={() => onSelectTab('segnalazioni')}
-              className="w-full sm:w-auto px-4 py-2.5 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer"
+              className="flex-1 sm:flex-initial px-4 py-2.5 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <Megaphone className="w-4 h-4" />
               Invia Segnalazione
             </button>
             <button
               onClick={() => onSelectTab('volontariato')}
-              className="w-full sm:w-auto px-4 py-2.5 bg-white/15 hover:bg-white/25 active:bg-white/30 text-white font-bold text-xs sm:text-sm rounded-xl border border-white/25 transition flex items-center justify-center gap-1.5 cursor-pointer"
+              className="flex-1 sm:flex-initial px-4 py-2.5 bg-white/15 hover:bg-white/25 active:bg-white/30 text-white font-bold text-xs sm:text-sm rounded-xl border border-white/25 transition flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <HeartHandshake className="w-4 h-4 text-amber-300" />
               Diventa Volontario
             </button>
+            {onOpenTour && (
+              <button
+                type="button"
+                onClick={onOpenTour}
+                className="w-full sm:w-auto px-3.5 py-2.5 bg-black/25 hover:bg-black/35 text-amber-200 hover:text-white font-bold text-xs rounded-xl border border-amber-400/30 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                title="Rivedi la guida e il tour delle sezioni principali"
+              >
+                <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
+                <span>Guida dell'App</span>
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -302,26 +321,36 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                     />
                   </div>
 
-                  <button
-                    onClick={() => onRequestJoinVolunteer(r)}
-                    className={`w-full py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                      hasJoined
-                        ? 'bg-amber-100 text-amber-950 border border-amber-300 hover:bg-amber-200'
-                        : 'bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 shadow-xs'
-                    }`}
-                  >
-                    {hasJoined ? (
-                      <>
-                        <CheckCircle2 className="w-4 h-4 text-emerald-700" />
-                        Hai aderito! (Annulla)
-                      </>
-                    ) : (
-                      <>
-                        <HeartHandshake className="w-4 h-4" />
-                        Ci sono anche io! (+10 pts)
-                      </>
-                    )}
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleShareVolunteer(r)}
+                      title="Condividi sui gruppi WhatsApp"
+                      className="p-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition cursor-pointer shrink-0"
+                    >
+                      <Share2 className="w-4 h-4 text-emerald-700" />
+                    </button>
+                    <button
+                      onClick={() => onRequestJoinVolunteer(r)}
+                      className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                        hasJoined
+                          ? 'bg-amber-100 text-amber-950 border border-amber-300 hover:bg-amber-200'
+                          : 'bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 shadow-xs'
+                      }`}
+                    >
+                      {hasJoined ? (
+                        <>
+                          <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                          Hai aderito! (Annulla)
+                        </>
+                      ) : (
+                        <>
+                          <HeartHandshake className="w-4 h-4" />
+                          Ci sono anche io! (+10 pts)
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -499,7 +528,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                     Esporta per il tuo Sito Web & Hosting
                   </h4>
                   <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-600 text-white">
-                    v1.3.2
+                    v1.4.0
                   </span>
                 </div>
                 <p className={`text-xs mt-0.5 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>

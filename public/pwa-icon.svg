@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#781816" />
+      <stop offset="100%" stop-color="#4a0e0c" />
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FBBF24" />
+      <stop offset="100%" stop-color="#F59E0B" />
+    </linearGradient>
+  </defs>
+  <!-- Background with subtle rounded corners -->
+  <rect width="512" height="512" rx="96" fill="url(#bg)" />
+  
+  <!-- Outer golden decorative frame -->
+  <rect x="36" y="36" width="440" height="440" rx="72" fill="none" stroke="url(#gold)" stroke-width="6" opacity="0.4" />
+  
+  <!-- Center Emblem Box -->
+  <rect x="136" y="86" width="240" height="240" rx="36" fill="rgba(255,255,255,0.08)" stroke="#ffffff" stroke-width="8" />
+  
+  <!-- CdQ Monogram -->
+  <text x="256" y="246" text-anchor="middle" font-family="'Caveat', cursive, Georgia, serif" font-size="140" font-weight="700" font-style="italic" fill="#ffffff" letter-spacing="-2">
+    CdQ
+  </text>
+  
+  <!-- Golden subtitle text -->
+  <text x="256" y="380" text-anchor="middle" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-size="28" font-weight="900" fill="url(#gold)" letter-spacing="3">
+    VILLAGGIO
+  </text>
+  <text x="256" y="420" text-anchor="middle" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-size="26" font-weight="800" fill="#ffffff" letter-spacing="4" opacity="0.95">
+    PRENESTINO
+  </text>
+</svg>

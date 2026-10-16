@@ -1,0 +1,27 @@
+{
+  "name": "CdQ Villaggio Prenestino",
+  "short_name": "CdQ Prenestino",
+  "description": "Portale della Comunità di Quartiere Villaggio Prenestino: notizie, volontariato, eventi e segnalazioni cittadine.",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#781816",
+  "theme_color": "#781816",
+  "lang": "it-IT",
+  "categories": ["community", "social", "utilities"],
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo-cdq.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

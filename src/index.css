@@ -109,3 +109,122 @@ html.dark,
   color: #fcd34d !important;
 }
 
+/* ==========================================================================
+   STILI GOOGLE MAPS: TESSERE NOTTURNE E POPUP PIN IN DARK & LIGHT MODE
+   ========================================================================== */
+
+/* Tessere della mappa in modalità notturna: trasforma la mappa standard in un tema notte moderno slate ad alto contrasto */
+.dark .map-night-theme .gm-style > div:first-child {
+  filter: invert(90%) hue-rotate(180deg) contrast(95%) brightness(90%) saturate(120%) !important;
+}
+
+/* Controlli di zoom (+/-) e pulsanti Google Maps in Dark Mode */
+.dark .map-night-theme .gm-bundled-control button,
+.dark .map-night-theme .gm-control-active,
+.dark .map-night-theme button[aria-label*="zoom" i],
+.dark .map-night-theme button[aria-label*="schermo intero" i],
+.dark .map-night-theme button[aria-label*="fullscreen" i] {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+.dark .map-night-theme .gm-control-active svg,
+.dark .map-night-theme .gm-control-active img {
+  filter: invert(1) brightness(1.5) !important;
+}
+
+/* Attribuzione termini e copyright in dark mode */
+.dark .map-night-theme .gm-style-cc a,
+.dark .map-night-theme .gm-style-cc span {
+  color: #94a3b8 !important;
+}
+
+/* --------------------------------------------------------------------------
+   INFOWINDOW (POPUP PIN MAPPA) IN DARK MODE
+   -------------------------------------------------------------------------- */
+.dark .gm-style .gm-style-iw-c,
+html.dark .gm-style .gm-style-iw-c,
+.dark .gm-style-iw-c,
+html.dark .gm-style-iw-c,
+.dark div.gm-style-iw-c {
+  background-color: #0f172a !important; /* slate-900 */
+  color: #f8fafc !important;
+  border: 1px solid #334155 !important;
+  box-shadow: 0 12px 30px -4px rgba(0, 0, 0, 0.75), 0 8px 12px -6px rgba(0, 0, 0, 0.75) !important;
+  border-radius: 1rem !important;
+  padding: 8px !important;
+}
+
+/* Triangolo di puntamento (freccia) del popup in Dark Mode */
+.dark .gm-style .gm-style-iw-tc::after,
+html.dark .gm-style .gm-style-iw-tc::after,
+.dark .gm-style-iw-tc::after,
+html.dark .gm-style-iw-tc::after {
+  background-color: #0f172a !important; /* slate-900 */
+  border-top: 1px solid #334155 !important;
+  border-left: 1px solid #334155 !important;
+}
+
+/* Contenitore interno del testo InfoWindow in Dark Mode */
+.dark .gm-style .gm-style-iw-d,
+html.dark .gm-style .gm-style-iw-d,
+.dark .gm-style-iw-d,
+html.dark .gm-style-iw-d {
+  background-color: transparent !important;
+  color: #f8fafc !important;
+  overflow: auto !important;
+}
+
+/* Titolo dell'attività/evento nel popup: sempre bianco e ben visibile su fondo scuro */
+.dark .gm-style .gm-style-iw-d h4,
+html.dark .gm-style .gm-style-iw-d h4,
+.dark .gm-style-iw-d h4,
+.dark .gm-dark-infowindow h4 {
+  color: #ffffff !important;
+}
+
+/* Pulsante 'X' di chiusura del popup in Dark Mode */
+.dark .gm-style button.gm-ui-hover-effect,
+html.dark .gm-style button.gm-ui-hover-effect,
+.dark button.gm-ui-hover-effect,
+html.dark button.gm-ui-hover-effect {
+  filter: invert(1) brightness(1.8) !important;
+  opacity: 0.85 !important;
+}
+
+.dark .gm-style button.gm-ui-hover-effect:hover,
+html.dark .gm-style button.gm-ui-hover-effect:hover {
+  opacity: 1 !important;
+}
+
+/* --------------------------------------------------------------------------
+   INFOWINDOW IN LIGHT MODE (Garantisce contrasto perfetto su sfondo bianco)
+   -------------------------------------------------------------------------- */
+html:not(.dark) .gm-style .gm-style-iw-c,
+html:not(.dark) .gm-style-iw-c {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15) !important;
+  border-radius: 1rem !important;
+  padding: 8px !important;
+}
+
+html:not(.dark) .gm-style .gm-style-iw-tc::after,
+html:not(.dark) .gm-style-iw-tc::after {
+  background-color: #ffffff !important;
+}
+
+html:not(.dark) .gm-style .gm-style-iw-d,
+html:not(.dark) .gm-style-iw-d {
+  background-color: transparent !important;
+  color: #0f172a !important;
+}
+
+html:not(.dark) .gm-style .gm-style-iw-d h4,
+html:not(.dark) .gm-style .gm-style-iw-d .text-slate-900,
+html:not(.dark) .gm-light-infowindow h4 {
+  color: #0f172a !important;
+}
+
