@@ -348,6 +348,11 @@ export const ProposteAltroTab: React.FC<ProposteAltroTabProps> = ({
                   <h4 className="text-xs font-bold text-slate-900 leading-snug">
                     {item.nome}
                   </h4>
+                  {item.descr && (
+                    <p className="text-[11px] text-slate-500 leading-tight mt-0.5 line-clamp-1">
+                      {item.descr}
+                    </p>
+                  )}
                   <span className="font-mono text-xs font-bold text-slate-700 block mt-0.5">
                     {item.numero}
                   </span>

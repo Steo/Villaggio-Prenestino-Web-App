@@ -6,6 +6,8 @@ import {
   NuovaAttivitaForm 
 } from '../types';
 import { MappaQuartiere } from './MappaQuartiere';
+import { GestioneTitolareModal } from './GestioneTitolareModal';
+import { compressImage } from '../utils/imageCompressor';
 import { 
   Store, 
   Search, 
@@ -39,7 +41,10 @@ import {
   Image as ImageIcon,
   Mail,
   ChevronDown,
+  KeyRound,
+  Info,
 } from 'lucide-react';
+import { CommercioSkeletonGrid } from './SkeletonLoaders';
 
 interface CommercioTabProps {
   attivita: AttivitaCommercio[];
@@ -47,8 +52,10 @@ interface CommercioTabProps {
   votedAttivita?: number[];
   onVoteAttivita: (attivita: AttivitaCommercio) => void;
   onAggiungiAttivita: (nuova: AttivitaCommercio) => void;
+  onUpdateAttivita?: (id: number, updatedData: Partial<AttivitaCommercio>) => void;
   onApprovaAttivita?: (id: number) => void;
   darkMode?: boolean;
+  loading?: boolean;
 }
 
 const CATEGORIA_CONFIG: Record<
@@ -134,8 +141,10 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
   votedAttivita = [],
   onVoteAttivita,
   onAggiungiAttivita,
+  onUpdateAttivita,
   onApprovaAttivita,
   darkMode,
+  loading = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<CategoriaCommercio>('tutti');
@@ -158,26 +167,46 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
   const [submittedShop, setSubmittedShop] = useState<AttivitaCommercio | null>(null);
   const [copiedShareId, setCopiedShareId] = useState<number | null>(null);
 
+  // Progressive disclosure: banner informativo espandibile e card accordion dettagli
+  const [showHeroDetails, setShowHeroDetails] = useState(false);
+  const [expandedShopIds, setExpandedShopIds] = useState<number[]>([]);
+
+  const toggleShopExpanded = (shopId: number) => {
+    setExpandedShopIds((prev) =>
+      prev.includes(shopId) ? prev.filter((id) => id !== shopId) : [...prev, shopId]
+    );
+  };
+
+  // Modale di gestione riservata per il titolare (con PIN)
+  const [shopForManagement, setShopForManagement] = useState<AttivitaCommercio | null>(null);
+  const [isManagementOpen, setIsManagementOpen] = useState(false);
+
   // Foto / Logo caricato dal commerciante in formato JPG
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert('La dimensione dell\'immagine supera i 5MB. Scegli un file JPG o PNG più leggero.');
-      return;
+    try {
+      const compressed = await compressImage(file, {
+        maxWidth: 1200,
+        maxHeight: 1200,
+        quality: 0.8,
+        mimeType: 'image/jpeg',
+      });
+      setUploadedImage(compressed);
+    } catch {
+      // Fallback
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const res = event.target?.result as string;
+        if (res) {
+          setUploadedImage(res);
+        }
+      };
+      reader.readAsDataURL(file);
     }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const res = event.target?.result as string;
-      if (res) {
-        setUploadedImage(res);
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   // Form stato nuova attività
@@ -344,6 +373,7 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
       miPiace: 1,
       statoApprovazione: 'in_attesa', // Inviata in moderazione all'amministratore WordPress
       inviataDaMe: true,
+      pinGestione: formData.pinGestione?.trim() || '1234',
       dataInserimento: new Date().toLocaleDateString('it-IT'),
       nomeReferente: formData.nomeReferente?.trim(),
       emailReferente: formData.emailReferente?.trim(),
@@ -408,36 +438,69 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
 
   return (
     <div className="space-y-5 pb-20 animate-fadeIn">
-      {/* HERO BANNER ROSSO (Layout e stile identico alla Home) */}
+      {/* HERO BANNER ROSSO (Compatto con divulgazione progressiva) */}
       <section
-        className="rounded-3xl p-5 sm:p-7 text-white shadow-lg border border-black/10 relative overflow-hidden"
+        className="rounded-3xl p-4 sm:p-6 text-white shadow-lg border border-black/10 relative overflow-hidden"
         style={{
           background: 'linear-gradient(135deg, #781816 0%, #5a1210 100%)',
         }}
       >
-        <div className="relative z-10 max-w-lg">
-          <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider mb-2">
-            Economia Locale & Negozi di Vicinato
-          </span>
-          <h2 className="text-xl sm:text-2xl font-black leading-tight text-white tracking-tight">
-            Commercianti & Attività di Villaggio Prenestino
-          </h2>
-          <p className="mt-1.5 text-xs sm:text-sm text-white/90 leading-relaxed">
-            Scopri, contatta e sostieni i commercianti del quartiere. Trova promozioni esclusive, ordina via WhatsApp e visualizza le attività sulla mappa interattiva.
-          </p>
+        <div className="relative z-10">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] sm:text-xs font-black uppercase tracking-wider mb-1.5">
+                Economia Locale
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black leading-tight text-white tracking-tight">
+                Commercio di Quartiere
+              </h2>
+              <p className="mt-1 text-xs sm:text-sm text-white/90 leading-relaxed">
+                Sostieni le attività e i negozi di vicinato di Villaggio Prenestino.
+              </p>
+            </div>
 
-          <div className="mt-4 flex flex-col sm:flex-row gap-2.5">
-            <button
-              onClick={() => {
-                setRegisterSuccess(false);
-                setIsRegisterModalOpen(true);
-              }}
-              className="w-full sm:w-auto px-4 py-2.5 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <PlusCircle className="w-4 h-4 text-slate-950" />
-              <span>Iscrivi la tua attività</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowHeroDetails((prev) => !prev)}
+                className="px-3 py-2 bg-white/10 hover:bg-white/20 active:bg-white/25 text-white text-xs font-semibold rounded-xl border border-white/20 transition flex items-center gap-1.5 cursor-pointer"
+                aria-expanded={showHeroDetails}
+              >
+                <span>Come funziona</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showHeroDetails ? 'rotate-180' : ''}`} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setRegisterSuccess(false);
+                  setIsRegisterModalOpen(true);
+                }}
+                className="px-4 py-2 bg-amber-400 hover:bg-amber-300 active:bg-amber-500 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <PlusCircle className="w-4 h-4 text-slate-950" />
+                <span>Iscrivi attività</span>
+              </button>
+            </div>
           </div>
+
+          {/* Dettagli espandibili a richiesta (Progressive Disclosure) */}
+          {showHeroDetails && (
+            <div className="mt-3.5 pt-3.5 border-t border-white/15 grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs text-white/90 animate-fadeIn">
+              <div className="p-2.5 rounded-xl bg-black/20 border border-white/10">
+                <strong className="block text-amber-300 font-bold mb-0.5">Iscrizione Gratuita</strong>
+                <span>Registra la tua vetrina in pochi passi per farti trovare dai residenti del quartiere.</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-black/20 border border-white/10">
+                <strong className="block text-amber-300 font-bold mb-0.5">Contatto Diretto</strong>
+                <span>Pulsanti rapidi WhatsApp, telefono e mappa su Google Maps senza intermediari.</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-black/20 border border-white/10">
+                <strong className="block text-amber-300 font-bold mb-0.5">Gestione con PIN</strong>
+                <span>Aggiorna offerte e orari quando vuoi inserendo il tuo codice PIN personale.</span>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -497,16 +560,13 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                 <MapPin className="w-4 h-4 text-amber-600" />
                 <span>Mappa Commerciale di Quartiere</span>
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Centrata su Villaggio Prenestino (Via Fosso dell'Osa)
-              </p>
             </div>
 
-            {/* Menù a tendina per filtrare i pin sulla mappa per tipologia di attività */}
+            {/* Menù a tendina per filtrare i pin sulla mappa per categoria */}
             <div className="flex items-center gap-2">
               <label htmlFor="map-pin-category-dropdown" className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 whitespace-nowrap">
                 <Filter className="w-3.5 h-3.5 text-amber-600" />
-                <span>Tipologia pin:</span>
+                <span>Categoria</span>
               </label>
               <div className="relative">
                 <select
@@ -514,7 +574,7 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                   value={mapCategoryFilter}
                   onChange={(e) => setMapCategoryFilter(e.target.value as CategoriaCommercio | 'tutti')}
                   className="py-1.5 pl-3 pr-8 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-100 shadow-2xs focus:ring-2 focus:ring-amber-500 focus:outline-none appearance-none cursor-pointer"
-                  title="Filtra i pin della mappa per tipologia di attività"
+                  title="Filtra i pin della mappa per categoria"
                 >
                   <option value="tutti">🏪 Tutte le attività ({attivita.length})</option>
                   <option value="alimentari">🛒 Alimentari ({attivita.filter(a => a.categoria === 'alimentari').length})</option>
@@ -545,6 +605,10 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                   setActivePage(Math.floor(index / ITEMS_PER_PAGE));
                 }
               }
+            }}
+            onOpenManagement={(shop) => {
+              setShopForManagement(shop);
+              setIsManagementOpen(true);
             }}
             darkMode={darkMode}
           />
@@ -610,7 +674,7 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                     <Filter className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                    <span>Filtro Categoria</span>
+                    <span>Categoria</span>
                   </span>
                   {selectedCategory !== 'tutti' ? (
                     <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
@@ -729,7 +793,9 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
           </div>
 
           {/* ELENCO COMMERCIANTI (PAGINATO A 6 PER PAGINA) */}
-          {visibleAttivita.length === 0 ? (
+          {loading ? (
+            <CommercioSkeletonGrid count={6} />
+          ) : visibleAttivita.length === 0 ? (
             <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 text-center border border-slate-200 dark:border-slate-800 space-y-3">
               <Store className="w-12 h-12 text-slate-300 mx-auto" />
               <h4 className="font-bold text-slate-800 dark:text-white text-base">
@@ -757,6 +823,7 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                 const isTop1 = globalIndex === 0;
                 const isTop3 = globalIndex < 3;
                 const hasVoted = votedAttivita.includes(shop.id);
+                const isExpanded = expandedShopIds.includes(shop.id);
 
                 return (
                   <div
@@ -855,7 +922,7 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                           </button>
                         </div>
 
-                        {/* Offerta attiva se presente */}
+                        {/* Offerta attiva visibile se presente */}
                         {shop.offertaAttiva && (
                           <div className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/50 space-y-1">
                             <div className="flex items-center justify-between text-amber-900 dark:text-amber-200">
@@ -873,105 +940,151 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                           </div>
                         )}
 
-                        {/* Descrizione sintetica */}
-                        <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-2">
-                          {shop.descrizione}
-                        </p>
-
-                        {/* Dettagli orari e telefono */}
-                        <div className="space-y-1 text-xs text-slate-500 pt-1 border-t border-slate-100 dark:border-slate-800">
-                          <div className="flex items-center justify-between">
+                        {/* COMPONENTE ACCORDION / COLLAPSIBLE PER DETTAGLI, ORARI E CONTATTI */}
+                        <div className="pt-1 border-t border-slate-100 dark:border-slate-800">
+                          <button
+                            type="button"
+                            onClick={() => toggleShopExpanded(shop.id)}
+                            className="w-full py-2.5 px-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-bold transition flex items-center justify-between cursor-pointer border border-slate-200/90 dark:border-slate-700/80 shadow-2xs"
+                            aria-expanded={isExpanded}
+                          >
                             <span className="flex items-center gap-1.5">
-                              <Clock className="w-3.5 h-3.5 text-slate-400" />
-                              <span>{shop.orari}</span>
+                              <Info className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                              <span>{isExpanded ? 'Nascondi dettagli e contatti' : 'Dettagli, orari e contatti'}</span>
                             </span>
-                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                              Aperto
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <Phone className="w-3.5 h-3.5 text-slate-400" />
-                            <a href={`tel:${shop.telefono}`} className="hover:text-slate-900 underline">
-                              {shop.telefono}
-                            </a>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                            <ChevronDown
+                              className={`w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ${
+                                isExpanded ? 'rotate-180 text-amber-600 dark:text-amber-400' : ''
+                              }`}
+                            />
+                          </button>
 
-                    {/* Footer Scheda: Azioni (WhatsApp Ordini, Mappa, Condividi) */}
-                    <div className="p-4 pt-0 space-y-2">
-                      <div className="grid grid-cols-2 gap-2">
-                        {/* Tasto WhatsApp diretto */}
-                        {shop.whatsapp ? (
-                          <a
-                            href={`https://wa.me/${shop.whatsapp}?text=${encodeURIComponent(
-                              `Salve ${shop.nome}, vi ho trovato sulla Web App di Villaggio Prenestino! Vorrei informazioni sul vostro servizio o promozioni.`
-                            )}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="w-full py-2 px-3 bg-[#25D366] hover:bg-[#20ba59] active:bg-[#1da850] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer"
-                          >
-                            <MessageCircle className="w-3.5 h-3.5" />
-                            <span>WhatsApp</span>
-                          </a>
-                        ) : (
-                          <a
-                            href={`tel:${shop.telefono}`}
-                            className="w-full py-2 px-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition"
-                          >
-                            <Phone className="w-3.5 h-3.5" />
-                            <span>Chiama</span>
-                          </a>
-                        )}
+                          {/* Sezione Espandibile Collapsible */}
+                          {isExpanded && (
+                            <div className="mt-3 space-y-3 pt-1 animate-fadeIn">
+                              {/* Descrizione completa */}
+                              {shop.descrizione && (
+                                <div className="space-y-1">
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                                    Chi siamo & Descrizione:
+                                  </span>
+                                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                                    {shop.descrizione}
+                                  </p>
+                                </div>
+                              )}
 
-                        {/* Tasto Mostra su Mappa / Indicazioni Google */}
-                        <a
-                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                            `${shop.nome}, ${shop.indirizzo}`
-                          )}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-full py-2 px-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition"
-                        >
-                          <Navigation className="w-3.5 h-3.5 text-amber-600" />
-                          <span>Percorso</span>
-                        </a>
-                      </div>
+                              {/* Dettagli orari e telefono */}
+                              <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-300 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/60">
+                                <div className="flex items-center justify-between">
+                                  <span className="flex items-center gap-1.5 text-slate-500">
+                                    <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                    <span>{shop.orari}</span>
+                                  </span>
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    Aperto
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                  <a href={`tel:${shop.telefono}`} className="hover:text-slate-900 dark:hover:text-white underline font-semibold">
+                                    {shop.telefono}
+                                  </a>
+                                </div>
+                              </div>
 
-                      {/* Tasto Condividi Offerta */}
-                      <button
-                        type="button"
-                        onClick={() => handleShareShopOffer(shop)}
-                        className="w-full py-1.5 px-3 border border-slate-200 dark:border-slate-800 rounded-xl text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 flex items-center justify-center gap-1.5 transition cursor-pointer"
-                      >
-                        <Share2 className="w-3 h-3 text-slate-500" />
-                        <span>
-                          {copiedShareId === shop.id ? 'Aperto WhatsApp!' : 'Condividi attività con i residenti'}
-                        </span>
-                      </button>
+                              {/* Azioni contatti: WhatsApp / Chiama e Percorso */}
+                              <div className="grid grid-cols-2 gap-2">
+                                {shop.whatsapp ? (
+                                  <a
+                                    href={`https://wa.me/${shop.whatsapp}?text=${encodeURIComponent(
+                                      `Salve ${shop.nome}, vi ho trovato sulla Web App di Villaggio Prenestino! Vorrei informazioni sul vostro servizio o promozioni.`
+                                    )}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="w-full py-2 px-3 bg-[#25D366] hover:bg-[#20ba59] active:bg-[#1da850] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer"
+                                  >
+                                    <MessageCircle className="w-3.5 h-3.5" />
+                                    <span>WhatsApp</span>
+                                  </a>
+                                ) : (
+                                  <a
+                                    href={`tel:${shop.telefono}`}
+                                    className="w-full py-2 px-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition"
+                                  >
+                                    <Phone className="w-3.5 h-3.5" />
+                                    <span>Chiama</span>
+                                  </a>
+                                )}
 
-                      {/* Box di simulazione approvazione WordPress se la scheda è in attesa */}
-                      {shop.statoApprovazione === 'in_attesa' && (
-                        <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
-                          <span className="text-[10px] font-medium text-amber-700 dark:text-amber-300 flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-amber-600" />
-                            <span>In moderazione WP</span>
-                          </span>
-                          {onApprovaAttivita && (
-                            <button
-                              type="button"
-                              onClick={() => onApprovaAttivita(shop.id)}
-                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-xl transition flex items-center gap-1 cursor-pointer"
-                              title="Simula approvazione immediata dal pannello admin WordPress"
-                            >
-                              <Check className="w-3 h-3" />
-                              <span>Approva (Admin)</span>
-                            </button>
+                                <a
+                                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                                    `${shop.nome}, ${shop.indirizzo}`
+                                  )}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="w-full py-2 px-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition"
+                                >
+                                  <Navigation className="w-3.5 h-3.5 text-amber-600" />
+                                  <span>Percorso</span>
+                                </a>
+                              </div>
+
+                              {/* Tasto Condividi Attività */}
+                              <button
+                                type="button"
+                                onClick={() => handleShareShopOffer(shop)}
+                                className="w-full py-1.5 px-3 border border-slate-200 dark:border-slate-800 rounded-xl text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 flex items-center justify-center gap-1.5 transition cursor-pointer"
+                              >
+                                <Share2 className="w-3 h-3 text-slate-500" />
+                                <span>
+                                  {copiedShareId === shop.id ? 'Aperto WhatsApp!' : 'Condividi con i residenti'}
+                                </span>
+                              </button>
+
+                              {/* Box simulazione approvazione WordPress se in attesa */}
+                              {shop.statoApprovazione === 'in_attesa' && (
+                                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                                  <span className="text-[10px] font-medium text-amber-700 dark:text-amber-300 flex items-center gap-1">
+                                    <Clock className="w-3 h-3 text-amber-600" />
+                                    <span>In moderazione WP</span>
+                                  </span>
+                                  {onApprovaAttivita && (
+                                    <button
+                                      type="button"
+                                      onClick={() => onApprovaAttivita(shop.id)}
+                                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-xl transition flex items-center gap-1 cursor-pointer"
+                                      title="Simula approvazione immediata dal pannello admin WordPress"
+                                    >
+                                      <Check className="w-3 h-3" />
+                                      <span>Approva (Admin)</span>
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Gestione con PIN per il titolare */}
+                              <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px]">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShopForManagement(shop);
+                                    setIsManagementOpen(true);
+                                  }}
+                                  className="inline-flex items-center gap-1.5 text-slate-500 hover:text-amber-600 dark:hover:text-amber-400 transition-colors cursor-pointer group"
+                                  title="Sei il titolare? Inserisci il tuo PIN per aggiornare orari, contatti e promozioni in corso"
+                                >
+                                  <KeyRound className="w-3.5 h-3.5 text-slate-400 group-hover:text-amber-500 transition-colors shrink-0" />
+                                  <span className="underline decoration-slate-300 dark:decoration-slate-700 group-hover:decoration-amber-500 underline-offset-2">
+                                    Sei il titolare? Gestisci scheda
+                                  </span>
+                                </button>
+                              </div>
+                            </div>
                           )}
                         </div>
-                      )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -1037,19 +1150,6 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
         </section>
       )}
 
-      {/* RICHIESTA RIMOZIONE ATTIVITÀ COMMERCIALE */}
-      <div className="pt-3 border-t border-slate-200 dark:border-slate-800 text-center">
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          Vuoi rimuovere la tua attività?{' '}
-          <a
-            href="mailto:associazione@villaggioprenestino.it?subject=Richiesta%20rimozione%20attivit%C3%A0%20commerciale&body=Salve,%20vorrei%20richiedere%20la%20rimozione%20della%20mia%20attivit%C3%A0%20commerciale%20dalla%20vetrina%20di%20Villaggio%20Prenestino:%0A%0ANome%20Attivit%C3%A0:%20%0AIndirizzo:%20%0AEmail%20/%20Telefono%20di%20riferimento:%20%0AMotivazione:%20"
-            className="font-bold text-[#781816] dark:text-amber-400 underline hover:text-[#5a1210] dark:hover:text-amber-300 transition"
-          >
-            Scrivici una email
-          </a>{' '}
-          e provvederemo.
-        </p>
-      </div>
 
       {/* MODALE REGISTRAZIONE COMMERCIANTE CON GESTIONE APPROVAZIONE WORDPRESS */}
       {isRegisterModalOpen && (
@@ -1068,134 +1168,88 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
 
             {/* SE L'ATTIVITÀ È STATA INVIATA: POPUP PERSISTENTE DI CONFERMA & MODERAZIONE */}
             {registerSuccess ? (
-              <div className="py-2 space-y-4 text-center">
+              <div className="py-2 space-y-3.5 text-center">
                 {/* Icona & Badge Stato */}
-                <div className="w-16 h-16 bg-amber-100 dark:bg-amber-950/80 border-2 border-amber-300 dark:border-amber-700 rounded-3xl flex items-center justify-center mx-auto text-amber-800 dark:text-amber-300 shadow-md">
-                  <Hourglass className="w-8 h-8 text-amber-700 animate-pulse" />
+                <div className="w-14 h-14 bg-amber-100 dark:bg-amber-950/80 border-2 border-amber-300 dark:border-amber-700 rounded-2xl flex items-center justify-center mx-auto text-amber-800 dark:text-amber-300 shadow-md">
+                  <Hourglass className="w-7 h-7 text-amber-700 animate-pulse" />
                 </div>
 
                 <div>
-                  <span className="inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300 mb-2">
-                    🟡 In Attesa di Approvazione Amministratore
+                  <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300 mb-1.5">
+                    In Attesa di Approvazione
                   </span>
-                  <h3 className="text-xl font-black text-slate-900 dark:text-white leading-tight">
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white leading-tight">
                     Attività Inviata con Successo!
                   </h3>
-                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 max-w-md mx-auto">
-                    La richiesta è stata inoltrata al sistema WordPress di Villaggio Prenestino. Un amministratore del portale verificherà i dati prima della pubblicazione pubblica.
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 max-w-sm mx-auto">
+                    La scheda verrà verificata dall'amministratore prima della pubblicazione nella vetrina e sulla mappa.
                   </p>
                 </div>
 
-                {/* PROCEDURA DI APPROVAZIONE IN 3 PASSI (Come per le Segnalazioni) */}
-                <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-3.5 border border-slate-200 dark:border-slate-700 text-left space-y-2.5">
-                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 block">
-                    Stato dell'Iter di Pubblicazione:
-                  </span>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {/* PROCEDURA DI APPROVAZIONE IN 3 PASSI */}
+                <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-3 border border-slate-200 dark:border-slate-700 text-left space-y-2">
+                  <div className="grid grid-cols-3 gap-2">
                     {/* Passo 1 */}
-                    <div className="bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 rounded-xl p-2.5 flex flex-col justify-between">
-                      <div className="flex items-center justify-between text-emerald-800 dark:text-emerald-300 font-bold text-[11px]">
-                        <span>1. Inviata</span>
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                      </div>
-                      <p className="text-[10px] text-emerald-700 dark:text-emerald-300 mt-1">
-                        Ricevuta dal database WordPress.
-                      </p>
+                    <div className="bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 rounded-xl p-2 text-center">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 mx-auto mb-0.5" />
+                      <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 block">1. Inviata</span>
                     </div>
 
                     {/* Passo 2 */}
-                    <div className="bg-amber-50 dark:bg-amber-950/60 border-2 border-amber-400 rounded-xl p-2.5 flex flex-col justify-between shadow-xs">
-                      <div className="flex items-center justify-between text-amber-900 dark:text-amber-200 font-black text-[11px]">
-                        <span>2. Verifica Admin</span>
-                        <Hourglass className="w-4 h-4 text-amber-600 animate-spin" />
-                      </div>
-                      <p className="text-[10px] text-amber-800 dark:text-amber-300 mt-1 font-medium">
-                        Controllo recapiti e sede in corso.
-                      </p>
+                    <div className="bg-amber-50 dark:bg-amber-950/60 border-2 border-amber-400 rounded-xl p-2 text-center shadow-2xs">
+                      <Hourglass className="w-4 h-4 text-amber-600 animate-spin mx-auto mb-0.5" />
+                      <span className="text-[11px] font-black text-amber-900 dark:text-amber-200 block">2. In Verifica</span>
                     </div>
 
                     {/* Passo 3 */}
-                    <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 flex flex-col justify-between opacity-75">
-                      <div className="flex items-center justify-between text-slate-600 dark:text-slate-400 font-bold text-[11px]">
-                        <span>3. Pubblicazione</span>
-                        <Store className="w-4 h-4 text-slate-400" />
-                      </div>
-                      <p className="text-[10px] text-slate-500 mt-1">
-                        Visibile a tutti su Google Maps e vetrina.
-                      </p>
+                    <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2 text-center opacity-70">
+                      <Store className="w-4 h-4 text-slate-400 mx-auto mb-0.5" />
+                      <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block">3. Online</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Riepilogo scheda inviata */}
                 {submittedShop && (
-                  <div className="p-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 text-left text-xs space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-slate-400">Riepilogo dati attività:</span>
+                  <div className="p-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 text-left text-xs space-y-0.5">
                     <p className="font-bold text-slate-900 dark:text-white text-sm">
                       {submittedShop.nome}
                     </p>
-                    <p className="text-slate-600 dark:text-slate-300 flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-amber-600" />
+                    <p className="text-slate-600 dark:text-slate-300 flex items-center gap-1 text-[11px]">
+                      <MapPin className="w-3 h-3 text-amber-600 shrink-0" />
                       <span>{submittedShop.indirizzo}</span>
-                    </p>
-                    <p className="text-slate-600 dark:text-slate-300 flex items-center gap-1">
-                      <Phone className="w-3.5 h-3.5 text-slate-400" />
-                      <span>{submittedShop.telefono}</span>
                     </p>
                   </div>
                 )}
 
-                {/* Avviso rassicurante per il commerciante */}
-                <div className="p-3 bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 rounded-2xl text-left text-xs text-sky-900 dark:text-sky-200 space-y-1">
-                  <div className="flex items-center gap-1.5 font-bold">
-                    <AlertCircle className="w-4 h-4 text-sky-600 shrink-0" />
-                    <span>Cosa accade ora?</span>
-                  </div>
-                  <p className="text-[11px] leading-relaxed text-sky-800 dark:text-sky-300">
-                    Non preoccuparti se non la vedi subito nella vetrina pubblica: la tua attività è memorizzata come <em>"In attesa di approvazione"</em> nella sezione superiore. Non appena l'amministratore approverà la scheda in WordPress, diventerà visibile a tutti i residenti di Villaggio Prenestino e riceverà la spunta di verifica.
-                  </p>
-                </div>
-
-                {/* Tasto di Chiusura Persistente */}
-                <div className="pt-2">
+                {/* Tasto di Chiusura */}
+                <div className="pt-1">
                   <button
                     type="button"
                     onClick={handleCloseRegisterModal}
-                    className="w-full py-3 px-6 bg-[#781816] hover:bg-[#5a1210] active:scale-98 text-white font-black text-xs sm:text-sm rounded-2xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-2.5 px-4 bg-[#781816] hover:bg-[#5a1210] active:scale-98 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer"
                   >
-                    <X className="w-4 h-4" />
-                    <span>Ho Capito, Chiudi Finestra (X)</span>
+                    <Check className="w-4 h-4" />
+                    <span>Ho capito, Chiudi</span>
                   </button>
                 </div>
               </div>
             ) : (
               /* FORM DI INSERIMENTO NUOVA ATTIVITÀ */
-              <form onSubmit={handleFormSubmit} className="space-y-4 text-xs">
-                <div>
-                  <span className="text-xs font-bold uppercase tracking-wider text-amber-600 flex items-center gap-1">
-                    <Store className="w-3.5 h-3.5" />
-                    Commercio di Prossimità
-                  </span>
-                  <h3 className="text-xl font-bold text-slate-950 dark:text-white">
-                    Iscrivi la tua Attività Commerciale
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Inserisci la tua attività per promuoverla a Km 0 a tutti i residenti di Villaggio Prenestino.
-                  </p>
-                </div>
-
-                {/* AVVISO DI MODERAZIONE CHIARA */}
-                <div className="p-3 bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 rounded-2xl flex items-start gap-2.5 text-amber-900 dark:text-amber-200">
-                  <ShieldCheck className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                  <div className="space-y-0.5">
-                    <strong className="block text-xs font-bold">
-                      Procedura di approvazione dell'amministratore
-                    </strong>
-                    <p className="text-[11px] leading-relaxed text-amber-800 dark:text-amber-300">
-                      Tutte le nuove attività inserite vengono verificate dall'amministratore del sito prima della pubblicazione. Questo assicura annunci autentici e recapiti verificati per il quartiere.
+              <form onSubmit={handleFormSubmit} className="space-y-3.5 text-xs">
+                {/* Intestazione essenziale con badge compatto */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-800">
+                  <div>
+                    <h3 className="text-base sm:text-lg font-black text-slate-950 dark:text-white">
+                      Iscrivi la tua Attività
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Vetrina gratuita per i negozi e le attività di Villaggio Prenestino.
                     </p>
                   </div>
+                  <span className="self-start sm:self-auto px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950/80 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-800 whitespace-nowrap">
+                    Iscrizione Gratuita • Moderazione Rapida
+                  </span>
                 </div>
 
                 <div className="space-y-1">
@@ -1245,32 +1299,27 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                   </div>
                 </div>
 
-                {/* CARICAMENTO LOGO O FOTO IN FORMATO JPG */}
-                <div className="space-y-2 p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700">
+                {/* CARICAMENTO LOGO O FOTO (COMPATTO) */}
+                <div className="space-y-1.5 p-3 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700">
                   <div className="flex items-center justify-between">
-                    <label className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                      <Camera className="w-4 h-4 text-amber-600" />
-                      <span>Logo o Foto del Negozio (Formato JPG)</span>
+                    <label className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 text-xs">
+                      <Camera className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Foto o Logo del Negozio</span>
                     </label>
-                    <span className="text-[10px] text-amber-700 dark:text-amber-300 font-bold bg-amber-100 dark:bg-amber-950/70 px-2 py-0.5 rounded-full border border-amber-300 dark:border-amber-800">
-                      Formato JPG / JPEG
-                    </span>
+                    <span className="text-[10px] text-slate-400">JPG, PNG (max 5MB)</span>
                   </div>
-                  <p className="text-[11px] text-slate-500">
-                    Carica il logo aziendale o una foto della facciata/vetrina del negozio: verrà presentata in primo piano nella scheda dell'attività.
-                  </p>
 
                   {uploadedImage ? (
-                    <div className="relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 h-36 bg-slate-100 dark:bg-slate-900 group">
+                    <div className="relative rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 h-28 bg-slate-100 dark:bg-slate-900 group">
                       <img
                         src={uploadedImage}
                         alt="Anteprima Foto/Logo Negozio"
                         className="w-full h-full object-cover"
                       />
                       <div className="absolute inset-0 bg-black/45 flex items-center justify-center gap-2">
-                        <label className="px-3 py-1.5 bg-white text-slate-900 rounded-xl text-xs font-bold shadow-md cursor-pointer hover:bg-slate-100 flex items-center gap-1">
-                          <Upload className="w-3.5 h-3.5" />
-                          <span>Cambia JPG</span>
+                        <label className="px-2.5 py-1 bg-white text-slate-900 rounded-lg text-xs font-bold shadow-md cursor-pointer hover:bg-slate-100 flex items-center gap-1">
+                          <Upload className="w-3 h-3" />
+                          <span>Cambia</span>
                           <input
                             type="file"
                             accept="image/jpeg,image/jpg,.jpg,.jpeg,image/png,image/webp"
@@ -1281,28 +1330,19 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                         <button
                           type="button"
                           onClick={() => setUploadedImage(null)}
-                          className="px-3 py-1.5 bg-rose-600 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer hover:bg-rose-700 flex items-center gap-1"
+                          className="px-2.5 py-1 bg-rose-600 text-white rounded-lg text-xs font-bold shadow-md cursor-pointer hover:bg-rose-700 flex items-center gap-1"
                         >
-                          <X className="w-3.5 h-3.5" />
+                          <X className="w-3 h-3" />
                           <span>Rimuovi</span>
                         </button>
                       </div>
-                      <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-black/75 text-white text-[10px] font-semibold flex items-center gap-1">
-                        <Check className="w-3 h-3 text-emerald-400" />
-                        <span>Immagine JPG pronta per la scheda</span>
-                      </div>
                     </div>
                   ) : (
-                    <label className="border-2 border-dashed border-amber-300 dark:border-amber-700/60 hover:border-amber-500 rounded-2xl p-4 flex flex-col items-center justify-center gap-1.5 cursor-pointer bg-amber-50/50 dark:bg-amber-950/20 transition text-center group">
-                      <div className="w-10 h-10 rounded-2xl bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 flex items-center justify-center group-hover:scale-105 transition-transform">
-                        <Upload className="w-5 h-5" />
-                      </div>
-                      <div className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                        Carica Logo o Foto del Negozio (.JPG)
-                      </div>
-                      <div className="text-[10px] text-slate-500">
-                        Tocca per selezionare una foto JPG dalla galleria o dai file
-                      </div>
+                    <label className="border-2 border-dashed border-amber-300 dark:border-amber-700/60 hover:border-amber-500 rounded-xl p-3 flex items-center justify-center gap-2.5 cursor-pointer bg-amber-50/40 dark:bg-amber-950/20 transition group">
+                      <Upload className="w-4 h-4 text-amber-600 shrink-0 group-hover:scale-110 transition-transform" />
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        Carica foto facciata o logo (.jpg, .png)
+                      </span>
                       <input
                         type="file"
                         accept="image/jpeg,image/jpg,.jpg,.jpeg,image/png,image/webp"
@@ -1315,7 +1355,7 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
 
                 <div className="space-y-1">
                   <label className="font-semibold text-slate-700 dark:text-slate-300">
-                    Numero WhatsApp per Ordini e Contatto Rapido
+                    Numero WhatsApp per Ordini (Opzionale)
                   </label>
                   <input
                     type="tel"
@@ -1324,7 +1364,6 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                     onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-slate-900 dark:text-white"
                   />
-                  <p className="text-[10px] text-slate-400">Inserisci il prefisso 39 per avviare la chat diretta con i clienti</p>
                 </div>
 
                 {/* SELETTORE STANDARDIZZATO ORARI DI APERTURA (NESSUN TESTO DA SCRIVERE) */}
@@ -1608,20 +1647,20 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                     <span>Offerta Speciale per i Residenti (Opzionale)</span>
                   </div>
 
-                  {/* Chiarimento vincolante: non modificabile, valida sempre e solo per chi mostra l'app in negozio */}
+                  {/* Chiarimento offerta e gestione con PIN */}
                   <div className="p-2.5 bg-amber-100/80 dark:bg-amber-900/40 rounded-xl border border-amber-300/80 dark:border-amber-700/60 text-[11px] text-amber-950 dark:text-amber-200 leading-relaxed space-y-1">
                     <div className="flex items-center gap-1.5 font-bold text-amber-900 dark:text-amber-300">
-                      <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                      <span>Condizioni dell'Offerta Speciale:</span>
+                      <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span>Promozione di prossimità:</span>
                     </div>
                     <p>
-                      L'offerta speciale <strong>non potrà essere modificata</strong> successivamente, quindi dovrà essere <strong>valida sempre e solo per chi mostra l'app in negozio</strong>.
+                      L&apos;offerta sarà visibile a tutti i residenti di Villaggio Prenestino che mostrano l&apos;app in negozio. Potrai aggiornarla o modificarla in qualsiasi momento con il tuo PIN di gestione.
                     </p>
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                      Titolo dell'Offerta
+                      Titolo dell&apos;Offerta
                     </label>
                     <input
                       type="text"
@@ -1634,7 +1673,7 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
 
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                      Dettaglio dell'Offerta
+                      Dettaglio dell&apos;Offerta
                     </label>
                     <input
                       type="text"
@@ -1644,6 +1683,29 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                       className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 rounded-xl text-slate-900 dark:text-white"
                     />
                   </div>
+                </div>
+
+                {/* Sezione PIN di Gestione Riservato (Senza Registrazione) */}
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-2xl space-y-2">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-900 dark:text-white text-xs">
+                    <KeyRound className="w-4 h-4 text-amber-500" />
+                    <span>PIN di Gestione Personale (Senza Registrazione Account)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                    Scegli un codice PIN a 4 cifre per poter modificare in futuro la tua scheda, offerte, orari e contatti senza doverti registrare.
+                  </p>
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={8}
+                    placeholder="Scegli un PIN a 4 cifre (es. 1234)"
+                    value={formData.pinGestione || ''}
+                    onChange={(e) => setFormData({ ...formData, pinGestione: e.target.value })}
+                    className="w-full text-xs py-2 px-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono tracking-widest focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
+                  />
+                  <p className="text-[10px] text-slate-400">
+                    Se lasciato vuoto, verrà impostato il PIN predefinito <strong>1234</strong>.
+                  </p>
                 </div>
 
                 <div className="pt-2 flex items-center justify-end gap-2">
@@ -1667,6 +1729,18 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal di Gestione Riservata per il Titolare con PIN segreto */}
+      <GestioneTitolareModal
+        shop={shopForManagement}
+        isOpen={isManagementOpen}
+        onClose={() => setIsManagementOpen(false)}
+        onSave={(id, updatedData) => {
+          if (onUpdateAttivita) {
+            onUpdateAttivita(id, updatedData);
+          }
+        }}
+      />
     </div>
   );
 };

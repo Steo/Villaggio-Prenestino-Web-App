@@ -15,8 +15,11 @@ import {
   Share2,
   Sparkles,
   BellRing,
+  ChevronDown,
 } from 'lucide-react';
 import { shareToWhatsApp } from '../utils/shareUtils';
+import { compressMultipleImages } from '../utils/imageCompressor';
+import { SegnalazioniSkeletonList } from './SkeletonLoaders';
 
 interface SegnalazioniTabProps {
   segnalazioni: SegnalazioneCittadina[];
@@ -31,6 +34,7 @@ interface SegnalazioniTabProps {
   }) => Promise<void>;
   onOpenPhoto: (url: string) => void;
   onAdvanceSegnalazioneStato?: (id: number) => void;
+  loading?: boolean;
 }
 
 export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
@@ -39,9 +43,18 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
   onSubmitSegnalazione,
   onOpenPhoto,
   onAdvanceSegnalazioneStato,
+  loading = false,
 }) => {
   const [mostraForm, setMostraForm] = useState(false);
   const [filtroStato, setFiltroStato] = useState<number>(0);
+  const [showIterInfo, setShowIterInfo] = useState(false);
+  const [expandedSegDescIds, setExpandedSegDescIds] = useState<number[]>([]);
+
+  const toggleSegDescExpanded = (id: number) => {
+    setExpandedSegDescIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
 
   // Wizard Step State (1: Problema & Foto, 2: Posizione GPS, 3: Riepilogo & Invio)
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
@@ -53,11 +66,12 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
   const [nome, setNome] = useState('');
   const [telefono, setTelefono] = useState('');
   const [foto, setFoto] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [isCompressingPhoto, setIsCompressingPhoto] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [inviataSuccesso, setInviataSuccesso] = useState(false);
   const [ultimaSegnalazioneInviata, setUltimaSegnalazioneInviata] = useState<{
-    titolo: string;
     luogo: string;
+    titolo: string;
   } | null>(null);
 
   // GPS State
@@ -75,25 +89,45 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
     'Altro',
   ];
 
-  // Gestione Scatto / Upload Foto
-  const handleFotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
+  // Gestione Scatto / Upload Foto con compressione automatica lato client (max 1280px, ~0.8 quality)
+  const handleFotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
 
-    if (foto.length + files.length > 3) {
-      alert('Puoi allegare al massimo 3 foto.');
+    const filesArray = Array.from(fileList);
+    if (foto.length + filesArray.length > 3) {
+      alert('Puoi allegare al massimo 3 foto per segnalazione.');
       return;
     }
 
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setFoto((prev) => [...prev, event.target!.result as string]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    setIsCompressingPhoto(true);
+    try {
+      // Compressione automatica su HTML5 canvas: risoluzione max 1280px e qualità JPEG 0.8
+      // riduce il peso medio da 5-15 MB a 90-180 KB mantenendo nitidezza per cartelli, buche e decoro
+      const compressedUrls = await compressMultipleImages(filesArray, {
+        maxWidth: 1280,
+        maxHeight: 1280,
+        quality: 0.8,
+        mimeType: 'image/jpeg',
+      });
+      setFoto((prev) => [...prev, ...compressedUrls]);
+    } catch (err) {
+      console.error('Errore durante la compressione immagine:', err);
+      // Fallback a FileReader in caso di browser legacy
+      filesArray.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          if (event.target?.result) {
+            setFoto((prev) => [...prev, event.target!.result as string]);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    } finally {
+      setIsCompressingPhoto(false);
+      // Reset input value per permettere di ricaricare la stessa immagine se necessario
+      e.target.value = '';
+    }
   };
 
   const handleRimuoviFoto = (index: number) => {
@@ -197,7 +231,7 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
     e.preventDefault();
     if (!titolo.trim() || !luogo.trim()) return;
 
-    setLoading(true);
+    setIsSubmitting(true);
     try {
       await onSubmitSegnalazione({
         titolo: titolo.trim(),
@@ -216,7 +250,7 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
     } catch {
       alert('Errore nell\'invio della segnalazione. Riprova.');
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -258,90 +292,88 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
 
   return (
     <div className="space-y-4 pb-20 animate-fadeIn">
-      {/* Banner informativo */}
+      {/* Banner informativo compatto con divulgazione progressiva */}
       <section
-        className="rounded-3xl p-5 sm:p-7 text-white shadow-lg border border-black/10 relative overflow-hidden"
+        className="rounded-3xl p-4 sm:p-6 text-white shadow-lg border border-black/10 relative overflow-hidden"
         style={{
           background: 'linear-gradient(135deg, #781816 0%, #5a1210 100%)',
         }}
       >
         <div className="relative z-10">
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3.5">
-            <div className="max-w-xl">
-              <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider mb-2">
-                Segnalazioni e Territorio
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] sm:text-xs font-black uppercase tracking-wider mb-1.5">
+                Segnalazioni & Decoro
               </span>
               <h2 className="text-xl sm:text-2xl font-black leading-tight text-white tracking-tight">
-                Come gestiamo l'inoltro delle segnalazioni
+                Segnalazioni Territoriali
               </h2>
+              <p className="mt-1 text-xs sm:text-sm text-white/90 leading-relaxed">
+                Invia e monitora disservizi, guasti e decoro a Villaggio Prenestino.
+              </p>
             </div>
 
-            <button
-              onClick={() => {
-                setMostraForm(!mostraForm);
-                if (inviataSuccesso) setInviataSuccesso(false);
-              }}
-              className="w-full sm:w-auto min-h-[44px] px-4 py-2.5 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-md transition flex items-center justify-center gap-2 shrink-0 cursor-pointer self-stretch sm:self-start"
-            >
-              {mostraForm ? <X className="w-4 h-4" /> : <Camera className="w-4 h-4" />}
-              {mostraForm ? 'Chiudi procedura' : 'Segnala in 3 passi (Foto + GPS)'}
-            </button>
-          </div>
+            <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowIterInfo((prev) => !prev)}
+                className="px-3 py-2 bg-white/10 hover:bg-white/20 active:bg-white/25 text-white text-xs font-semibold rounded-xl border border-white/20 transition flex items-center gap-1.5 cursor-pointer"
+                aria-expanded={showIterInfo}
+              >
+                <span>Iter 3 stati</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showIterInfo ? 'rotate-180' : ''}`} />
+              </button>
 
-          <p className="mt-2 text-xs sm:text-sm text-white/90 leading-relaxed max-w-2xl">
-            I guasti puntuali e urgenti (es. lampione spento o pericolo) vengono inoltrati subito. Gli interventi strutturali (es. rifacimento strada), invece, richiedono la raccolta di più segnalazioni dalla zona prima dell'invio.
-          </p>
-
-          {/* Infografica: I 3 stati delle Segnalazioni */}
-          <div className="mt-5 pt-4 border-t border-white/15">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-amber-300 mb-3 flex items-center gap-1.5">
-              <span>I 3 stati della segnalazione:</span>
-            </h4>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              {/* Stato 1 */}
-              <div className="bg-black/25 backdrop-blur-xs rounded-2xl p-3 sm:p-3.5 border border-amber-400/40 flex flex-col justify-between space-y-2">
-                <div className="flex items-center justify-between gap-1.5">
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-400 text-slate-950">
-                    <Clock className="w-3 h-3 text-slate-950" />
-                    1. Ricevuta
-                  </span>
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
-                </div>
-                <p className="text-[11px] sm:text-xs text-white/90 leading-relaxed">
-                  L'Associazione riceve e archivia la segnalazione inviata dal cittadino.
-                </p>
-              </div>
-
-              {/* Stato 2 */}
-              <div className="bg-black/25 backdrop-blur-xs rounded-2xl p-3 sm:p-3.5 border border-sky-400/40 flex flex-col justify-between space-y-2">
-                <div className="flex items-center justify-between gap-1.5">
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-sky-400 text-slate-950">
-                    <AlertCircle className="w-3 h-3 text-slate-950" />
-                    2. Inoltrata all'ente preposto
-                  </span>
-                  <span className="w-2.5 h-2.5 rounded-full bg-sky-400" />
-                </div>
-                <p className="text-[11px] sm:text-xs text-white/90 leading-relaxed">
-                  Trasmessa formalmente agli organi competenti per la presa in carico dell'intervento.
-                </p>
-              </div>
-
-              {/* Stato 3 */}
-              <div className="bg-black/25 backdrop-blur-xs rounded-2xl p-3 sm:p-3.5 border border-emerald-400/40 flex flex-col justify-between space-y-2">
-                <div className="flex items-center justify-between gap-1.5">
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-400 text-slate-950">
-                    <CheckCircle2 className="w-3 h-3 text-slate-950" />
-                    3. Risolta
-                  </span>
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                </div>
-                <p className="text-[11px] sm:text-xs text-white/90 leading-relaxed">
-                  Intervento eseguito o problema risolto con esito positivo confermato.
-                </p>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setMostraForm(!mostraForm);
+                  if (inviataSuccesso) setInviataSuccesso(false);
+                }}
+                className="px-4 py-2 bg-amber-400 hover:bg-amber-300 active:bg-amber-500 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                {mostraForm ? <X className="w-4 h-4" /> : <Camera className="w-4 h-4" />}
+                <span>{mostraForm ? 'Chiudi' : 'Nuova segnalazione'}</span>
+              </button>
             </div>
           </div>
+
+          {/* Infografica espandibile: I 3 stati delle Segnalazioni (Progressive Disclosure) */}
+          {showIterInfo && (
+            <div className="mt-3.5 pt-3.5 border-t border-white/15 animate-fadeIn space-y-2">
+              <p className="text-[11px] text-white/80">
+                I guasti urgenti vengono inoltrati subito; le richieste strutturali vengono aggregate prima della trasmissione agli uffici competenti.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {/* Stato 1 */}
+                <div className="bg-black/25 backdrop-blur-xs rounded-xl p-2.5 border border-amber-400/30 flex items-start gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse mt-1 shrink-0" />
+                  <div>
+                    <strong className="block text-xs font-bold text-amber-300">1. Ricevuta</strong>
+                    <span className="text-[11px] text-white/85">Archiviata dall'Associazione di quartiere.</span>
+                  </div>
+                </div>
+
+                {/* Stato 2 */}
+                <div className="bg-black/25 backdrop-blur-xs rounded-xl p-2.5 border border-sky-400/30 flex items-start gap-2">
+                  <span className="w-2 h-2 rounded-full bg-sky-400 mt-1 shrink-0" />
+                  <div>
+                    <strong className="block text-xs font-bold text-sky-300">2. Inoltrata</strong>
+                    <span className="text-[11px] text-white/85">Trasmessa agli enti e uffici preposti.</span>
+                  </div>
+                </div>
+
+                {/* Stato 3 */}
+                <div className="bg-black/25 backdrop-blur-xs rounded-xl p-2.5 border border-emerald-400/30 flex items-start gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 mt-1 shrink-0" />
+                  <div>
+                    <strong className="block text-xs font-bold text-emerald-300">3. Risolta</strong>
+                    <span className="text-[11px] text-white/85">Intervento eseguito o completato.</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -425,26 +457,23 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
 
               {/* PASSO 1: Il Problema & Foto */}
               {currentStep === 1 && (
-                <div className="space-y-3.5 animate-fadeIn">
+                <div className="space-y-3 animate-fadeIn">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                     <span className="w-5 h-5 rounded-full bg-amber-500 text-slate-950 font-black text-xs flex items-center justify-center">
                       1
                     </span>
-                    Cosa è successo? Scegli il problema e scatta una foto
+                    Cosa è successo?
                   </h3>
 
                   {/* Scelta rapida categoria con touch targets generosi */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      Categoria frequente:
-                    </label>
                     <div className="flex flex-wrap gap-1.5 mb-2">
                       {categorieRapide.map((cat) => (
                         <button
                           key={cat}
                           type="button"
                           onClick={() => setTitolo(cat)}
-                          className={`min-h-[38px] text-xs px-3 py-1.5 rounded-xl border transition ${
+                          className={`min-h-[36px] text-xs px-3 py-1.5 rounded-xl border transition ${
                             titolo === cat
                               ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-950 dark:text-amber-300 border-amber-400 font-bold shadow-2xs'
                               : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
@@ -459,29 +488,33 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
                       required
                       value={titolo}
                       onChange={(e) => setTitolo(e.target.value)}
-                      placeholder="es. Buca profonda o perdita acqua"
-                      className="w-full min-h-[44px] px-3.5 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      placeholder="Oppure scrivi il problema (es. Buca profonda o perdita acqua)"
+                      className="w-full min-h-[42px] px-3.5 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                   </div>
 
-                  {/* Foto con fotocamera */}
+                  {/* Foto con fotocamera & compressione automatica */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex justify-between">
-                      <span>Foto ({foto.length}/3):</span>
-                      <span className="text-[11px] text-slate-400">Scatta dal vivo o allega</span>
-                    </label>
+                    <div className="flex items-center justify-between mb-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      <span>Foto allegate ({foto.length}/3)</span>
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Compressione veloce attiva
+                      </span>
+                    </div>
 
                     <div className="flex flex-wrap items-center gap-2.5">
                       {foto.map((url, idx) => (
                         <div
                           key={idx}
-                          className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-300 dark:border-slate-700"
+                          className="relative w-18 h-18 rounded-xl overflow-hidden border border-slate-300 dark:border-slate-700 shadow-2xs"
                         >
                           <img src={url} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
                           <button
                             type="button"
                             onClick={() => handleRimuoviFoto(idx)}
-                            className="absolute top-1 right-1 p-1 rounded-full bg-slate-900/80 text-white"
+                            className="absolute top-1 right-1 p-1 rounded-full bg-slate-900/80 text-white cursor-pointer hover:bg-rose-600 transition"
+                            title="Rimuovi foto"
                           >
                             <X className="w-3 h-3" />
                           </button>
@@ -489,14 +522,28 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
                       ))}
 
                       {foto.length < 3 && (
-                        <label className="min-w-[80px] h-20 px-3 rounded-xl border-2 border-dashed border-amber-400/80 hover:border-amber-500 flex flex-col items-center justify-center text-slate-600 dark:text-slate-300 cursor-pointer bg-amber-50/40 dark:bg-amber-950/20 active:scale-95 transition">
-                          <Camera className="w-5 h-5 text-amber-600 mb-0.5" />
-                          <span className="text-[10px] font-bold">+ Fotocamera</span>
+                        <label className={`min-w-[76px] h-18 px-3 rounded-xl border-2 border-dashed flex flex-col items-center justify-center text-slate-600 dark:text-slate-300 transition ${
+                          isCompressingPhoto
+                            ? 'border-amber-500 bg-amber-100/60 dark:bg-amber-950/40 cursor-wait'
+                            : 'border-amber-400/80 hover:border-amber-500 bg-amber-50/40 dark:bg-amber-950/20 active:scale-95 cursor-pointer'
+                        }`}>
+                          {isCompressingPhoto ? (
+                            <>
+                              <Loader2 className="w-4 h-4 text-amber-600 animate-spin mb-0.5" />
+                              <span className="text-[10px] font-bold text-amber-800 dark:text-amber-300">Ottimizzo...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Camera className="w-4 h-4 text-amber-600 mb-0.5" />
+                              <span className="text-[10px] font-bold">+ Foto</span>
+                            </>
+                          )}
                           <input
                             type="file"
                             accept="image/*"
                             capture="environment"
                             multiple
+                            disabled={isCompressingPhoto}
                             onChange={handleFotoUpload}
                             className="hidden"
                           />
@@ -508,25 +555,25 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
                   {/* Descrizione facoltativa */}
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Descrizione dettagliata (facoltativa):
+                      Note o dettagli (facoltativo):
                     </label>
                     <textarea
                       rows={2}
                       value={descrizione}
                       onChange={(e) => setDescrizione(e.target.value)}
-                      placeholder="Ulteriori dettagli utili per l'intervento (es. davanti al civico 15)"
+                      placeholder="Dettagli utili (es. davanti al civico 15)"
                       className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                   </div>
 
                   {/* Tasto Avanti al Passo 2 */}
-                  <div className="pt-2 flex justify-end">
+                  <div className="pt-1 flex justify-end">
                     <button
                       type="button"
                       onClick={handleNextStep}
-                      className="min-h-[44px] px-5 py-2.5 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 font-bold text-xs sm:text-sm rounded-xl shadow-md transition flex items-center gap-1.5 cursor-pointer"
+                      className="min-h-[42px] px-5 py-2 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 font-bold text-xs sm:text-sm rounded-xl shadow-md transition flex items-center gap-1.5 cursor-pointer"
                     >
-                      <span>Avanti: Posizione e GPS</span>
+                      <span>Avanti: Posizione</span>
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -535,74 +582,72 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
 
               {/* PASSO 2: Posizione & GPS */}
               {currentStep === 2 && (
-                <div className="space-y-3.5 animate-fadeIn">
+                <div className="space-y-3 animate-fadeIn">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                     <span className="w-5 h-5 rounded-full bg-amber-500 text-slate-950 font-black text-xs flex items-center justify-center">
                       2
                     </span>
-                    Dove si trova esattamente il problema?
+                    Dove si trova?
                   </h3>
 
                   {/* Box Rilevamento GPS Touch Rapido */}
-                  <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700/60 space-y-2.5">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h4 className="text-xs font-bold text-amber-950 dark:text-amber-200 flex items-center gap-1">
-                          <Navigation className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
-                          Rilevamento GPS Automatico
-                        </h4>
-                        <p className="text-[11px] text-amber-900/80 dark:text-amber-300/80">
-                          Se ti trovi sul posto, usa il GPS del telefono per rilevare subito via e coordinate.
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={handleDetectGps}
-                        disabled={isDetectingGps}
-                        className="min-h-[44px] px-3.5 py-2 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 disabled:opacity-60 text-slate-950 font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer"
-                      >
-                        {isDetectingGps ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>Rilevamento...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Navigation className="w-4 h-4" />
-                            <span>Rileva GPS</span>
-                          </>
-                        )}
-                      </button>
+                  <div className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700/60 flex items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-xs font-bold text-amber-950 dark:text-amber-200 flex items-center gap-1">
+                        <Navigation className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
+                        <span>Rilevamento GPS</span>
+                      </h4>
+                      <p className="text-[11px] text-amber-900/80 dark:text-amber-300/80">
+                        Rileva subito la via se ti trovi sul posto.
+                      </p>
                     </div>
 
-                    {gpsAccuracy && (
-                      <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Posizione rilevata con precisione a circa {gpsAccuracy} metri.
-                      </p>
-                    )}
-
-                    {gpsError && (
-                      <p className="text-[11px] text-rose-600 dark:text-rose-400 font-medium">
-                        {gpsError}
-                      </p>
-                    )}
+                    <button
+                      type="button"
+                      onClick={handleDetectGps}
+                      disabled={isDetectingGps}
+                      className="min-h-[38px] px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 disabled:opacity-60 text-slate-950 font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer"
+                    >
+                      {isDetectingGps ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Rilevamento...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Navigation className="w-3.5 h-3.5" />
+                          <span>Rileva GPS</span>
+                        </>
+                      )}
+                    </button>
                   </div>
+
+                  {gpsAccuracy && (
+                    <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Posizione rilevata con precisione (±{gpsAccuracy}m).
+                    </p>
+                  )}
+
+                  {gpsError && (
+                    <p className="text-[11px] text-rose-600 dark:text-rose-400 font-medium">
+                      {gpsError}
+                    </p>
+                  )}
 
                   {/* Campo Indirizzo Modificabile */}
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
                       <MapPin className="w-3.5 h-3.5 text-amber-600" />
-                      Via / Incrocio esatto *:
+                      <span>Via o incrocio *:</span>
                     </label>
                     <input
                       type="text"
                       required
                       value={luogo}
                       onChange={(e) => setLuogo(e.target.value)}
-                      placeholder="es. Via Fosso dell'Osa 120 o incrocio Via Specchia"
-                      className="w-full min-h-[44px] px-3.5 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      placeholder="es. Via Fosso dell'Osa o incrocio Via Specchia"
+                      className="w-full min-h-[42px] px-3.5 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                   </div>
 
@@ -719,10 +764,10 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
                     </button>
                     <button
                       type="submit"
-                      disabled={loading}
+                      disabled={isSubmitting}
                       className="min-h-[44px] px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs sm:text-sm rounded-xl transition flex items-center gap-1.5 shadow-md cursor-pointer"
                     >
-                      {loading ? (
+                      {isSubmitting ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin" />
                           <span>Invio in corso...</span>
@@ -787,12 +832,15 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
       </div>
 
       {/* LISTA SEGNALAZIONI */}
-      <div className="space-y-3">
-        {segnalazioniFiltrate.length === 0 ? (
-          <div className="bg-white rounded-2xl p-8 text-center border border-slate-200 text-slate-500 text-xs">
-            Nessuna segnalazione in questa sezione.
-          </div>
-        ) : (
+      {loading ? (
+        <SegnalazioniSkeletonList count={3} />
+      ) : (
+        <div className="space-y-3">
+          {segnalazioniFiltrate.length === 0 ? (
+            <div className="bg-white rounded-2xl p-8 text-center border border-slate-200 text-slate-500 text-xs">
+              Nessuna segnalazione in questa sezione.
+            </div>
+          ) : (
           segnalazioniFiltrate.map((seg) => (
             <div
               key={seg.id}
@@ -834,9 +882,23 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
               </div>
 
               {seg.desc && (
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  {seg.desc}
-                </p>
+                <div>
+                  <p className={`text-xs text-slate-600 leading-relaxed ${
+                    expandedSegDescIds.includes(seg.id) ? '' : 'line-clamp-2'
+                  }`}>
+                    {seg.desc}
+                  </p>
+                  {seg.desc.length > 90 && (
+                    <button
+                      type="button"
+                      onClick={() => toggleSegDescExpanded(seg.id)}
+                      className="text-[11px] font-bold text-amber-700 hover:underline mt-0.5 cursor-pointer inline-flex items-center gap-0.5"
+                    >
+                      <span>{expandedSegDescIds.includes(seg.id) ? 'Mostra meno' : 'Leggi tutto'}</span>
+                      <ChevronDown className={`w-3 h-3 transition-transform ${expandedSegDescIds.includes(seg.id) ? 'rotate-180' : ''}`} />
+                    </button>
+                  )}
+                </div>
               )}
 
               {/* Pulsante di avanzamento stato per testare la notifica del browser */}
@@ -873,6 +935,7 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
           ))
         )}
       </div>
+      )}
     </div>
   );
 };

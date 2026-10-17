@@ -1,6 +1,6 @@
 {
-  "summary": "Piano di implementazione per pin personalizzati sagomati con colori e icone tematiche per categoria (negozi ed eventi) sulla mappa di Villaggio Prenestino",
-  "updatedAt": "2026-10-16T11:14:05.779985565Z",
+  "summary": "Piano di semplificazione dell'interfaccia utente (UX/UI) e sintesi dei testi per la Scheda Commercio (e form registrazione attività) e la Scheda Segnalazioni (e procedura guidata di invio). Adotta l'approccio concordato a divulgazione progressiva: testi essenziali a colpo d'occhio, gerarchia visiva pulita, micro-copy intuitivo e dettagli approfonditi espandibili su richiesta tramite elementi collassabili/accordion.",
+  "updatedAt": "2026-10-17T09:54:08.173706790Z",
   "requestFeedback": true,
   "userFacing": true
 }

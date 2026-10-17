@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { ClassificaCittadini } from './ClassificaCittadini';
 import { shareWithNativeOrWhatsApp, shareToWhatsApp } from '../utils/shareUtils';
+import { NewsSkeletonList } from './SkeletonLoaders';
 
 interface HomeTabProps {
   news: WpArticle[];
@@ -41,6 +42,7 @@ interface HomeTabProps {
   onUpdateUserNome?: (nome: string) => void;
   onOpenExportModal?: () => void;
   onOpenTour?: () => void;
+  loading?: boolean;
 }
 
 export const HomeTab: React.FC<HomeTabProps> = ({
@@ -58,6 +60,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   onUpdateUserNome,
   onOpenExportModal,
   onOpenTour,
+  loading = false,
 }) => {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -189,62 +192,66 @@ export const HomeTab: React.FC<HomeTabProps> = ({
           </a>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-          {news.slice(0, 3).map((art) => (
-            <article
-              key={art.id}
-              className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col justify-between group"
-            >
-              <div>
-                <div className="relative aspect-[16/9] overflow-hidden bg-slate-100">
-                  <img
-                    src={art.img}
-                    alt={art.titolo}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    loading="lazy"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src =
-                        'https://images.unsplash.com/photo-1577495508048-b635879837f1?auto=format&fit=crop&w=600&q=80';
-                    }}
-                  />
-                  <span className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-md bg-slate-950/80 text-white text-[10px] font-bold">
-                    {art.data}
-                  </span>
+        {loading ? (
+          <NewsSkeletonList count={3} />
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            {news.slice(0, 3).map((art) => (
+              <article
+                key={art.id}
+                className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col justify-between group"
+              >
+                <div>
+                  <div className="relative aspect-[16/9] overflow-hidden bg-slate-100">
+                    <img
+                      src={art.img}
+                      alt={art.titolo}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      loading="lazy"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src =
+                          'https://images.unsplash.com/photo-1577495508048-b635879837f1?auto=format&fit=crop&w=600&q=80';
+                      }}
+                    />
+                    <span className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-md bg-slate-950/80 text-white text-[10px] font-bold">
+                      {art.data}
+                    </span>
+                  </div>
+
+                  <div className="p-3.5">
+                    <h4 className="text-sm font-bold text-slate-900 leading-snug line-clamp-2">
+                      {art.titolo}
+                    </h4>
+                    <p className="mt-1.5 text-xs text-slate-600 line-clamp-2 leading-relaxed">
+                      {art.estratto}
+                    </p>
+                  </div>
                 </div>
 
-                <div className="p-3.5">
-                  <h4 className="text-sm font-bold text-slate-900 leading-snug line-clamp-2">
-                    {art.titolo}
-                  </h4>
-                  <p className="mt-1.5 text-xs text-slate-600 line-clamp-2 leading-relaxed">
-                    {art.estratto}
-                  </p>
+                <div className="px-3.5 pb-3 pt-1 flex items-center gap-2">
+                  <a
+                    href={art.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 py-1.5 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition flex items-center justify-center gap-1"
+                  >
+                    Leggi <ChevronRight className="w-3.5 h-3.5" />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => handleShareNews(art)}
+                    title="Condividi notizia su WhatsApp o altre app"
+                    aria-label="Condividi notizia su WhatsApp o altre app"
+                    className="py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs shadow-xs hover:shadow transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                  >
+                    <Share2 className="w-3.5 h-3.5 text-white stroke-[2.3]" />
+                    <span>Condividi</span>
+                  </button>
                 </div>
-              </div>
-
-              <div className="px-3.5 pb-3 pt-1 flex items-center gap-2">
-                <a
-                  href={art.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 py-1.5 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition flex items-center justify-center gap-1"
-                >
-                  Leggi <ChevronRight className="w-3.5 h-3.5" />
-                </a>
-                <button
-                  type="button"
-                  onClick={() => handleShareNews(art)}
-                  title="Condividi notizia su WhatsApp o altre app"
-                  aria-label="Condividi notizia su WhatsApp o altre app"
-                  className="py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs shadow-xs hover:shadow transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
-                >
-                  <Share2 className="w-3.5 h-3.5 text-white stroke-[2.3]" />
-                  <span>Condividi</span>
-                </button>
-              </div>
-            </article>
-          ))}
-        </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* SEZIONE: Volontariato: Serve una mano */}

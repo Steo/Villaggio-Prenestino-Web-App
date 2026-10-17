@@ -286,7 +286,7 @@ export const NUMERI_UTILI = [
   },
   {
     nome: 'Polizia Locale Roma Capitale - Municipio VI',
-    numero: '06 6769 6250',
+    numero: '06 6769 5100',
     descr: 'Gruppo VI Tor Bella Monaca - Viabilità, soste, pronto intervento',
     tipo: 'locale',
   },
@@ -297,9 +297,15 @@ export const NUMERI_UTILI = [
     tipo: 'locale',
   },
   {
-    nome: 'AMA Roma - Segnalazione Rifiuti & Ingombranti',
-    numero: '06 0606',
-    descr: 'ChiamaRoma 060606 per rifiuti abbandonati e pulizia strade',
+    nome: 'Segnalazione Discariche Abusive',
+    numero: '800 867 035',
+    descr: 'Numero verde gratuito per segnalare discariche abusive e rifiuti abbandonati',
+    tipo: 'servizi',
+  },
+  {
+    nome: 'Ritiro Rifiuti Ingombranti (ChiamaRoma)',
+    numero: '060606',
+    descr: 'ChiamaRoma 060606 per prenotazione ritiro ingombranti a domicilio e informazioni AMA',
     tipo: 'servizi',
   },
   {
@@ -326,6 +332,7 @@ export const INITIAL_ATTIVITA_COMMERCIO: AttivitaCommercio[] = [
     verificato: true,
     recensioneVoto: 4.8,
     miPiace: 54,
+    pinGestione: '1234',
     immagine: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80',
     offertaAttiva: {
       titolo: 'Mercoledì del Pane & Dolci di Quartiere',
@@ -349,6 +356,7 @@ export const INITIAL_ATTIVITA_COMMERCIO: AttivitaCommercio[] = [
     verificato: true,
     recensioneVoto: 4.9,
     miPiace: 46,
+    pinGestione: '1234',
     immagine: 'https://images.unsplash.com/photo-1587854692152-cbe660dbde88?auto=format&fit=crop&w=800&q=80',
     offertaAttiva: {
       titolo: 'Check-Up Cardiovascolare Gratuito',
@@ -371,6 +379,7 @@ export const INITIAL_ATTIVITA_COMMERCIO: AttivitaCommercio[] = [
     verificato: true,
     recensioneVoto: 4.7,
     miPiace: 39,
+    pinGestione: '1234',
     immagine: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80',
     offertaAttiva: {
       titolo: 'Combo Colazione del Residente',
@@ -394,6 +403,7 @@ export const INITIAL_ATTIVITA_COMMERCIO: AttivitaCommercio[] = [
     verificato: true,
     recensioneVoto: 4.8,
     miPiace: 31,
+    pinGestione: '1234',
     immagine: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=800&q=80',
     offertaAttiva: {
       titolo: 'Spesa a Domicilio Gratuita per Over 65',
@@ -416,6 +426,7 @@ export const INITIAL_ATTIVITA_COMMERCIO: AttivitaCommercio[] = [
     verificato: true,
     recensioneVoto: 4.6,
     miPiace: 25,
+    pinGestione: '1234',
     immagine: 'https://images.unsplash.com/photo-1581783342308-f792dbdd27c5?auto=format&fit=crop&w=800&q=80',
     offertaAttiva: {
       titolo: 'Promozione Sicurezza & Duplicazione Chiavi',
@@ -439,6 +450,7 @@ export const INITIAL_ATTIVITA_COMMERCIO: AttivitaCommercio[] = [
     verificato: true,
     recensioneVoto: 4.9,
     miPiace: 21,
+    pinGestione: '1234',
     immagine: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=800&q=80',
     offertaAttiva: {
       titolo: 'Trattamento Ristrutturante in Omaggio',
@@ -462,6 +474,7 @@ export const INITIAL_ATTIVITA_COMMERCIO: AttivitaCommercio[] = [
     verificato: true,
     recensioneVoto: 4.8,
     miPiace: 18,
+    pinGestione: '1234',
     immagine: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80',
     offertaAttiva: {
       titolo: 'Teglia Famiglia Asporto del Weekend',
@@ -485,6 +498,7 @@ export const INITIAL_ATTIVITA_COMMERCIO: AttivitaCommercio[] = [
     verificato: true,
     recensioneVoto: 4.7,
     miPiace: 14,
+    pinGestione: '1234',
     immagine: 'https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?auto=format&fit=crop&w=800&q=80',
     offertaAttiva: {
       titolo: 'Controllo Livelli & Pressione Gratuito',
@@ -507,6 +521,7 @@ export const INITIAL_ATTIVITA_COMMERCIO: AttivitaCommercio[] = [
     verificato: true,
     recensioneVoto: 4.9,
     miPiace: 11,
+    pinGestione: '1234',
     immagine: 'https://images.unsplash.com/photo-1574258495973-f010dfbb5371?auto=format&fit=crop&w=800&q=80',
     offertaAttiva: {
       titolo: 'Seconda Coppia di Lenti al 50%',

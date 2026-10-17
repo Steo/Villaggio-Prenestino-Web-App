@@ -113,6 +113,7 @@ export default function App() {
   const [segnalazioni, setSegnalazioni] = useState<SegnalazioneCittadina[]>([]);
   const [proposte, setProposte] = useState<PropostaCittadina[]>([]);
   const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null);
+  const [loadingData, setLoadingData] = useState<boolean>(true);
 
   // Vetrina Commercio & Mappa Attività
   const [attivitaCommercio, setAttivitaCommercio] = useState<AttivitaCommercio[]>(() => {
@@ -129,6 +130,7 @@ export default function App() {
               lng: init ? init.lng : item.lng,
               indirizzo: init ? init.indirizzo : item.indirizzo,
               miPiace: typeof item.miPiace === 'number' ? item.miPiace : (init?.miPiace || 10),
+              pinGestione: item.pinGestione || init?.pinGestione || '1234',
             };
           });
         }
@@ -231,6 +233,21 @@ export default function App() {
       return updated;
     });
     showToast('Attività commerciale approvata con successo! Ora è pubblica per tutti i residenti.');
+  };
+
+  const handleUpdateAttivita = (id: number, updatedData: Partial<AttivitaCommercio>) => {
+    setAttivitaCommercio((prev) => {
+      const updated = prev.map((item) =>
+        item.id === id ? { ...item, ...updatedData } : item
+      );
+      try {
+        localStorage.setItem('vp_attivita_commercio', JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+      return updated;
+    });
+    showToast('Scheda attività commerciale aggiornata con successo!');
   };
 
   // Volunteer contact modal state
@@ -485,12 +502,19 @@ export default function App() {
   };
 
   const loadData = async () => {
-    const data = await fetchAllData();
-    setNews(data.news);
-    setEventi(data.eventi);
-    setRichieste(data.richieste);
-    setSegnalazioni(data.segnalazioni);
-    setProposte(data.proposte);
+    setLoadingData(true);
+    try {
+      const data = await fetchAllData();
+      setNews(data.news);
+      setEventi(data.eventi);
+      setRichieste(data.richieste);
+      setSegnalazioni(data.segnalazioni);
+      setProposte(data.proposte);
+    } catch (err) {
+      console.error('Errore durante il caricamento dati:', err);
+    } finally {
+      setLoadingData(false);
+    }
   };
 
   useEffect(() => {
@@ -809,6 +833,7 @@ export default function App() {
             onUpdateUserNome={handleUpdateUserNome}
             onOpenExportModal={() => setExportModalOpen(true)}
             onOpenTour={() => setTourModalOpen(true)}
+            loading={loadingData}
           />
         )}
 
@@ -827,6 +852,7 @@ export default function App() {
             onSubmitSegnalazione={handleSubmitSegnalazione}
             onOpenPhoto={(url) => setLightboxPhoto(url)}
             onAdvanceSegnalazioneStato={handleSimulateReportStatusChange}
+            loading={loadingData}
           />
         )}
 
@@ -848,8 +874,10 @@ export default function App() {
             votedAttivita={interactions.negoziVotati || []}
             onVoteAttivita={handleVoteAttivita}
             onAggiungiAttivita={handleAggiungiAttivita}
+            onUpdateAttivita={handleUpdateAttivita}
             onApprovaAttivita={handleApprovaAttivita}
             darkMode={darkMode}
+            loading={loadingData}
           />
         )}
 

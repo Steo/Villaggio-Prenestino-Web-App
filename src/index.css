@@ -11,6 +11,12 @@
   to { opacity: 1; transform: scale(1); }
 }
 
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 .animate-fadeIn {
   animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
@@ -132,12 +138,23 @@ html.dark,
 }
 
 /* ==========================================================================
-   STILI GOOGLE MAPS: TESSERE NOTTURNE E POPUP PIN IN DARK & LIGHT MODE
+   STILI GOOGLE MAPS: TEMA NOTTURNO BLU NOTTE E POPUP PIN IN DARK & LIGHT MODE
    ========================================================================== */
 
-/* Tessere della mappa in modalità notturna: trasforma la mappa standard in un tema notte moderno slate ad alto contrasto */
+/* Contenitore e sfondo della mappa in modalità notturna: NESSUN filtro negativo/invert */
+.dark .map-night-theme,
+.dark .map-night-theme .gm-style,
 .dark .map-night-theme .gm-style > div:first-child {
-  filter: invert(90%) hue-rotate(180deg) contrast(95%) brightness(90%) saturate(120%) !important;
+  background-color: #0b1329 !important;
+  filter: none !important;
+}
+
+/* Protezione assoluta: nessuna foto, pin SVG o icona marker deve subire filtri o negativi */
+.map-night-theme .gm-style img,
+.map-night-theme .gm-style svg,
+.map-night-theme .gm-style-iw-c img,
+.gm-dark-infowindow img {
+  filter: none !important;
 }
 
 /* Controlli di zoom (+/-) e pulsanti Google Maps in Dark Mode */
@@ -146,14 +163,15 @@ html.dark,
 .dark .map-night-theme button[aria-label*="zoom" i],
 .dark .map-night-theme button[aria-label*="schermo intero" i],
 .dark .map-night-theme button[aria-label*="fullscreen" i] {
-  background-color: #1e293b !important;
+  background-color: #0f172a !important;
   color: #f8fafc !important;
-  border-color: #334155 !important;
+  border: 1px solid #1e293b !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4) !important;
 }
 
-.dark .map-night-theme .gm-control-active svg,
-.dark .map-night-theme .gm-control-active img {
-  filter: invert(1) brightness(1.5) !important;
+.dark .map-night-theme .gm-bundled-control button svg path,
+.dark .map-night-theme button[aria-label*="zoom" i] svg path {
+  fill: #cbd5e1 !important;
 }
 
 /* Attribuzione termini e copyright in dark mode */
@@ -164,17 +182,19 @@ html.dark,
 
 /* --------------------------------------------------------------------------
    INFOWINDOW (POPUP PIN MAPPA) IN DARK MODE
+   Colore di fondo blu notte (#0b1329) e testi ad alto contrasto
    -------------------------------------------------------------------------- */
 .dark .gm-style .gm-style-iw-c,
 html.dark .gm-style .gm-style-iw-c,
 .dark .gm-style-iw-c,
 html.dark .gm-style-iw-c,
-.dark div.gm-style-iw-c {
-  background-color: #0f172a !important; /* slate-900 */
+.dark div.gm-style-iw-c,
+.gm-dark-infowindow {
+  background-color: #0b1329 !important; /* Blu notte scuro */
   color: #f8fafc !important;
-  border: 1px solid #334155 !important;
-  box-shadow: 0 12px 30px -4px rgba(0, 0, 0, 0.75), 0 8px 12px -6px rgba(0, 0, 0, 0.75) !important;
-  border-radius: 1rem !important;
+  border: 1px solid #1e293b !important;
+  box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.8), 0 8px 16px -6px rgba(0, 0, 0, 0.6) !important;
+  border-radius: 1.25rem !important;
   padding: 8px !important;
 }
 
@@ -183,9 +203,9 @@ html.dark .gm-style-iw-c,
 html.dark .gm-style .gm-style-iw-tc::after,
 .dark .gm-style-iw-tc::after,
 html.dark .gm-style-iw-tc::after {
-  background-color: #0f172a !important; /* slate-900 */
-  border-top: 1px solid #334155 !important;
-  border-left: 1px solid #334155 !important;
+  background-color: #0b1329 !important; /* Stesso blu notte */
+  border-top: 1px solid #1e293b !important;
+  border-left: 1px solid #1e293b !important;
 }
 
 /* Contenitore interno del testo InfoWindow in Dark Mode */
@@ -196,9 +216,10 @@ html.dark .gm-style-iw-d {
   background-color: transparent !important;
   color: #f8fafc !important;
   overflow: auto !important;
+  max-height: 420px !important;
 }
 
-/* Titolo dell'attività/evento nel popup: sempre bianco e ben visibile su fondo scuro */
+/* Titolo dell'attività/evento nel popup: sempre bianco su fondo blu notte */
 .dark .gm-style .gm-style-iw-d h4,
 html.dark .gm-style .gm-style-iw-d h4,
 .dark .gm-style-iw-d h4,
@@ -210,13 +231,17 @@ html.dark .gm-style .gm-style-iw-d h4,
 .dark .gm-style button.gm-ui-hover-effect,
 html.dark .gm-style button.gm-ui-hover-effect,
 .dark button.gm-ui-hover-effect,
-html.dark button.gm-ui-hover-effect {
-  filter: invert(1) brightness(1.8) !important;
+html.dark button.gm-ui-hover-effect,
+.gm-dark-infowindow button.gm-ui-hover-effect {
+  filter: invert(1) brightness(2) !important;
   opacity: 0.85 !important;
+  top: 6px !important;
+  right: 6px !important;
 }
 
 .dark .gm-style button.gm-ui-hover-effect:hover,
-html.dark .gm-style button.gm-ui-hover-effect:hover {
+html.dark .gm-style button.gm-ui-hover-effect:hover,
+.gm-dark-infowindow button.gm-ui-hover-effect:hover {
   opacity: 1 !important;
 }
 

@@ -69,6 +69,7 @@ export interface AttivitaCommercio {
   dataInserimento?: string;
   nomeReferente?: string;
   emailReferente?: string;
+  pinGestione?: string; // Codice PIN univoco (es. 4 cifre) per la modifica dei dati da parte del titolare senza registrazione
 }
 
 export interface NuovaAttivitaForm {
@@ -85,6 +86,7 @@ export interface NuovaAttivitaForm {
   logo?: string;     // Logo del negozio in formato JPG
   nomeReferente?: string;
   emailReferente?: string;
+  pinGestione?: string; // Codice PIN a 4 cifre a scelta del titolare
 }
 
 export interface RichiestaVolontariato {

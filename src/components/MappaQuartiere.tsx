@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { APIProvider, Map, AdvancedMarker, InfoWindow, ColorScheme, useMap } from '@vis.gl/react-google-maps';
+import { APIProvider, Map, InfoWindow, ColorScheme, useMap } from '@vis.gl/react-google-maps';
 import { CustomMapPin } from './CustomMapPin';
+import { CustomMapMarker } from './CustomMapMarker';
 import { AttivitaCommercio, EventoQuartiere, CategoriaCommercio } from '../types';
 import { 
   Store, 
@@ -15,7 +16,9 @@ import {
   ExternalLink, 
   Layers, 
   Sparkles,
-  Filter
+  Filter,
+  KeyRound,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface MappaQuartiereProps {
@@ -27,6 +30,7 @@ interface MappaQuartiereProps {
   onFilterChange: (tipo: 'tutti' | 'negozi' | 'eventi') => void;
   categoriaFilter?: CategoriaCommercio | 'tutti';
   onCategoriaFilterChange?: (cat: CategoriaCommercio | 'tutti') => void;
+  onOpenManagement?: (shop: AttivitaCommercio) => void;
   darkMode?: boolean;
 }
 
@@ -36,25 +40,94 @@ const VILLAGGIO_PRENESTINO_CENTER = {
   lng: 12.6865
 };
 
-// Stile cartografico notturno avanzato per Google Maps
+// Stile cartografico diurno per Google Maps:
+// Nasconde specificamente i negozi e attività commerciali di Google Maps (poi.business)
+// preservando invece fermate autobus (transit.station), linee e presidi civici/scolastici/sanitari
+const LIGHT_MAP_STYLES = [
+  // Disabilita tutte le attività commerciali terze di Google Maps
+  {
+    featureType: 'poi.business',
+    stylers: [{ visibility: 'off' }],
+  },
+  // Disabilita le icone dei POI generici per evitare pin di negozi non categorizzati
+  {
+    featureType: 'poi',
+    elementType: 'labels.icon',
+    stylers: [{ visibility: 'off' }],
+  },
+  // Mantieni e valorizza le fermate dei trasporti pubblici (autobus ATAC, tram, metro)
+  {
+    featureType: 'transit.station',
+    stylers: [{ visibility: 'on' }],
+  },
+  {
+    featureType: 'transit.station',
+    elementType: 'labels.icon',
+    stylers: [{ visibility: 'on' }],
+  },
+  {
+    featureType: 'transit.line',
+    stylers: [{ visibility: 'on' }],
+  },
+  // Mantieni parchi pubblici e presidi civici/scuole/ospedali
+  {
+    featureType: 'poi.park',
+    stylers: [{ visibility: 'on' }],
+  },
+  {
+    featureType: 'poi.park',
+    elementType: 'labels.icon',
+    stylers: [{ visibility: 'on' }],
+  },
+  {
+    featureType: 'poi.government',
+    stylers: [{ visibility: 'on' }],
+  },
+  {
+    featureType: 'poi.medical',
+    stylers: [{ visibility: 'on' }],
+  },
+  {
+    featureType: 'poi.school',
+    stylers: [{ visibility: 'on' }],
+  },
+];
+
+// Stile cartografico notturno avanzato per Google Maps:
+// Colori scuri della mappa (blu notte / slate profondo) in perfetta linea con il tema dark dell'app
 const DARK_MAP_STYLES = [
-  { elementType: 'geometry', stylers: [{ color: '#1e293b' }] }, // slate-800
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#0f172a' }] }, // slate-900
-  { elementType: 'labels.text.fill', stylers: [{ color: '#cbd5e1' }] }, // slate-300
+  { elementType: 'geometry', stylers: [{ color: '#0b1329' }] }, // Base blu notte scuro profondo
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#060a14' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
   {
     featureType: 'administrative.locality',
     elementType: 'labels.text.fill',
     stylers: [{ color: '#f8fafc' }],
   },
   {
+    featureType: 'administrative.neighborhood',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#cbd5e1' }],
+  },
+  // Esclusione mirata attività commerciali predefinite di Google Maps
+  {
+    featureType: 'poi.business',
+    stylers: [{ visibility: 'off' }],
+  },
+  {
+    featureType: 'poi',
+    elementType: 'labels.icon',
+    stylers: [{ visibility: 'off' }],
+  },
+  {
     featureType: 'poi',
     elementType: 'labels.text.fill',
-    stylers: [{ color: '#94a3b8' }],
+    stylers: [{ color: '#64748b' }],
   },
   {
     featureType: 'poi.park',
     elementType: 'geometry',
-    stylers: [{ color: '#14382c' }],
+    stylers: [{ color: '#0c231a' }], // Verde smeraldo scuro notturno
   },
   {
     featureType: 'poi.park',
@@ -62,29 +135,41 @@ const DARK_MAP_STYLES = [
     stylers: [{ color: '#34d399' }],
   },
   {
+    featureType: 'poi.government',
+    stylers: [{ visibility: 'on' }],
+  },
+  {
+    featureType: 'poi.medical',
+    stylers: [{ visibility: 'on' }],
+  },
+  {
+    featureType: 'poi.school',
+    stylers: [{ visibility: 'on' }],
+  },
+  {
     featureType: 'road',
     elementType: 'geometry',
-    stylers: [{ color: '#334155' }],
+    stylers: [{ color: '#162238' }], // Strade in tonalità ardesia / blu notte
   },
   {
     featureType: 'road',
     elementType: 'geometry.stroke',
-    stylers: [{ color: '#1e293b' }],
+    stylers: [{ color: '#0b1329' }],
   },
   {
     featureType: 'road',
     elementType: 'labels.text.fill',
-    stylers: [{ color: '#e2e8f0' }],
+    stylers: [{ color: '#cbd5e1' }],
   },
   {
     featureType: 'road.highway',
     elementType: 'geometry',
-    stylers: [{ color: '#475569' }],
+    stylers: [{ color: '#253754' }],
   },
   {
     featureType: 'road.highway',
     elementType: 'geometry.stroke',
-    stylers: [{ color: '#1e293b' }],
+    stylers: [{ color: '#111c2e' }],
   },
   {
     featureType: 'road.highway',
@@ -94,7 +179,11 @@ const DARK_MAP_STYLES = [
   {
     featureType: 'transit',
     elementType: 'geometry',
-    stylers: [{ color: '#334155' }],
+    stylers: [{ color: '#162238' }],
+  },
+  {
+    featureType: 'transit.station',
+    stylers: [{ visibility: 'on' }],
   },
   {
     featureType: 'transit.station',
@@ -102,23 +191,70 @@ const DARK_MAP_STYLES = [
     stylers: [{ color: '#cbd5e1' }],
   },
   {
+    featureType: 'transit.line',
+    stylers: [{ visibility: 'on' }],
+  },
+  {
     featureType: 'water',
     elementType: 'geometry',
-    stylers: [{ color: '#091528' }],
+    stylers: [{ color: '#060e1d' }], // Acqua blu notte oceanica
   },
   {
     featureType: 'water',
     elementType: 'labels.text.fill',
-    stylers: [{ color: '#64748b' }],
+    stylers: [{ color: '#475569' }],
   },
   {
     featureType: 'water',
     elementType: 'labels.text.stroke',
-    stylers: [{ color: '#091528' }],
+    stylers: [{ color: '#060e1d' }],
   },
 ];
 
-// Componente child per sincronizzare reattivamente le opzioni notte su Google Maps instance
+// Mappatura colori categorie per popup mappa: mantengono gli stessi colori del tema chiaro e dei pin SVG
+const CATEGORIA_BADGE_STYLE: Record<
+  CategoriaCommercio,
+  { label: string; text: string; bg: string; border: string }
+> = {
+  alimentari: {
+    label: 'Alimentari',
+    text: 'text-emerald-700 dark:text-emerald-400',
+    bg: 'bg-emerald-50 dark:bg-emerald-950/60',
+    border: 'border-emerald-300 dark:border-emerald-700/80',
+  },
+  ristorazione: {
+    label: 'Bar & Cucina',
+    text: 'text-amber-700 dark:text-amber-400',
+    bg: 'bg-amber-50 dark:bg-amber-950/60',
+    border: 'border-amber-300 dark:border-amber-700/80',
+  },
+  salute: {
+    label: 'Farmacia & Salute',
+    text: 'text-rose-700 dark:text-rose-400',
+    bg: 'bg-rose-50 dark:bg-rose-950/60',
+    border: 'border-rose-300 dark:border-rose-700/80',
+  },
+  servizi: {
+    label: 'Artigiani & Servizi',
+    text: 'text-indigo-700 dark:text-indigo-400',
+    bg: 'bg-indigo-50 dark:bg-indigo-950/60',
+    border: 'border-indigo-300 dark:border-indigo-700/80',
+  },
+  casa: {
+    label: 'Casa & Brico',
+    text: 'text-sky-700 dark:text-sky-400',
+    bg: 'bg-sky-50 dark:bg-sky-950/60',
+    border: 'border-sky-300 dark:border-sky-700/80',
+  },
+  tutti: {
+    label: 'Tutte',
+    text: 'text-amber-700 dark:text-amber-400',
+    bg: 'bg-amber-50 dark:bg-amber-950/60',
+    border: 'border-amber-300 dark:border-amber-700/80',
+  },
+};
+
+// Componente child per sincronizzare reattivamente le opzioni notte e stili su Google Maps instance
 const MapNightThemeSync: React.FC<{ isDark: boolean }> = ({ isDark }) => {
   const map = useMap();
 
@@ -135,7 +271,7 @@ const MapNightThemeSync: React.FC<{ isDark: boolean }> = ({ isDark }) => {
         });
       }
       map.setOptions({
-        styles: isDark ? DARK_MAP_STYLES : [],
+        styles: isDark ? DARK_MAP_STYLES : LIGHT_MAP_STYLES,
       });
     } catch (e) {
       console.warn('Map night theme sync error:', e);
@@ -154,6 +290,7 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
   onFilterChange,
   categoriaFilter = 'tutti',
   onCategoriaFilterChange,
+  onOpenManagement,
   darkMode,
 }) => {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
@@ -266,7 +403,7 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
     <div className="relative w-full rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 shadow-sm transition-all">
       {/* Top Controls Overlay */}
       <div className="absolute top-3 left-3 right-3 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-        {/* Toggle Filters & Dropdown Tipologia */}
+        {/* Toggle Filters & Dropdown Categoria */}
         <div className="flex flex-wrap items-center gap-1.5 p-1 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-xl shadow-md border border-slate-200 dark:border-slate-800 pointer-events-auto">
           <button
             onClick={() => onFilterChange('tutti')}
@@ -302,17 +439,21 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
             Eventi ({visibleEvents.length})
           </button>
 
-          {/* Menù a tendina integrato per tipologia attività */}
+          {/* Menù a tendina integrato per categoria */}
           {onCategoriaFilterChange && filterTipo !== 'eventi' && (
-            <div className="flex items-center gap-1 pl-1.5 border-l border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-1.5 pl-1.5 border-l border-slate-200 dark:border-slate-700">
               <Filter className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                Categoria
+              </span>
               <select
                 value={categoriaFilter || 'tutti'}
                 onChange={(e) => onCategoriaFilterChange(e.target.value as CategoriaCommercio | 'tutti')}
                 className="text-[11px] font-bold bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer py-1 pr-1"
-                title="Filtra i pin sulla mappa per tipologia di attività"
+                title="Filtra i pin sulla mappa per categoria"
+                aria-label="Categoria"
               >
-                <option value="tutti" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">Tutte le tipologie</option>
+                <option value="tutti" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">Tutte ({attivita.length})</option>
                 <option value="alimentari" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">🛒 Alimentari</option>
                 <option value="ristorazione" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">🍽️ Ristorazione & Bar</option>
                 <option value="salute" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">💊 Farmacia & Salute</option>
@@ -365,9 +506,9 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
               key={isDark ? 'dark-map' : 'light-map'}
               center={mapCenter}
               zoom={mapZoom}
-              mapId="DEMO_MAP_ID"
               colorScheme={isDark ? ColorScheme.DARK : ColorScheme.LIGHT}
-              styles={isDark ? DARK_MAP_STYLES : undefined}
+              styles={isDark ? DARK_MAP_STYLES : LIGHT_MAP_STYLES}
+              clickableIcons={false}
               internalUsageAttributionIds={['gmp_git_agentskills_v1']}
               style={{ width: '100%', height: '100%' }}
               gestureHandling="greedy"
@@ -385,17 +526,17 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
 
               {/* User Location Marker */}
               {userLocation && (
-                <AdvancedMarker
+                <CustomMapMarker
                   position={userLocation}
-                  title="La tua posizione attuale"
+                  zIndex={100}
                 >
-                  <div className="relative flex items-center justify-center">
+                  <div className="relative flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2">
                     <div className="w-6 h-6 bg-blue-600 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-[10px] animate-pulse">
                       📍
                     </div>
                     <div className="absolute w-8 h-8 rounded-full bg-blue-400 opacity-40 animate-ping -z-10" />
                   </div>
-                </AdvancedMarker>
+                </CustomMapMarker>
               )}
 
               {/* Business Markers con Pin Sagomato Personalizzato per Categoria e animazione bounce/scale */}
@@ -404,10 +545,10 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
                 const isBouncingPin = Boolean(bouncingCategory && (bouncingCategory === 'tutti' || bouncingCategory === shop.categoria));
 
                 return (
-                  <AdvancedMarker
+                  <CustomMapMarker
                     key={`shop-${shop.id}`}
                     position={{ lat: shop.lat, lng: shop.lng }}
-                    title={shop.nome}
+                    zIndex={isSelected ? 50 : 20}
                     onClick={() => {
                       setSelectedItem({ tipo: 'negozio', negozio: shop });
                       onSelectAttivita(shop.id);
@@ -420,7 +561,7 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
                       label={shop.nome}
                       isBouncing={isBouncingPin}
                     />
-                  </AdvancedMarker>
+                  </CustomMapMarker>
                 );
               })}
 
@@ -430,10 +571,10 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
                 const isSelected = selectedItem?.evento?.id === evento.id;
 
                 return (
-                  <AdvancedMarker
+                  <CustomMapMarker
                     key={`event-${evento.id}`}
                     position={{ lat: evento.lat, lng: evento.lng }}
-                    title={evento.t}
+                    zIndex={isSelected ? 45 : 15}
                     onClick={() => {
                       setSelectedItem({ tipo: 'evento', evento });
                       onSelectAttivita(null);
@@ -444,7 +585,7 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
                       isSelected={isSelected}
                       label={evento.t}
                     />
-                  </AdvancedMarker>
+                  </CustomMapMarker>
                 );
               })}
 
@@ -462,57 +603,78 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
                   maxWidth={320}
                   className={isDark ? 'gm-dark-infowindow' : 'gm-light-infowindow'}
                 >
-                  <div className="p-1 max-w-[280px] bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-xl">
+                  <div className={`p-1.5 max-w-[285px] rounded-2xl transition-colors ${
+                    isDark ? 'bg-[#0b1329] text-slate-100' : 'bg-white text-slate-900'
+                  }`}>
                     {selectedItem.tipo === 'negozio' && selectedItem.negozio && (
-                      <div className="space-y-2">
+                      <div className="space-y-2.5">
                         {selectedItem.negozio.immagine && (
-                          <div className="relative h-28 w-full rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800">
+                          <div className="relative h-28 w-full rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-800/80">
                             <img
                               src={selectedItem.negozio.immagine}
                               alt={selectedItem.negozio.nome}
                               className="w-full h-full object-cover"
+                              style={{ filter: 'none' }}
                             />
                             {selectedItem.negozio.offertaAttiva && (
-                              <div className="absolute top-1.5 left-1.5 bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1">
+                              <div className="absolute top-1.5 left-1.5 bg-amber-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full shadow-md flex items-center gap-1">
                                 <Sparkles className="w-2.5 h-2.5" />
-                                Offerta Attiva
+                                <span>Offerta Attiva</span>
                               </div>
                             )}
                           </div>
                         )}
 
                         <div>
-                          <span className="text-[10px] uppercase font-bold text-blue-600 dark:text-blue-400 tracking-wider">
-                            {selectedItem.negozio.categoria}
-                          </span>
-                          <h4 className="font-bold text-sm text-slate-900 dark:text-white leading-tight mt-0.5">
+                          <div className="flex items-center justify-between gap-1 mb-1">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] uppercase font-black tracking-wider border ${
+                              CATEGORIA_BADGE_STYLE[selectedItem.negozio.categoria]?.text || 'text-amber-600 dark:text-amber-400'
+                            } ${
+                              CATEGORIA_BADGE_STYLE[selectedItem.negozio.categoria]?.bg || 'bg-amber-50 dark:bg-amber-950/60'
+                            } ${
+                              CATEGORIA_BADGE_STYLE[selectedItem.negozio.categoria]?.border || 'border-amber-200 dark:border-amber-800'
+                            }`}>
+                              {selectedItem.negozio.categoria}
+                            </span>
+                            {selectedItem.negozio.verificato && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                                <ShieldCheck className="w-3.5 h-3.5" />
+                                <span>Verificato</span>
+                              </span>
+                            )}
+                          </div>
+                          <h4 className={`font-extrabold text-sm leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
                             {selectedItem.negozio.nome}
                           </h4>
-                          <p className="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-1 mt-1">
-                            <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                            {selectedItem.negozio.indirizzo}
+                          <p className={`text-xs flex items-center gap-1 mt-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                            <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                            <span>{selectedItem.negozio.indirizzo}</span>
                           </p>
                         </div>
 
                         {selectedItem.negozio.offertaAttiva && (
-                          <div className="bg-amber-50 dark:bg-amber-950/70 border border-amber-200/80 dark:border-amber-800/80 rounded-lg p-2 text-xs">
-                            <div className="font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1">
-                              <Tag className="w-3 h-3 text-amber-600 dark:text-amber-400" />
-                              {selectedItem.negozio.offertaAttiva.titolo}
+                          <div className={`border rounded-xl p-2.5 text-xs space-y-1 ${
+                            isDark
+                              ? 'bg-amber-950/40 border-amber-600/40 text-amber-200'
+                              : 'bg-amber-50 border-amber-200 text-amber-950'
+                          }`}>
+                            <div className={`font-bold flex items-center gap-1.5 ${isDark ? 'text-amber-300' : 'text-amber-900'}`}>
+                              <Tag className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                              <span>{selectedItem.negozio.offertaAttiva.titolo}</span>
                             </div>
-                            <p className="text-[11px] text-amber-800 dark:text-amber-300 mt-0.5 line-clamp-2">
+                            <p className={`text-[11px] leading-relaxed line-clamp-2 ${isDark ? 'text-amber-200/90' : 'text-amber-800'}`}>
                               {selectedItem.negozio.offertaAttiva.dettaglio}
                             </p>
                           </div>
                         )}
 
-                        <div className="text-[11px] text-slate-600 dark:text-slate-300 flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                        <div className={`text-[11px] flex items-center gap-1.5 px-0.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                          <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                           <span>{selectedItem.negozio.orari}</span>
                         </div>
 
                         {/* Action buttons */}
-                        <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-slate-100 dark:border-slate-800">
+                        <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-slate-200/80 dark:border-slate-800">
                           {selectedItem.negozio.whatsapp ? (
                             <a
                               href={`https://wa.me/${selectedItem.negozio.whatsapp}?text=${encodeURIComponent(
@@ -520,22 +682,23 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
                               )}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="px-2 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-1 text-center"
+                              className="px-2 py-2 bg-[#25D366] hover:bg-[#20ba59] active:bg-[#1da850] text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 text-center shadow-xs transition"
                             >
-                              <MessageCircle className="w-3 h-3" />
-                              WhatsApp
+                              <MessageCircle className="w-3.5 h-3.5" />
+                              <span>WhatsApp</span>
                             </a>
                           ) : (
                             <a
                               href={`tel:${selectedItem.negozio.telefono.replace(/\s+/g, '')}`}
-                              className="px-2 py-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-1 text-center"
+                              className="px-2 py-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 text-center shadow-xs transition"
                             >
-                              <Phone className="w-3 h-3" />
-                              Chiama
+                              <Phone className="w-3.5 h-3.5" />
+                              <span>Chiama</span>
                             </a>
                           )}
 
                           <button
+                            type="button"
                             onClick={() =>
                               handleOpenDirections(
                                 selectedItem.negozio!.indirizzo,
@@ -543,36 +706,56 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
                                 selectedItem.negozio!.lng
                               )
                             }
-                            className="px-2 py-1.5 bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-1 cursor-pointer"
+                            className={`px-2 py-2 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                              isDark
+                                ? 'bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700'
+                                : 'bg-slate-900 hover:bg-slate-800 text-white shadow-xs'
+                            }`}
                           >
-                            <Navigation className="w-3 h-3 text-amber-400" />
-                            Indicazioni
+                            <Navigation className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Indicazioni</span>
                           </button>
                         </div>
+
+                        {onOpenManagement && (
+                          <div className="pt-1.5 border-t border-slate-200/80 dark:border-slate-800 flex items-center justify-between text-[10px]">
+                            <button
+                              type="button"
+                              onClick={() => onOpenManagement(selectedItem.negozio!)}
+                              className="inline-flex items-center gap-1 text-slate-500 hover:text-amber-600 dark:hover:text-amber-400 cursor-pointer group"
+                            >
+                              <KeyRound className="w-3 h-3 text-slate-400 group-hover:text-amber-500" />
+                              <span className="underline decoration-slate-300 dark:decoration-slate-700 underline-offset-2">
+                                Sei il titolare? Gestisci scheda
+                              </span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
 
                     {selectedItem.tipo === 'evento' && selectedItem.evento && (
-                      <div className="space-y-2">
+                      <div className="space-y-2.5">
                         <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-transparent dark:border-purple-800 text-[10px] font-bold rounded-md uppercase">
+                          <span className="px-2 py-0.5 bg-[#781816]/15 dark:bg-[#781816]/30 text-[#781816] dark:text-rose-300 border border-[#781816]/30 text-[10px] font-black rounded-md uppercase">
                             Evento Associazione
                           </span>
-                          <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                          <span className={`text-[11px] font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                             {selectedItem.evento.d} {selectedItem.evento.m} • {selectedItem.evento.ora}
                           </span>
                         </div>
-                        <h4 className="font-bold text-sm text-slate-900 dark:text-white leading-tight mt-0.5">
+                        <h4 className={`font-extrabold text-sm leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
                           {selectedItem.evento.t}
                         </h4>
-                        <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">
+                        <p className={`text-xs leading-relaxed line-clamp-2 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                           {selectedItem.evento.p}
                         </p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                          <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                          {selectedItem.evento.luogo}
+                        <p className={`text-xs flex items-center gap-1.5 font-medium ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                          <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                          <span>{selectedItem.evento.luogo}</span>
                         </p>
                         <button
+                          type="button"
                           onClick={() =>
                             handleOpenDirections(
                               selectedItem.evento!.luogo,
@@ -580,10 +763,10 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
                               selectedItem.evento!.lng
                             )
                           }
-                          className="w-full py-1.5 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 mt-1 cursor-pointer"
+                          className="w-full py-2 bg-[#781816] hover:bg-[#5a1210] active:scale-[0.98] text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 mt-1 cursor-pointer shadow-xs transition"
                         >
-                          <Navigation className="w-3 h-3 text-white" />
-                          Indicazioni per l'evento
+                          <Navigation className="w-3.5 h-3.5 text-white" />
+                          <span>Indicazioni per l'evento</span>
                         </button>
                       </div>
                     )}
@@ -601,6 +784,12 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
             </p>
           </div>
         )}
+
+        {/* Badge informativo discreto: solo attività locali e fermate */}
+        <div className="absolute bottom-2.5 left-3 z-10 hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-lg shadow-xs border border-slate-200/80 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-300 pointer-events-none">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+          <span className="font-medium">Mappa quartiere: negozi Google nascosti • Solo commercianti locali & fermate ATAC</span>
+        </div>
       </div>
     </div>
   );
