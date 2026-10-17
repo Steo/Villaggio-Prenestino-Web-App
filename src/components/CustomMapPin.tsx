@@ -19,6 +19,7 @@ interface CustomMapPinProps {
   hasOffer?: boolean;
   label?: string;
   className?: string;
+  isBouncing?: boolean;
 }
 
 interface PinConfig {
@@ -87,6 +88,7 @@ export const CustomMapPin: React.FC<CustomMapPinProps> = ({
   hasOffer = false,
   label,
   className = '',
+  isBouncing = false,
 }) => {
   const config = PIN_CONFIGS[tipo] || PIN_CONFIGS.alimentari;
   const width = isSelected ? 42 : 34;
@@ -99,8 +101,8 @@ export const CustomMapPin: React.FC<CustomMapPinProps> = ({
       } ${className}`}
       title={label || config.label}
     >
-      {/* Contenitore Pin Sagomato SVG */}
-      <div className="relative filter drop-shadow-[0_4px_6px_rgba(0,0,0,0.35)] transition-transform duration-200">
+      {/* Contenitore Pin Sagomato SVG con animazione bounce/scale */}
+      <div className={`relative filter drop-shadow-[0_4px_6px_rgba(0,0,0,0.35)] transition-transform duration-200 ${isBouncing ? 'animate-pin-bounce' : ''}`}>
         <svg
           width={width}
           height={height}

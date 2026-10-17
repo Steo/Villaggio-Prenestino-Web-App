@@ -125,6 +125,9 @@ export default function App() {
             const init = INITIAL_ATTIVITA_COMMERCIO.find((x) => x.id === item.id);
             return {
               ...item,
+              lat: init ? init.lat : item.lat,
+              lng: init ? init.lng : item.lng,
+              indirizzo: init ? init.indirizzo : item.indirizzo,
               miPiace: typeof item.miPiace === 'number' ? item.miPiace : (init?.miPiace || 10),
             };
           });

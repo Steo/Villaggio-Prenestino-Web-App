@@ -38,6 +38,7 @@ import {
   Camera,
   Image as ImageIcon,
   Mail,
+  ChevronDown,
 } from 'lucide-react';
 
 interface CommercioTabProps {
@@ -142,6 +143,7 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
   const [onlyOpen, setOnlyOpen] = useState(false);
   const [selectedAttivitaId, setSelectedAttivitaId] = useState<number | null>(null);
   const [mapFilterTipo, setMapFilterTipo] = useState<'tutti' | 'negozi' | 'eventi'>('tutti');
+  const [mapCategoryFilter, setMapCategoryFilter] = useState<CategoriaCommercio | 'tutti'>('tutti');
   
   // Paginazione: massimo 6 commercianti per pagina
   const ITEMS_PER_PAGE = 6;
@@ -488,22 +490,51 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
 
       {/* MAPPA INTERATTIVA GOOGLE MAPS */}
       {viewMode !== 'list-only' && (
-        <section className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-amber-600" />
-              <span>Mappa Commerciale di Quartiere</span>
-            </h3>
-            <span className="text-xs text-slate-500">
-              Tocca un'attività per info e orari
-            </span>
+        <section className="space-y-2.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-amber-600" />
+                <span>Mappa Commerciale di Quartiere</span>
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Centrata su Villaggio Prenestino (Via Fosso dell'Osa)
+              </p>
+            </div>
+
+            {/* Menù a tendina per filtrare i pin sulla mappa per tipologia di attività */}
+            <div className="flex items-center gap-2">
+              <label htmlFor="map-pin-category-dropdown" className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 whitespace-nowrap">
+                <Filter className="w-3.5 h-3.5 text-amber-600" />
+                <span>Tipologia pin:</span>
+              </label>
+              <div className="relative">
+                <select
+                  id="map-pin-category-dropdown"
+                  value={mapCategoryFilter}
+                  onChange={(e) => setMapCategoryFilter(e.target.value as CategoriaCommercio | 'tutti')}
+                  className="py-1.5 pl-3 pr-8 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-100 shadow-2xs focus:ring-2 focus:ring-amber-500 focus:outline-none appearance-none cursor-pointer"
+                  title="Filtra i pin della mappa per tipologia di attività"
+                >
+                  <option value="tutti">🏪 Tutte le attività ({attivita.length})</option>
+                  <option value="alimentari">🛒 Alimentari ({attivita.filter(a => a.categoria === 'alimentari').length})</option>
+                  <option value="ristorazione">🍽️ Ristorazione & Bar ({attivita.filter(a => a.categoria === 'ristorazione').length})</option>
+                  <option value="salute">💊 Farmacia & Salute ({attivita.filter(a => a.categoria === 'salute').length})</option>
+                  <option value="servizi">🔧 Artigiani & Servizi ({attivita.filter(a => a.categoria === 'servizi').length})</option>
+                  <option value="casa">🏡 Casa & Brico ({attivita.filter(a => a.categoria === 'casa').length})</option>
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+            </div>
           </div>
 
           <MappaQuartiere
-            attivita={filteredAttivita}
+            attivita={attivita}
             eventi={eventi}
             filterTipo={mapFilterTipo}
             onFilterChange={(t) => setMapFilterTipo(t)}
+            categoriaFilter={mapCategoryFilter}
+            onCategoriaFilterChange={(cat) => setMapCategoryFilter(cat)}
             selectedAttivitaId={selectedAttivitaId}
             onSelectAttivita={(id) => {
               setSelectedAttivitaId(id);

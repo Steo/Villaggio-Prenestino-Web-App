@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { APIProvider, Map, AdvancedMarker, InfoWindow, ColorScheme, useMap } from '@vis.gl/react-google-maps';
 import { CustomMapPin } from './CustomMapPin';
-import { AttivitaCommercio, EventoQuartiere } from '../types';
+import { AttivitaCommercio, EventoQuartiere, CategoriaCommercio } from '../types';
 import { 
   Store, 
   Calendar, 
@@ -14,7 +14,8 @@ import {
   Tag, 
   ExternalLink, 
   Layers, 
-  Sparkles 
+  Sparkles,
+  Filter
 } from 'lucide-react';
 
 interface MappaQuartiereProps {
@@ -24,12 +25,15 @@ interface MappaQuartiereProps {
   onSelectAttivita: (id: number | null) => void;
   filterTipo: 'tutti' | 'negozi' | 'eventi';
   onFilterChange: (tipo: 'tutti' | 'negozi' | 'eventi') => void;
+  categoriaFilter?: CategoriaCommercio | 'tutti';
+  onCategoriaFilterChange?: (cat: CategoriaCommercio | 'tutti') => void;
   darkMode?: boolean;
 }
 
+// Centro geografico esatto di Villaggio Prenestino lungo Via Fosso dell'Osa
 const VILLAGGIO_PRENESTINO_CENTER = {
-  lat: 41.8965,
-  lng: 12.6710
+  lat: 41.8985,
+  lng: 12.6865
 };
 
 // Stile cartografico notturno avanzato per Google Maps
@@ -148,6 +152,8 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
   onSelectAttivita,
   filterTipo,
   onFilterChange,
+  categoriaFilter = 'tutti',
+  onCategoriaFilterChange,
   darkMode,
 }) => {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
@@ -162,6 +168,19 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
   const [geoError, setGeoError] = useState<string | null>(null);
   const [mapCenter, setMapCenter] = useState(VILLAGGIO_PRENESTINO_CENTER);
   const [mapZoom, setMapZoom] = useState(15);
+
+  // Animazione 'bounce' e 'scale' all'attivazione o cambio categoria filtro
+  const [bouncingCategory, setBouncingCategory] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (categoriaFilter) {
+      setBouncingCategory(categoriaFilter);
+      const timer = setTimeout(() => {
+        setBouncingCategory(null);
+      }, 850);
+      return () => clearTimeout(timer);
+    }
+  }, [categoriaFilter]);
 
   // Rileva Dark Mode sia dalla prop darkMode sia dalla classe 'dark' sul document root
   const [isDark, setIsDark] = useState<boolean>(() => {
@@ -236,15 +255,19 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${query}`, '_blank');
   };
 
-  const visibleShops = (filterTipo === 'tutti' || filterTipo === 'negozi') ? attivita : [];
+  const shopsByCategory = (categoriaFilter && categoriaFilter !== 'tutti')
+    ? attivita.filter(a => a.categoria === categoriaFilter)
+    : attivita;
+
+  const visibleShops = (filterTipo === 'tutti' || filterTipo === 'negozi') ? shopsByCategory : [];
   const visibleEvents = (filterTipo === 'tutti' || filterTipo === 'eventi') ? eventi.filter(e => !e.passato && e.lat && e.lng) : [];
 
   return (
     <div className="relative w-full rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 shadow-sm transition-all">
       {/* Top Controls Overlay */}
       <div className="absolute top-3 left-3 right-3 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-        {/* Toggle Filters */}
-        <div className="flex items-center gap-1.5 p-1 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-xl shadow-md border border-slate-200 dark:border-slate-800 pointer-events-auto">
+        {/* Toggle Filters & Dropdown Tipologia */}
+        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-xl shadow-md border border-slate-200 dark:border-slate-800 pointer-events-auto">
           <button
             onClick={() => onFilterChange('tutti')}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
@@ -265,7 +288,7 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
             }`}
           >
             <Store className="w-3.5 h-3.5" />
-            Commercianti ({attivita.length})
+            Commercianti ({shopsByCategory.length})
           </button>
           <button
             onClick={() => onFilterChange('eventi')}
@@ -278,9 +301,29 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
             <Calendar className="w-3.5 h-3.5" />
             Eventi ({visibleEvents.length})
           </button>
+
+          {/* Menù a tendina integrato per tipologia attività */}
+          {onCategoriaFilterChange && filterTipo !== 'eventi' && (
+            <div className="flex items-center gap-1 pl-1.5 border-l border-slate-200 dark:border-slate-700">
+              <Filter className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
+              <select
+                value={categoriaFilter || 'tutti'}
+                onChange={(e) => onCategoriaFilterChange(e.target.value as CategoriaCommercio | 'tutti')}
+                className="text-[11px] font-bold bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer py-1 pr-1"
+                title="Filtra i pin sulla mappa per tipologia di attività"
+              >
+                <option value="tutti" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">Tutte le tipologie</option>
+                <option value="alimentari" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">🛒 Alimentari</option>
+                <option value="ristorazione" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">🍽️ Ristorazione & Bar</option>
+                <option value="salute" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">💊 Farmacia & Salute</option>
+                <option value="servizi" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">🔧 Artigiani & Servizi</option>
+                <option value="casa" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">🏡 Casa & Brico</option>
+              </select>
+            </div>
+          )}
         </div>
 
-        {/* Locate me button */}
+        {/* Locate me button & Centra su Villaggio Prenestino Via Fosso dell'Osa */}
         <div className="flex items-center gap-2 pointer-events-auto">
           <button
             onClick={handleLocateMe}
@@ -297,10 +340,12 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
               setMapCenter(VILLAGGIO_PRENESTINO_CENTER);
               setMapZoom(15);
             }}
-            title="Reimposta centro Villaggio Prenestino"
-            className="px-2.5 py-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-xl shadow-md border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+            title="Centra su Villaggio Prenestino (Via Fosso dell'Osa)"
+            className="flex items-center gap-1.5 px-3 py-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-xl shadow-md border border-slate-200 dark:border-slate-800 text-xs font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-all cursor-pointer"
           >
-            Centra Quartiere
+            <MapPin className="w-3.5 h-3.5 text-amber-600" />
+            <span className="hidden sm:inline">Via Fosso dell'Osa</span>
+            <span className="sm:hidden">Centro</span>
           </button>
         </div>
       </div>
@@ -353,9 +398,10 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
                 </AdvancedMarker>
               )}
 
-              {/* Business Markers con Pin Sagomato Personalizzato per Categoria */}
+              {/* Business Markers con Pin Sagomato Personalizzato per Categoria e animazione bounce/scale */}
               {visibleShops.map((shop) => {
                 const isSelected = selectedItem?.negozio?.id === shop.id;
+                const isBouncingPin = Boolean(bouncingCategory && (bouncingCategory === 'tutti' || bouncingCategory === shop.categoria));
 
                 return (
                   <AdvancedMarker
@@ -372,6 +418,7 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
                       isSelected={isSelected}
                       hasOffer={Boolean(shop.offertaAttiva)}
                       label={shop.nome}
+                      isBouncing={isBouncingPin}
                     />
                   </AdvancedMarker>
                 );

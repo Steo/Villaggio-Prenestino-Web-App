@@ -375,7 +375,7 @@ export function cleanExcerpt(html: string): string {
  * Registra o annulla interazione (Adesione evento, Volontariato "Ci sono", Like proposta)
  */
 export async function submitInteraction(params: {
-  tipo: 'evento_vengo' | 'cisono' | 'proposta_vota';
+  tipo: 'evento_vengo' | 'cisono' | 'proposta_vota' | 'negozio_vota';
   postId: number;
   nome?: string;
   telefono?: string;
@@ -418,6 +418,8 @@ export async function submitInteraction(params: {
       }
       countResult = p.v;
     }
+  } else if (params.tipo === 'negozio_vota') {
+    countResult = 1;
   }
   saveLocalDataStore(store);
 
