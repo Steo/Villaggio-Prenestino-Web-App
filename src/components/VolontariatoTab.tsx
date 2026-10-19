@@ -10,6 +10,7 @@ import {
   Send,
   MapPin,
   Share2,
+  Calendar,
 } from 'lucide-react';
 import { shareToWhatsApp } from '../utils/shareUtils';
 
@@ -78,16 +79,32 @@ export const VolontariatoTab: React.FC<VolontariatoTabProps> = ({
           background: 'linear-gradient(135deg, #781816 0%, #5a1210 100%)',
         }}
       >
-        <div className="relative z-10 max-w-xl">
-          <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider mb-2">
-            Volontariato di Quartiere
-          </span>
-          <h2 className="text-xl sm:text-2xl font-black leading-tight text-white tracking-tight">
-            Unisciti ai volontari di Villaggio Prenestino
-          </h2>
-          <p className="mt-1.5 text-xs sm:text-sm text-white/90 leading-relaxed">
-            Basta anche un'ora ogni tanto per parchi, eventi o aiuto alla comunità.
-          </p>
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+          <div className="max-w-xl">
+            <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider mb-2">
+              Volontariato di Quartiere
+            </span>
+            <h2 className="text-xl sm:text-2xl font-black leading-tight text-white tracking-tight">
+              Unisciti ai volontari di Villaggio Prenestino
+            </h2>
+            <p className="mt-1.5 text-xs sm:text-sm text-white/90 leading-relaxed">
+              Basta anche un'ora ogni tanto per parchi, eventi o aiuto alla comunità.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto shrink-0 mt-3 sm:mt-0">
+            <button
+              type="button"
+              onClick={() => {
+                const el = document.getElementById('modulo-volontari');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="w-full sm:w-auto px-4 py-2.5 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <HeartHandshake className="w-4 h-4 text-slate-950" />
+              <span>Segnala la tua disponibilità</span>
+            </button>
+          </div>
         </div>
       </section>
 
@@ -97,62 +114,86 @@ export const VolontariatoTab: React.FC<VolontariatoTabProps> = ({
           Attività aperte in cerca di persone
         </h3>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {richieste.map((r) => {
-            const hasJoined = joinedRichieste.includes(r.id);
-            const percentage = Math.min(100, Math.round((r.have / Math.max(1, r.need)) * 100));
+        {richieste.length === 0 ? (
+          <div className="bg-white rounded-2xl p-6 sm:p-8 text-center border border-slate-200/90 shadow-xs space-y-2">
+            <HeartHandshake className="w-10 h-10 text-amber-500 mx-auto" />
+            <h4 className="text-sm font-bold text-slate-800">Nessuna attività di volontariato attiva al momento</h4>
+            <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+              Non ci sono richieste aperte in questo momento. Compila il modulo in basso per segnalare la tua disponibilità: sarai ricontattato per le prossime iniziative del quartiere!
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {richieste.map((r) => {
+              const hasJoined = joinedRichieste.includes(r.id);
+              const percentage = Math.min(100, Math.round((r.have / Math.max(1, r.need)) * 100));
+              const riferimentiTemporali = r.data || r.ora || r.data_ora
+                ? (r.data ? `${r.data}${r.ora ? ` • ore ${r.ora}` : ''}` : (r.ora ? `Ore ${r.ora}` : r.data_ora || ''))
+                : null;
 
-            return (
-              <div
-                key={r.id}
-                className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-xs flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-1.5">
-                    <h4 className="text-sm font-bold text-slate-900 leading-snug">
-                      {r.t}
-                    </h4>
-                    {r.urgente && (
-                      <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-slate-950">
-                        Urgente
+              return (
+                <div
+                  key={r.id}
+                  className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-xs flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-1.5">
+                      <h4 className="text-sm font-bold text-slate-900 leading-snug">
+                        {r.t}
+                      </h4>
+                      {r.urgente && (
+                        <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-slate-950">
+                          Urgente
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Indirizzo e riferimenti temporali (data e ora) affiancati */}
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-semibold mt-1.5">
+                      <span className="flex items-center gap-1 text-amber-800">
+                        <MapPin className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                        <span>{r.w}</span>
                       </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-amber-800 font-semibold flex items-center gap-1 mt-1">
-                    <MapPin className="w-3 h-3 text-amber-600 shrink-0" />
-                    {r.w}
-                  </p>
-                  <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
-                    {r.desc}
-                  </p>
-                </div>
+                      {riferimentiTemporali && (
+                        <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-950 px-2 py-0.5 rounded-md border border-amber-200/80 font-medium text-[11px]">
+                          <Calendar className="w-3 h-3 text-amber-700 shrink-0" />
+                          <span>{riferimentiTemporali}</span>
+                        </span>
+                      )}
+                    </div>
 
-                <div className="mt-3 pt-2.5 border-t border-slate-100">
-                  <div className="flex items-center justify-between text-xs mb-1 font-semibold text-slate-700">
-                    <span>
-                      Aderiti: <strong>{r.have}</strong> su {r.need}
-                    </span>
-                    <span className="text-amber-800 font-bold">{percentage}%</span>
-                  </div>
-                  <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden mb-2.5">
-                    <div
-                      className="h-full rounded-full transition-all duration-300"
-                      style={{ width: `${percentage}%`, backgroundColor: '#781816' }}
-                    />
+                    <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                      {r.desc}
+                    </p>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const msg = `🤝 *Appello Volontari a Villaggio Prenestino*:\n"${r.t}"\n📍 Luogo: ${r.w}\n👥 Mancano ${Math.max(1, r.need - r.have)} volontari!\n\n${r.desc}`;
-                        shareToWhatsApp(msg, 'https://www.villaggioprenestino.it');
-                      }}
-                      title="Condividi appello sui gruppi WhatsApp"
-                      className="p-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition cursor-pointer shrink-0"
-                    >
-                      <Share2 className="w-4 h-4 text-emerald-700" />
-                    </button>
+                  <div className="mt-3 pt-2.5 border-t border-slate-100">
+                    <div className="flex items-center justify-between text-xs mb-1 font-semibold text-slate-700">
+                      <span>
+                        Aderiti: <strong>{r.have}</strong> su {r.need}
+                      </span>
+                      <span className="text-amber-800 font-bold">{percentage}%</span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden mb-2.5">
+                      <div
+                        className="h-full rounded-full transition-all duration-300"
+                        style={{ width: `${percentage}%`, backgroundColor: '#781816' }}
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const dateLine = riferimentiTemporali ? `🗓️ Quando: ${riferimentiTemporali}\n` : '';
+                          const msg = `🤝 *Appello Volontari a Villaggio Prenestino*:\n"${r.t}"\n📍 Luogo: ${r.w}\n${dateLine}👥 Mancano ${Math.max(1, r.need - r.have)} volontari!\n\n${r.desc}`;
+                          shareToWhatsApp(msg, 'https://www.villaggioprenestino.it');
+                        }}
+                        title="Condividi appello sui gruppi WhatsApp"
+                        className="p-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition cursor-pointer shrink-0"
+                      >
+                        <Share2 className="w-4 h-4 text-emerald-700" />
+                      </button>
                     <button
                       onClick={() => onRequestJoinVolunteer(r)}
                       className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
@@ -179,10 +220,11 @@ export const VolontariatoTab: React.FC<VolontariatoTabProps> = ({
             );
           })}
         </div>
+        )}
       </section>
 
       {/* FORM: REGISTRAZIONE VOLONTARIO */}
-      <section className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-3.5">
+      <section id="modulo-volontari" className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-3.5">
         <div>
           <h3 className="text-base font-black text-slate-900">
             Modulo volontari

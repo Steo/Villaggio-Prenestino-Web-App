@@ -1,6 +1,6 @@
 {
-  "summary": "Piano di semplificazione dell'interfaccia utente (UX/UI) e sintesi dei testi per la Scheda Commercio (e form registrazione attività) e la Scheda Segnalazioni (e procedura guidata di invio). Adotta l'approccio concordato a divulgazione progressiva: testi essenziali a colpo d'occhio, gerarchia visiva pulita, micro-copy intuitivo e dettagli approfonditi espandibili su richiesta tramite elementi collassabili/accordion.",
-  "updatedAt": "2026-10-17T09:54:08.173706790Z",
+  "summary": "Piano di implementazione per sostituire il fumetto nativo InfoWindow con un popup modale dedicato, centrato e ad alta leggibilità per le schede dei negozi al tocco del pin sulla mappa.",
+  "updatedAt": "2026-10-18T08:04:48.400922807Z",
   "requestFeedback": true,
   "userFacing": true
 }

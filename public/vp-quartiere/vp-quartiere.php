@@ -343,13 +343,35 @@ function vpq_render_evento_meta($post) {
 
 function vpq_render_richiesta_meta($post) {
     wp_nonce_field('vpq_save_meta', 'vpq_meta_nonce');
-    $luogo     = get_post_meta($post->ID, '_vp_luogo', true) ?: 'Parco di Via Fosso dell\'Osa';
+    $luogo     = get_post_meta($post->ID, '_vp_luogo', true) ?: '';
+    $data      = get_post_meta($post->ID, '_vp_data', true) ?: '';
+    $ora       = get_post_meta($post->ID, '_vp_ora', true) ?: '';
     $obiettivo = get_post_meta($post->ID, '_vp_obiettivo', true) ?: '8';
     $urgente   = (bool) get_post_meta($post->ID, '_vp_urgente', true);
     ?>
     <table class="form-table">
-        <tr><th><label for="vp_luogo">Dove (Luogo/Zona):</label></th><td><input type="text" id="vp_luogo" name="vp_luogo" value="<?php echo esc_attr($luogo); ?>" class="regular-text" /></td></tr>
-        <tr><th><label for="vp_obiettivo">Volontari necessari (Target):</label></th><td><input type="number" id="vp_obiettivo" name="vp_obiettivo" value="<?php echo esc_attr($obiettivo); ?>" class="small-text" /></td></tr>
+        <tr>
+            <th><label for="vp_luogo">Dove (Luogo/Zona):</label></th>
+            <td><input type="text" id="vp_luogo" name="vp_luogo" value="<?php echo esc_attr($luogo); ?>" class="regular-text" placeholder="es. Parco giochi Via Fosso dell'Osa" /></td>
+        </tr>
+        <tr>
+            <th><label for="vp_data">Data di svolgimento:</label></th>
+            <td>
+                <input type="text" id="vp_data" name="vp_data" value="<?php echo esc_attr($data); ?>" class="regular-text" placeholder="es. Sabato 24 Maggio 2026 o 24/05/2026" />
+                <p class="description">Inserisci la data in cui si terrà l'iniziativa (es. "Sabato 24 Maggio 2026", "24/05/2026" o "Tutti i martedì"). Verrà mostrata nella scheda Volontari accanto al luogo.</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="vp_ora">Orario di inizio / fascia:</label></th>
+            <td>
+                <input type="text" id="vp_ora" name="vp_ora" value="<?php echo esc_attr($ora); ?>" class="regular-text" style="width:200px;" placeholder="es. 09:30 o 09:30 - 12:30" />
+                <p class="description">Orario previsto per il ritrovo dei volontari (es. 09:30 o 09:30 - 12:30).</p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="vp_obiettivo">Volontari necessari (Target):</label></th>
+            <td><input type="number" id="vp_obiettivo" name="vp_obiettivo" value="<?php echo esc_attr($obiettivo); ?>" class="small-text" /></td>
+        </tr>
         <tr>
             <th><label for="vp_urgente">Priorità:</label></th>
             <td>
@@ -519,6 +541,7 @@ function vpq_save_meta($post_id) {
     if (isset($_POST['vp_mese'])) update_post_meta($post_id, '_vp_mese', sanitize_text_field($_POST['vp_mese']));
     if (isset($_POST['vp_anno'])) update_post_meta($post_id, '_vp_anno', sanitize_text_field($_POST['vp_anno']));
     if (isset($_POST['vp_data_completa'])) update_post_meta($post_id, '_vp_data_completa', sanitize_text_field($_POST['vp_data_completa']));
+    if (isset($_POST['vp_data'])) update_post_meta($post_id, '_vp_data', sanitize_text_field($_POST['vp_data']));
     if (isset($_POST['vp_ora'])) update_post_meta($post_id, '_vp_ora', sanitize_text_field($_POST['vp_ora']));
     if (isset($_POST['vp_luogo'])) update_post_meta($post_id, '_vp_luogo', sanitize_text_field($_POST['vp_luogo']));
     if (isset($_POST['vp_target'])) update_post_meta($post_id, '_vp_target', absint($_POST['vp_target']));
@@ -563,14 +586,32 @@ function vpq_save_meta($post_id) {
 /**
  * Colonne Personalizzate nel Back Office
  */
-// 1. Richieste Volontariato: chi si è offerto con telefono
+// 1. Richieste Volontariato: chi si è offerto con telefono, luogo e data/ora
 add_filter('manage_vp_richiesta_posts_columns', function($cols) {
-    $cols['vp_volontari_lista'] = 'Volontari che hanno aderito (Nome & Tel)';
+    $cols['vp_data_ora']        = 'Data & Orario';
+    $cols['vp_luogo_col']       = 'Luogo';
     $cols['vp_progresso']       = 'Stato Aderiti';
+    $cols['vp_volontari_lista'] = 'Volontari che hanno aderito (Nome & Tel)';
     return $cols;
 });
 add_action('manage_vp_richiesta_posts_custom_column', function($col, $post_id) {
     global $wpdb;
+    if ($col === 'vp_data_ora') {
+        $data = get_post_meta($post_id, '_vp_data', true);
+        $ora  = get_post_meta($post_id, '_vp_ora', true);
+        if ($data || $ora) {
+            echo '<strong>' . esc_html($data ?: '—') . '</strong>';
+            if ($ora) {
+                echo '<br /><small style="color:#64748b;">⏰ Ore ' . esc_html($ora) . '</small>';
+            }
+        } else {
+            echo '<span style="color:#94a3b8;">Non specificata</span>';
+        }
+    }
+    if ($col === 'vp_luogo_col') {
+        $luogo = get_post_meta($post_id, '_vp_luogo', true);
+        echo '📍 ' . esc_html($luogo ?: 'Villaggio Prenestino');
+    }
     if ($col === 'vp_volontari_lista') {
         $table = $wpdb->prefix . 'vp_interazioni';
         $rows  = $wpdb->get_results($wpdb->prepare("SELECT nome, telefono, creato FROM $table WHERE tipo='cisono' AND post_id=%d ORDER BY creato DESC LIMIT 30", $post_id));
@@ -861,6 +902,20 @@ add_action('rest_api_init', function() {
         'callback'            => 'vpq_api_post_commercio_vota',
         'permission_callback' => '__return_true',
     ]);
+
+    // 15. POST /wp-json/vp/v1/notify-email - Notifica email ad associazione@villaggioprenestino.it
+    register_rest_route($ns, '/notify-email', [
+        'methods'             => 'POST',
+        'callback'            => 'vpq_api_post_notify_email',
+        'permission_callback' => '__return_true',
+    ]);
+
+    // 16. GET/POST /wp-json/vp/v1/tabs-config - Stato e attivazione schede web app
+    register_rest_route($ns, '/tabs-config', [
+        'methods'             => ['GET', 'POST'],
+        'callback'            => 'vpq_api_tabs_config',
+        'permission_callback' => '__return_true',
+    ]);
 });
 
 /**
@@ -918,15 +973,22 @@ function vpq_api_get_dati() {
     ]);
     $richieste = [];
     foreach ($richieste_query->posts as $p) {
-        $aderiti = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE tipo='cisono' AND post_id=%d", $p->ID));
+        $aderiti  = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE tipo='cisono' AND post_id=%d", $p->ID));
+        $data_r   = get_post_meta($p->ID, '_vp_data', true) ?: '';
+        $ora_r    = get_post_meta($p->ID, '_vp_ora', true) ?: '';
+        $data_ora = trim(($data_r ? $data_r : '') . ($ora_r ? ($data_r ? ' • ore ' : 'Ore ') . $ora_r : ''));
+
         $richieste[] = [
-            'id'     => $p->ID,
-            't'      => $p->post_title,
-            'w'      => get_post_meta($p->ID, '_vp_luogo', true) ?: 'Villaggio Prenestino',
-            'desc'   => wp_strip_all_tags($p->post_content),
-            'have'   => $aderiti,
-            'need'   => (int) get_post_meta($p->ID, '_vp_obiettivo', true) ?: 8,
-            'urgente'=> (bool) get_post_meta($p->ID, '_vp_urgente', true),
+            'id'       => $p->ID,
+            't'        => $p->post_title,
+            'w'        => get_post_meta($p->ID, '_vp_luogo', true) ?: 'Villaggio Prenestino',
+            'desc'     => wp_strip_all_tags($p->post_content),
+            'have'     => $aderiti,
+            'need'     => (int) get_post_meta($p->ID, '_vp_obiettivo', true) ?: 8,
+            'urgente'  => (bool) get_post_meta($p->ID, '_vp_urgente', true),
+            'data'     => $data_r,
+            'ora'      => $ora_r,
+            'data_ora' => $data_ora,
         ];
     }
 
@@ -1037,8 +1099,9 @@ function vpq_api_get_dati() {
         'segnalazioni' => $segnalazioni,
         'proposte'     => $proposte,
         'commercio'    => $commercio,
-        'classifica'   => vpq_api_get_classifica_data(),
-        'news'         => $news,
+        'classifica'    => vpq_api_get_classifica_data(),
+        'news'          => $news,
+        'schede_attive' => vpq_get_tabs_config(),
     ]);
 }
 
@@ -1202,6 +1265,24 @@ function vpq_api_post_segnalazione(WP_REST_Request $request) {
         }
         update_post_meta($post_id, '_vp_foto_urls', $foto_urls);
     }
+
+    // Notifica email automatica all'Associazione di Quartiere
+    $email_to = 'associazione@villaggioprenestino.it';
+    $email_subject = '📢 Nuova Segnalazione da Web App: ' . $titolo . ' (' . $luogo . ')';
+    $email_body = "Gentile Direttivo dell'Associazione di Quartiere Villaggio Prenestino,\n\n"
+        . "È stata inserita una nuova segnalazione tramite la Web App di Quartiere:\n\n"
+        . "📌 Titolo: " . $titolo . "\n"
+        . "📍 Luogo: " . $luogo . "\n"
+        . "📝 Descrizione:\n" . $descrizione . "\n\n"
+        . "👤 Cittadino: " . $nome . "\n"
+        . "📞 Telefono: " . ($telefono ?: 'Non indicato') . "\n"
+        . "📸 Foto caricate: " . count($foto_urls) . " allegati\n"
+        . "🗓️ Data: " . current_time('d/m/Y H:i') . "\n\n"
+        . "Puoi revisionare e aggiornare lo stato della segnalazione da WordPress:\n"
+        . admin_url('post.php?post=' . $post_id . '&action=edit') . "\n\n"
+        . "--\nAssociazione di Quartiere Villaggio Prenestino\nwww.villaggioprenestino.it";
+    $email_headers = ['Content-Type: text/plain; charset=UTF-8'];
+    @wp_mail($email_to, $email_subject, $email_body, $email_headers);
 
     return rest_ensure_response([
         'success'   => true,
@@ -1381,6 +1462,8 @@ function vpq_api_post_richiesta(WP_REST_Request $request) {
     $luogo       = sanitize_text_field($request->get_param('w') ?: $request->get_param('luogo') ?: 'Villaggio Prenestino');
     $need        = absint($request->get_param('need') ?: $request->get_param('obiettivo') ?: 8);
     $urgente     = (bool) $request->get_param('urgente');
+    $data        = sanitize_text_field($request->get_param('data') ?: $request->get_param('data_ora') ?: '');
+    $ora         = sanitize_text_field($request->get_param('ora') ?: '');
 
     if (!$titolo) {
         return new WP_Error('vpq_no_title', 'Titolo richiesta mancante.', ['status' => 400]);
@@ -1400,6 +1483,12 @@ function vpq_api_post_richiesta(WP_REST_Request $request) {
     update_post_meta($post_id, '_vp_luogo', $luogo);
     update_post_meta($post_id, '_vp_obiettivo', $need);
     update_post_meta($post_id, '_vp_urgente', $urgente ? '1' : '0');
+    if ($data) {
+        update_post_meta($post_id, '_vp_data', $data);
+    }
+    if ($ora) {
+        update_post_meta($post_id, '_vp_ora', $ora);
+    }
 
     return rest_ensure_response([
         'success'   => true,
@@ -1526,6 +1615,27 @@ function vpq_api_post_commercio(WP_REST_Request $request) {
         update_post_meta($post_id, '_vp_logo', $logo);
     }
 
+    // Notifica email automatica all'Associazione di Quartiere per nuova attività commerciale
+    $email_to = 'associazione@villaggioprenestino.it';
+    $email_subject = '🏪 Nuova Bottega/Attività da approvare: ' . $nome . ' (' . strtoupper($categoria) . ')';
+    $email_body = "Gentile Direttivo dell'Associazione di Quartiere Villaggio Prenestino,\n\n"
+        . "È stata registrata una nuova attività commerciale tramite la Web App in attesa di moderazione:\n\n"
+        . "🏪 Attività: " . $nome . "\n"
+        . "🏷️ Categoria: " . strtoupper($categoria) . "\n"
+        . "📍 Indirizzo: " . $indirizzo . "\n"
+        . "📞 Telefono: " . $telefono . "\n"
+        . "💬 WhatsApp: " . ($whatsapp ?: 'Non indicato') . "\n"
+        . "🕒 Orari: " . $orari . "\n"
+        . "👤 Referente: " . ($nome_referente ?: 'Non specificato') . ($email_referente ? " (" . $email_referente . ")" : "") . "\n"
+        . "🎁 Offerta per residenti: " . ($offerta_titolo ? ($offerta_titolo . " - " . $offerta_dettaglio) : 'Nessuna offerta') . "\n"
+        . "📝 Descrizione: " . ($descrizione ?: 'Nessuna descrizione') . "\n"
+        . "🗓️ Data: " . current_time('d/m/Y H:i') . "\n\n"
+        . "Puoi approvare e pubblicare la scheda commerciante dal pannello WordPress:\n"
+        . admin_url('post.php?post=' . $post_id . '&action=edit') . "\n\n"
+        . "--\nAssociazione di Quartiere Villaggio Prenestino\nwww.villaggioprenestino.it";
+    $email_headers = ['Content-Type: text/plain; charset=UTF-8'];
+    @wp_mail($email_to, $email_subject, $email_body, $email_headers);
+
     return rest_ensure_response([
         'success'   => true,
         'post_id'   => $post_id,
@@ -1533,6 +1643,122 @@ function vpq_api_post_commercio(WP_REST_Request $request) {
         'messaggio' => 'Attività commerciale registrata con successo! È ora in attesa di approvazione da parte dell\'amministratore prima della pubblicazione.',
     ]);
 }
+
+/**
+ * 15. CALLBACK: POST /notify-email (Invio notifica email generica da Web App)
+ */
+function vpq_api_post_notify_email(WP_REST_Request $request) {
+    $to = 'associazione@villaggioprenestino.it';
+    $subject = sanitize_text_field($request->get_param('subject') ?: 'Notifica da Web App Villaggio Prenestino');
+    $message = sanitize_textarea_field($request->get_param('message') ?: '');
+    $headers = ['Content-Type: text/plain; charset=UTF-8'];
+    $sent = @wp_mail($to, $subject, $message, $headers);
+    return rest_ensure_response([
+        'success'   => (bool) $sent,
+        'recipient' => $to,
+    ]);
+}
+
+/**
+ * 16. Configurazione e stato di attivazione delle schede nell'App
+ * Valori di default: tutte attive (true)
+ */
+function vpq_get_tabs_config() {
+    $defaults = [
+        'eventi'       => true,
+        'segnalazioni' => true,
+        'commercio'    => true,
+        'volontariato' => true,
+        'proposte'     => true,
+    ];
+    $saved = get_option('vpq_app_tabs_config', null);
+    if ($saved === null) {
+        return $defaults;
+    }
+    if (is_array($saved)) {
+        return array_merge($defaults, $saved);
+    }
+    return $defaults;
+}
+
+function vpq_update_tab_status($tab_key, $is_active) {
+    $config = vpq_get_tabs_config();
+    $config[$tab_key] = (bool) $is_active;
+    update_option('vpq_app_tabs_config', $config);
+    return $config;
+}
+
+/**
+ * CALLBACK: GET/POST /tabs-config
+ */
+function vpq_api_tabs_config(WP_REST_Request $request) {
+    if ($request->get_method() === 'POST') {
+        $params = $request->get_json_params() ?: $request->get_params();
+        if (isset($params['feature'])) {
+            $feature = sanitize_key($params['feature']);
+            $active  = !empty($params['active']);
+            $allowed = ['eventi', 'segnalazioni', 'commercio', 'volontariato', 'proposte'];
+            if (in_array($feature, $allowed, true)) {
+                vpq_update_tab_status($feature, $active);
+            }
+        } elseif (isset($params['config']) && is_array($params['config'])) {
+            foreach ($params['config'] as $k => $v) {
+                $feature = sanitize_key($k);
+                $allowed = ['eventi', 'segnalazioni', 'commercio', 'volontariato', 'proposte'];
+                if (in_array($feature, $allowed, true)) {
+                    vpq_update_tab_status($feature, (bool)$v);
+                }
+            }
+        }
+    }
+    return rest_ensure_response([
+        'success'       => true,
+        'schede_attive' => vpq_get_tabs_config(),
+    ]);
+}
+
+/**
+ * Renderizza il Toggle Button in alto ad ogni scheda nell'admin di WordPress
+ * Permette all'amministratore di attivare o disattivare ogni funzionalità nell'app.
+ */
+function vpq_render_tab_toggle_banner($feature, $label, $tab_slug) {
+    $cfg = vpq_get_tabs_config();
+    $is_active = !empty($cfg[$feature]);
+    $toggle_nonce = wp_create_nonce('vpq_toggle_tab_' . $feature);
+    $toggle_url = admin_url('admin.php?page=vp-quartiere&tab=' . $tab_slug . '&action=vpq_toggle_tab&feature=' . $feature . '&_wpnonce=' . $toggle_nonce);
+    ?>
+    <div style="background:<?php echo $is_active ? '#f0fdf4' : '#fff1f2'; ?>;border:1px solid <?php echo $is_active ? '#bbf7d0' : '#fecdd3'; ?>;border-left:5px solid <?php echo $is_active ? '#16a34a' : '#e11d48'; ?>;border-radius:12px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+        <div style="display:flex;align-items:center;gap:14px;">
+            <div style="width:42px;height:42px;border-radius:10px;background:<?php echo $is_active ? '#16a34a' : '#e11d48'; ?>;color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:bold;flex-shrink:0;">
+                <?php echo $is_active ? '✓' : '✕'; ?>
+            </div>
+            <div>
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                    <strong style="color:#0f172a;font-size:14px;">Stato Scheda nell'App:</strong>
+                    <span style="font-size:11px;font-weight:800;padding:3px 10px;border-radius:15px;background:<?php echo $is_active ? '#dcfce7' : '#ffe4e6'; ?>;color:<?php echo $is_active ? '#15803d' : '#9f1239'; ?>;border:1px solid <?php echo $is_active ? '#86efac' : '#fca5a5'; ?>;display:inline-flex;align-items:center;gap:5px;">
+                        <span style="width:8px;height:8px;border-radius:50%;background:<?php echo $is_active ? '#16a34a' : '#e11d48'; ?>;display:inline-block;"></span>
+                        <?php echo $is_active ? 'ATTIVA NELL\'APP (Visibile a tutti i cittadini)' : 'DISATTIVATA NELL\'APP (Nascosta agli utenti)'; ?>
+                    </span>
+                </div>
+                <p style="margin:4px 0 0 0;font-size:12px;color:#475569;">
+                    <?php if ($is_active): ?>
+                        La funzionalità <strong>"<?php echo esc_html($label); ?>"</strong> è attualmente <strong>attiva e visibile</strong> a tutti i cittadini nella barra di navigazione e nelle sezioni dell'applicazione.
+                    <?php else: ?>
+                        La funzionalità <strong>"<?php echo esc_html($label); ?>"</strong> è <strong>disattivata e nascosta</strong> agli utilizzatori dell'app (ad eccezione della Home).
+                    <?php endif; ?>
+                </p>
+            </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <a href="<?php echo esc_url($toggle_url); ?>" class="button <?php echo $is_active ? 'button-secondary' : 'button-primary'; ?>" style="font-weight:700;font-size:12px;padding:6px 16px;height:auto;display:inline-flex;align-items:center;gap:6px;cursor:pointer;<?php echo $is_active ? 'color:#be123c;border-color:#fca5a5;background:#fff;' : 'background:#16a34a;border-color:#15803d;color:#fff;'; ?>">
+                <span class="dashicons dashicons-controls-<?php echo $is_active ? 'pause' : 'play'; ?>" style="font-size:16px;width:16px;height:16px;line-height:16px;"></span>
+                <?php echo $is_active ? 'Disattiva questa Scheda nell\'App' : 'Attiva questa Scheda nell\'App'; ?>
+            </a>
+        </div>
+    </div>
+    <?php
+}
+
 
 /**
  * 14. CALLBACK: POST /commercio/vota (Mi piace attività commerciale)
@@ -1798,6 +2024,29 @@ function vpq_render_admin_hub($preset_tab = '') {
     global $wpdb;
     $table = $wpdb->prefix . 'vp_interazioni';
 
+    // Gestione azione toggle tab per attivazione/disattivazione funzionalità nell'App
+    if (isset($_GET['action']) && $_GET['action'] === 'vpq_toggle_tab' && isset($_GET['feature']) && isset($_GET['_wpnonce'])) {
+        $feat = sanitize_key($_GET['feature']);
+        if (wp_verify_nonce($_GET['_wpnonce'], 'vpq_toggle_tab_' . $feat)) {
+            $allowed_features = ['eventi', 'segnalazioni', 'commercio', 'volontariato', 'proposte'];
+            if (in_array($feat, $allowed_features, true)) {
+                $cfg = vpq_get_tabs_config();
+                $new_val = empty($cfg[$feat]);
+                vpq_update_tab_status($feat, $new_val);
+                $names = [
+                    'eventi'       => 'Eventi',
+                    'segnalazioni' => 'Segnalazioni',
+                    'commercio'    => 'Commercianti',
+                    'volontariato' => 'Volontariato',
+                    'proposte'     => 'Idee e Proposte',
+                ];
+                $name = $names[$feat] ?? $feat;
+                $msg = $new_val ? "Scheda {$name} attivata con successo nell'App!" : "Scheda {$name} disattivata nell'App per gli utilizzatori.";
+                echo '<div class="notice notice-success is-dismissible" style="margin:15px 0;"><p><strong>' . esc_html($msg) . '</strong></p></div>';
+            }
+        }
+    }
+
     // Gestione salvataggio impostazioni
     if (isset($_POST['vpq_save_settings']) && check_admin_referer('vpq_settings_nonce')) {
         update_option('vpq_allow_origins', sanitize_text_field($_POST['vpq_allow_origins']));
@@ -1807,8 +2056,11 @@ function vpq_render_admin_hub($preset_tab = '') {
         echo '<div class="notice notice-success is-dismissible" style="margin:15px 0;"><p><strong>Impostazioni API salvate con successo!</strong></p></div>';
     }
 
+    // Configurazione schede attive
+    $tabs_cfg = vpq_get_tabs_config();
+
     // Tab attiva (di default sempre la Dashboard / Panoramica)
-    $allowed_tabs = ['panoramica', 'eventi', 'volontari', 'segnalazioni', 'commercianti', 'impostazioni', 'webapp'];
+    $allowed_tabs = ['panoramica', 'eventi', 'volontari', 'segnalazioni', 'proposte', 'commercianti', 'impostazioni', 'webapp'];
     $active_tab   = !empty($preset_tab) ? $preset_tab : (isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'panoramica');
     if (!in_array($active_tab, $allowed_tabs)) {
         $active_tab = 'panoramica';
@@ -1848,7 +2100,7 @@ function vpq_render_admin_hub($preset_tab = '') {
                     Centro Gestione Web App - Villaggio Prenestino
                 </h1>
                 <p style="margin:4px 0 0 0;color:#64748b;font-size:13px;">
-                    Pannello unico a schede per gestire contenuti, consultare statistiche civiche e configurare le API senza disperdere voci nel menu di WordPress.
+                    Pannello unico a schede per gestire contenuti, consultare statistiche civiche e attivare/disattivare le funzionalità dell'App per gli utenti.
                 </p>
             </div>
             <div style="display:flex;align-items:center;gap:10px;">
@@ -1868,15 +2120,19 @@ function vpq_render_admin_hub($preset_tab = '') {
             </a>
             <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=commercianti'); ?>" class="nav-tab <?php echo $active_tab === 'commercianti' ? 'nav-tab-active' : ''; ?>" style="font-weight:600;font-size:13px;">
                 🏪 Commercianti <?php if ($pending_commercio > 0): ?><span style="background:#e11d48;color:#fff;padding:2px 7px;border-radius:10px;font-size:10px;margin-left:4px;font-weight:bold;"><?php echo $pending_commercio; ?> in attesa</span><?php endif; ?>
+                <span title="<?php echo !empty($tabs_cfg['commercio']) ? 'Attiva nell\'App' : 'Disattivata nell\'App'; ?>" style="font-size:10px;margin-left:4px;"><?php echo !empty($tabs_cfg['commercio']) ? '🟢' : '🔴'; ?></span>
             </a>
             <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=eventi'); ?>" class="nav-tab <?php echo $active_tab === 'eventi' ? 'nav-tab-active' : ''; ?>" style="font-weight:600;font-size:13px;">
-                📅 Eventi del Quartiere
+                📅 Eventi del Quartiere <span title="<?php echo !empty($tabs_cfg['eventi']) ? 'Attiva nell\'App' : 'Disattivata nell\'App'; ?>" style="font-size:10px;margin-left:4px;"><?php echo !empty($tabs_cfg['eventi']) ? '🟢' : '🔴'; ?></span>
             </a>
             <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=volontari'); ?>" class="nav-tab <?php echo $active_tab === 'volontari' ? 'nav-tab-active' : ''; ?>" style="font-weight:600;font-size:13px;">
-                🤝 Volontariato & Albo
+                🤝 Volontariato & Albo <span title="<?php echo !empty($tabs_cfg['volontariato']) ? 'Attiva nell\'App' : 'Disattivata nell\'App'; ?>" style="font-size:10px;margin-left:4px;"><?php echo !empty($tabs_cfg['volontariato']) ? '🟢' : '🔴'; ?></span>
             </a>
             <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=segnalazioni'); ?>" class="nav-tab <?php echo $active_tab === 'segnalazioni' ? 'nav-tab-active' : ''; ?>" style="font-weight:600;font-size:13px;">
-                ⚠️ Segnalazioni & Proposte
+                ⚠️ Segnalazioni <span title="<?php echo !empty($tabs_cfg['segnalazioni']) ? 'Attiva nell\'App' : 'Disattivata nell\'App'; ?>" style="font-size:10px;margin-left:4px;"><?php echo !empty($tabs_cfg['segnalazioni']) ? '🟢' : '🔴'; ?></span>
+            </a>
+            <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=proposte'); ?>" class="nav-tab <?php echo $active_tab === 'proposte' ? 'nav-tab-active' : ''; ?>" style="font-weight:600;font-size:13px;">
+                💡 Idee & Proposte <span title="<?php echo !empty($tabs_cfg['proposte']) ? 'Attiva nell\'App' : 'Disattivata nell\'App'; ?>" style="font-size:10px;margin-left:4px;"><?php echo !empty($tabs_cfg['proposte']) ? '🟢' : '🔴'; ?></span>
             </a>
             <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=impostazioni'); ?>" class="nav-tab <?php echo $active_tab === 'impostazioni' ? 'nav-tab-active' : ''; ?>" style="font-weight:600;font-size:13px;">
                 ⚙️ Impostazioni & API
@@ -1917,6 +2173,58 @@ function vpq_render_admin_hub($preset_tab = '') {
                     </a>
                 </div>
             <?php endif; ?>
+
+            <!-- Controllo Attivazione Funzionalità nell'App (ad eccezione della Home) -->
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.05);margin-bottom:25px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:15px;border-bottom:1px solid #f1f5f9;padding-bottom:12px;">
+                    <div>
+                        <h3 style="margin:0;font-size:16px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:8px;">
+                            <span class="dashicons dashicons-admin-settings" style="color:#0284c7;"></span>
+                            Controllo Attivazione Schede nella Web App
+                        </h3>
+                        <p style="margin:3px 0 0 0;font-size:12px;color:#64748b;">
+                            Attiva o disattiva le singole schede nell'applicazione per gli utenti (la scheda Home rimane sempre attiva).
+                        </p>
+                    </div>
+                    <span style="font-size:12px;color:#64748b;font-weight:600;">
+                        5 funzionalità gestibili
+                    </span>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:12px;">
+                    <?php
+                    $features_meta = [
+                        'commercio'    => ['nome' => 'Commercianti', 'tab' => 'commercianti', 'icon' => 'store', 'color' => '#d97706'],
+                        'eventi'       => ['nome' => 'Eventi', 'tab' => 'eventi', 'icon' => 'calendar-alt', 'color' => '#0284c7'],
+                        'volontariato' => ['nome' => 'Volontariato', 'tab' => 'volontari', 'icon' => 'groups', 'color' => '#16a34a'],
+                        'segnalazioni' => ['nome' => 'Segnalazioni', 'tab' => 'segnalazioni', 'icon' => 'warning', 'color' => '#dc2626'],
+                        'proposte'     => ['nome' => 'Idee e Proposte', 'tab' => 'proposte', 'icon' => 'lightbulb', 'color' => '#8b5cf6'],
+                    ];
+                    foreach ($features_meta as $fkey => $finfo):
+                        $is_on = !empty($tabs_cfg[$fkey]);
+                        $t_url = wp_nonce_url(admin_url('admin.php?page=vp-quartiere&tab=panoramica&action=vpq_toggle_tab&feature=' . $fkey), 'vpq_toggle_tab_' . $fkey);
+                        ?>
+                        <div style="background:<?php echo $is_on ? '#f8fafc' : '#fff1f2'; ?>;border:1px solid <?php echo $is_on ? '#e2e8f0' : '#fecdd3'; ?>;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;justify-content:space-between;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                                <strong style="font-size:13px;color:#0f172a;display:flex;align-items:center;gap:6px;">
+                                    <span class="dashicons dashicons-<?php echo esc_attr($finfo['icon']); ?>" style="font-size:16px;width:16px;height:16px;color:<?php echo esc_attr($finfo['color']); ?>;"></span>
+                                    <?php echo esc_html($finfo['nome']); ?>
+                                </strong>
+                                <span style="font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px;background:<?php echo $is_on ? '#dcfce7' : '#ffe4e6'; ?>;color:<?php echo $is_on ? '#15803d' : '#9f1239'; ?>;">
+                                    <?php echo $is_on ? 'ATTIVA' : 'DISATTIVATA'; ?>
+                                </span>
+                            </div>
+                            <div style="margin-top:auto;display:flex;align-items:center;gap:6px;padding-top:6px;">
+                                <a href="<?php echo esc_url($t_url); ?>" class="button button-small <?php echo $is_on ? 'button-secondary' : 'button-primary'; ?>" style="font-size:11px;font-weight:700;flex:1;text-align:center;<?php echo $is_on ? 'color:#b91c1c;' : 'background:#16a34a;border-color:#15803d;'; ?>">
+                                    <?php echo $is_on ? 'Disattiva' : 'Attiva'; ?>
+                                </a>
+                                <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=' . $finfo['tab']); ?>" class="button button-small" style="font-size:11px;" title="Apri scheda">
+                                    &rarr;
+                                </a>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
 
             <!-- 5 KPI Cards (Dati Reali da Database) -->
             <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:16px;margin-bottom:25px;">
@@ -2234,6 +2542,7 @@ function vpq_render_admin_hub($preset_tab = '') {
         <!-- TAB 2: EVENTI DEL QUARTIERE                -->
         <!-- ========================================== -->
         <?php elseif ($active_tab === 'eventi'): ?>
+            <?php vpq_render_tab_toggle_banner('eventi', 'Eventi del Quartiere', 'eventi'); ?>
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
                 <div>
                     <h2 style="margin:0;font-size:18px;font-weight:800;color:#0f172a;">Gestione Eventi della Comunità</h2>
@@ -2348,6 +2657,7 @@ function vpq_render_admin_hub($preset_tab = '') {
         <!-- TAB 3: VOLONTARIATO & ALBO                 -->
         <!-- ========================================== -->
         <?php elseif ($active_tab === 'volontari'): ?>
+            <?php vpq_render_tab_toggle_banner('volontariato', 'Volontariato & Iniziative Civiche', 'volontari'); ?>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
                 <!-- Colonna 1: Serve una Mano (Iniziative attive) -->
                 <div>
@@ -2375,12 +2685,22 @@ function vpq_render_admin_hub($preset_tab = '') {
                                 $richieste = get_posts(['post_type' => 'vp_richiesta', 'posts_per_page' => 10, 'post_status' => 'publish']);
                                 if ($richieste):
                                     foreach ($richieste as $r):
-                                        $req = get_post_meta($r->ID, '_vp_volontari_richiesti', true) ?: 3;
-                                        $ad  = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE tipo='richiesta_aderisci' AND post_id=%d", $r->ID));
+                                        $req    = get_post_meta($r->ID, '_vp_obiettivo', true) ?: 8;
+                                        $ad     = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE tipo='cisono' AND post_id=%d", $r->ID));
+                                        $data_r = get_post_meta($r->ID, '_vp_data', true);
+                                        $ora_r  = get_post_meta($r->ID, '_vp_ora', true);
+                                        $luogo_r = get_post_meta($r->ID, '_vp_luogo', true);
                                         ?>
                                         <tr>
                                             <td style="padding:10px 14px;">
                                                 <strong><a href="<?php echo get_edit_post_link($r->ID); ?>"><?php echo esc_html($r->post_title); ?></a></strong>
+                                                <?php if ($data_r || $ora_r || $luogo_r): ?>
+                                                    <div style="font-size:11px;color:#64748b;margin-top:2px;">
+                                                        <?php if ($data_r): ?>🗓️ <?php echo esc_html($data_r); ?><?php endif; ?>
+                                                        <?php if ($ora_r): ?> ⏰ Ore <?php echo esc_html($ora_r); ?><?php endif; ?>
+                                                        <?php if ($luogo_r): ?> 📍 <?php echo esc_html($luogo_r); ?><?php endif; ?>
+                                                    </div>
+                                                <?php endif; ?>
                                             </td>
                                             <td>
                                                 <span style="font-size:12px;font-weight:700;color:#059669;"><?php echo $ad; ?> / <?php echo $req; ?></span>
@@ -2456,6 +2776,7 @@ function vpq_render_admin_hub($preset_tab = '') {
         <!-- TAB 4: SEGNALAZIONI & PROPOSTE             -->
         <!-- ========================================== -->
         <?php elseif ($active_tab === 'segnalazioni'): ?>
+            <?php vpq_render_tab_toggle_banner('segnalazioni', 'Segnalazioni Cittadine', 'segnalazioni'); ?>
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
                 <div>
                     <h2 style="margin:0;font-size:18px;font-weight:800;color:#0f172a;">Istanze dei Cittadini & Segnalazioni</h2>
@@ -2549,6 +2870,7 @@ function vpq_render_admin_hub($preset_tab = '') {
             }
             $commercio_admin_query = new WP_Query($query_args);
             ?>
+            <?php vpq_render_tab_toggle_banner('commercio', 'Commercianti & Negozi di Quartiere', 'commercianti'); ?>
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:15px;">
                 <div>
                     <h2 style="margin:0;font-size:18px;font-weight:800;color:#0f172a;">
@@ -2671,6 +2993,79 @@ function vpq_render_admin_hub($preset_tab = '') {
                                 </td>
                             </tr>
                         <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+
+        <!-- ========================================== -->
+        <!-- TAB: IDEE & PROPOSTE DEI CITTADINI         -->
+        <!-- ========================================== -->
+        <?php elseif ($active_tab === 'proposte'): ?>
+            <?php vpq_render_tab_toggle_banner('proposte', 'Idee & Proposte Partecipative', 'proposte'); ?>
+
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+                <div>
+                    <h2 style="margin:0;font-size:18px;font-weight:800;color:#0f172a;">Idee & Proposte dei Cittadini</h2>
+                    <p style="margin:4px 0 0 0;font-size:12px;color:#64748b;">
+                        Consulta le proposte caricate dai cittadini dall'app o inserite manualmente, con il rispettivo conteggio dei voti "Mi piace".
+                    </p>
+                </div>
+                <div style="display:flex;gap:10px;">
+                    <a href="<?php echo admin_url('post-new.php?post_type=vp_proposta'); ?>" class="button button-primary" style="background:#7c3aed;border-color:#6d28d9;font-weight:700;padding:6px 14px;height:auto;">
+                        ➕ Nuova Proposta
+                    </a>
+                    <a href="<?php echo admin_url('edit.php?post_type=vp_proposta'); ?>" class="button button-secondary" style="padding:6px 14px;height:auto;">
+                        📋 Tutte le Proposte in WordPress &rarr;
+                    </a>
+                </div>
+            </div>
+
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05);margin-bottom:25px;">
+                <table class="wp-list-table widefat fixed striped" style="border:none;">
+                    <thead>
+                        <tr>
+                            <th style="font-weight:700;padding:12px 16px;">Titolo Proposta</th>
+                            <th style="font-weight:700;width:150px;">Autore / Cittadino</th>
+                            <th style="font-weight:700;width:120px;text-align:center;">Voti "Mi piace"</th>
+                            <th style="font-weight:700;width:150px;">Data Creazione</th>
+                            <th style="font-weight:700;width:100px;text-align:right;padding-right:16px;">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php
+                        $proposte_admin = get_posts([
+                            'post_type'      => 'vp_proposta',
+                            'post_status'    => 'publish',
+                            'posts_per_page' => 50,
+                            'orderby'        => 'date',
+                            'order'          => 'DESC',
+                        ]);
+                        if (!empty($proposte_admin)):
+                            foreach ($proposte_admin as $pr):
+                                $voti = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE tipo='proposta_vota' AND post_id=%d", $pr->ID));
+                                $autore = get_post_meta($pr->ID, '_vp_autore', true) ?: 'Cittadino';
+                                ?>
+                                <tr>
+                                    <td style="padding:12px 16px;">
+                                        <strong><a href="<?php echo esc_url(get_edit_post_link($pr->ID)); ?>"><?php echo esc_html($pr->post_title); ?></a></strong>
+                                    </td>
+                                    <td><span style="font-size:12px;color:#475569;"><?php echo esc_html($autore); ?></span></td>
+                                    <td style="text-align:center;">
+                                        <span style="background:#f3e8ff;color:#6b21a8;font-weight:800;padding:3px 10px;border-radius:12px;font-size:12px;border:1px solid #e9d5ff;">
+                                            👍 <?php echo $voti; ?>
+                                        </span>
+                                    </td>
+                                    <td><span style="font-size:12px;color:#64748b;"><?php echo get_the_date('d/m/Y', $pr->ID); ?></span></td>
+                                    <td style="text-align:right;padding-right:16px;">
+                                        <a href="<?php echo esc_url(get_edit_post_link($pr->ID)); ?>" class="button button-small">Modifica</a>
+                                    </td>
+                                </tr>
+                                <?php
+                            endforeach;
+                        else:
+                            echo '<tr><td colspan="5" style="text-align:center;padding:30px;color:#64748b;">Nessuna proposta caricata al momento.</td></tr>';
+                        endif;
+                        ?>
                     </tbody>
                 </table>
             </div>

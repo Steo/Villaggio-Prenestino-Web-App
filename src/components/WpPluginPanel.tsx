@@ -9,6 +9,8 @@ import {
   InsightData,
   TipoEvento,
   AttivitaCommercio,
+  AppTabsConfig,
+  DEFAULT_TABS_CONFIG,
 } from '../types';
 import { adminGetInsightStats } from '../services/wpService';
 import {
@@ -34,6 +36,7 @@ import {
   FileSpreadsheet,
   Users,
   Eye,
+  EyeOff,
   Sliders,
   ChevronRight,
   Sparkles,
@@ -41,6 +44,8 @@ import {
   Store,
   Phone,
   Tag,
+  Percent,
+  Mail,
 } from 'lucide-react';
 
 interface WpPluginPanelProps {
@@ -61,7 +66,77 @@ interface WpPluginPanelProps {
   onCreateRichiesta?: (richiesta: Omit<RichiestaVolontariato, 'id' | 'have'>) => void;
   onApprovaAttivita?: (id: number) => void;
   onDeactivateAdmin?: () => void;
+  tabsConfig?: AppTabsConfig;
+  onToggleTab?: (tab: keyof AppTabsConfig) => void;
 }
+
+const TabActiveToggleButton: React.FC<{
+  feature: keyof AppTabsConfig;
+  title: string;
+  tabsConfig: AppTabsConfig;
+  onToggleTab?: (tab: keyof AppTabsConfig) => void;
+  description: string;
+}> = ({ feature, title, tabsConfig, onToggleTab, description }) => {
+  const isActive = tabsConfig[feature] !== false;
+  return (
+    <div
+      className={`p-4 rounded-2xl border transition-all mb-4 ${
+        isActive
+          ? 'bg-emerald-50/80 border-emerald-200'
+          : 'bg-rose-50/80 border-rose-200'
+      }`}
+    >
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div
+            className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+              isActive ? 'bg-emerald-600 text-white shadow-xs' : 'bg-rose-600 text-white shadow-xs'
+            }`}
+          >
+            {isActive ? <Check className="w-5 h-5 stroke-[2.5]" /> : <EyeOff className="w-5 h-5 stroke-[2.5]" />}
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold text-slate-800">Stato Funzionalità nell'App:</span>
+              <span
+                className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1.5 ${
+                  isActive
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    : 'bg-rose-100 text-rose-800 border border-rose-300'
+                }`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    isActive ? 'bg-emerald-600 animate-pulse' : 'bg-rose-600'
+                  }`}
+                />
+                {isActive ? 'SCHEDA ATTIVA' : 'SCHEDA DISATTIVATA'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 mt-0.5">
+              {isActive
+                ? `La scheda "${title}" è attiva e visibile a tutti gli utilizzatori dell'app nella barra di navigazione.`
+                : `La scheda "${title}" è disattivata e nascosta nella barra di navigazione dell'app (ad eccezione della Home).`}
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onToggleTab?.(feature)}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shrink-0 shadow-xs ${
+            isActive
+              ? 'bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 hover:border-rose-400'
+              : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200'
+          }`}
+        >
+          <Sliders className="w-4 h-4" />
+          <span>{isActive ? 'Disattiva nell\'App' : 'Attiva nell\'App'}</span>
+        </button>
+      </div>
+    </div>
+  );
+};
 
 export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
   isOpen,
@@ -81,6 +156,8 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
   onCreateRichiesta,
   onApprovaAttivita,
   onDeactivateAdmin,
+  tabsConfig = DEFAULT_TABS_CONFIG,
+  onToggleTab,
 }) => {
   const [activeTab, setActiveTab] = useState<
     'insights' | 'commercianti' | 'eventi' | 'segnalazioni' | 'volontari' | 'proposte' | 'config'
@@ -391,6 +468,10 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
           >
             <Store className="w-4 h-4 text-amber-600" />
             <span>Commercianti ({attivitaCommercio.length})</span>
+            <span
+              className={`w-2 h-2 rounded-full ${tabsConfig.commercio !== false ? 'bg-emerald-500' : 'bg-rose-500'}`}
+              title={tabsConfig.commercio !== false ? "Scheda Attiva nell'App" : "Scheda Disattivata nell'App"}
+            />
             {attivitaCommercio.filter(a => a.statoApprovazione === 'in_attesa').length > 0 && (
               <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-rose-500 text-white font-bold animate-pulse">
                 {attivitaCommercio.filter(a => a.statoApprovazione === 'in_attesa').length} in attesa
@@ -408,6 +489,10 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
           >
             <Calendar className="w-4 h-4 text-amber-600" />
             <span>Eventi ({eventi.length})</span>
+            <span
+              className={`w-2 h-2 rounded-full ${tabsConfig.eventi !== false ? 'bg-emerald-500' : 'bg-rose-500'}`}
+              title={tabsConfig.eventi !== false ? "Scheda Attiva nell'App" : "Scheda Disattivata nell'App"}
+            />
           </button>
 
           <button
@@ -420,6 +505,10 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
           >
             <AlertTriangle className="w-4 h-4 text-amber-500" />
             <span>Segnalazioni ({segnalazioni.length})</span>
+            <span
+              className={`w-2 h-2 rounded-full ${tabsConfig.segnalazioni !== false ? 'bg-emerald-500' : 'bg-rose-500'}`}
+              title={tabsConfig.segnalazioni !== false ? "Scheda Attiva nell'App" : "Scheda Disattivata nell'App"}
+            />
           </button>
 
           <button
@@ -432,6 +521,10 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
           >
             <HeartHandshake className="w-4 h-4 text-emerald-600" />
             <span>Volontariato ({richieste.length})</span>
+            <span
+              className={`w-2 h-2 rounded-full ${tabsConfig.volontariato !== false ? 'bg-emerald-500' : 'bg-rose-500'}`}
+              title={tabsConfig.volontariato !== false ? "Scheda Attiva nell'App" : "Scheda Disattivata nell'App"}
+            />
           </button>
 
           <button
@@ -444,6 +537,10 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
           >
             <Lightbulb className="w-4 h-4 text-amber-500" />
             <span>Idee ({proposte.length})</span>
+            <span
+              className={`w-2 h-2 rounded-full ${tabsConfig.proposte !== false ? 'bg-emerald-500' : 'bg-rose-500'}`}
+              title={tabsConfig.proposte !== false ? "Scheda Attiva nell'App" : "Scheda Disattivata nell'App"}
+            />
           </button>
 
           <button
@@ -521,6 +618,77 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
                   >
                     <RefreshCw className={`w-4 h-4 ${loadingInsights ? 'animate-spin' : ''}`} />
                   </button>
+                </div>
+              </div>
+
+              {/* Riquadro Attivazione Schede Web App */}
+              <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-2.5 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Sliders className="w-4 h-4 text-[#0073aa]" />
+                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                      Controllo Attivazione Schede nella Web App
+                    </h4>
+                  </div>
+                  <span className="text-[11px] text-slate-500">
+                    La scheda Home è sempre attiva • Attiva/disattiva le singole sezioni per gli utenti
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+                  {[
+                    { key: 'commercio' as const, label: 'Commercianti', tab: 'commercianti' as const, icon: Store, color: 'text-amber-600' },
+                    { key: 'eventi' as const, label: 'Eventi', tab: 'eventi' as const, icon: Calendar, color: 'text-blue-600' },
+                    { key: 'segnalazioni' as const, label: 'Segnalazioni', tab: 'segnalazioni' as const, icon: AlertTriangle, color: 'text-rose-600' },
+                    { key: 'volontariato' as const, label: 'Volontari', tab: 'volontari' as const, icon: HeartHandshake, color: 'text-emerald-600' },
+                    { key: 'proposte' as const, label: 'Idee', tab: 'proposte' as const, icon: Lightbulb, color: 'text-purple-600' },
+                  ].map((item) => {
+                    const active = tabsConfig[item.key] !== false;
+                    const IconComp = item.icon;
+                    return (
+                      <div
+                        key={item.key}
+                        className={`p-3 rounded-xl border flex flex-col justify-between transition ${
+                          active
+                            ? 'bg-slate-50/80 border-slate-200'
+                            : 'bg-rose-50/50 border-rose-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-1 mb-2">
+                          <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                            <IconComp className={`w-3.5 h-3.5 ${item.color}`} />
+                            {item.label}
+                          </span>
+                          <span
+                            className={`w-2 h-2 rounded-full ${
+                              active ? 'bg-emerald-500' : 'bg-rose-500'
+                            }`}
+                          />
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <button
+                            type="button"
+                            onClick={() => onToggleTab?.(item.key)}
+                            className={`flex-1 py-1 px-2 rounded-lg text-[10px] font-bold transition cursor-pointer text-center ${
+                              active
+                                ? 'bg-rose-100 hover:bg-rose-200 text-rose-800'
+                                : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                            }`}
+                          >
+                            {active ? 'Disattiva' : 'Attiva'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab(item.tab)}
+                            className="p-1 rounded-lg bg-slate-200/80 hover:bg-slate-300 text-slate-700 text-[10px] font-bold transition cursor-pointer"
+                            title={`Vai alla scheda ${item.label}`}
+                          >
+                            <ChevronRight className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -827,6 +995,14 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
           {/* TAB: GESTIONE & APPROVAZIONE COMMERCIANTI */}
           {activeTab === 'commercianti' && (
             <div className="space-y-4 animate-fadeIn">
+              <TabActiveToggleButton
+                feature="commercio"
+                title="Commercianti & Negozi"
+                tabsConfig={tabsConfig}
+                onToggleTab={onToggleTab}
+                description="Mostra la vetrina e la mappa dei commercianti di quartiere agli utenti dell'app."
+              />
+
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -994,9 +1170,9 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
                               </div>
 
                               {shop.offertaAttiva && (
-                                <div className="text-[11px] text-amber-800 bg-amber-50 rounded-lg px-2 py-1 border border-amber-200 mt-1 inline-flex items-center gap-1">
-                                  <Tag className="w-3 h-3 text-amber-600" />
-                                  <span>Offerta: <strong>{shop.offertaAttiva.titolo}</strong> - {shop.offertaAttiva.dettaglio}</span>
+                                <div className="text-[11px] text-teal-800 bg-teal-50 rounded-lg px-2 py-1 border border-teal-200 mt-1 inline-flex items-center gap-1 font-medium">
+                                  <Percent className="w-3 h-3 text-teal-600 stroke-[2.5]" />
+                                  <span>Offerta %: <strong>{shop.offertaAttiva.titolo}</strong> - {shop.offertaAttiva.dettaglio}</span>
                                 </div>
                               )}
                             </div>
@@ -1031,6 +1207,14 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
           {/* TAB 2: GESTIONE EVENTI */}
           {activeTab === 'eventi' && (
             <div className="space-y-4 animate-fadeIn">
+              <TabActiveToggleButton
+                feature="eventi"
+                title="Eventi del Quartiere"
+                tabsConfig={tabsConfig}
+                onToggleTab={onToggleTab}
+                description="Gestisce la visibilità del calendario eventi e iscrizioni per gli utenti dell'app."
+              />
+
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -1279,6 +1463,14 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
           {/* TAB 3: GESTIONE SEGNALAZIONI */}
           {activeTab === 'segnalazioni' && (
             <div className="space-y-4 animate-fadeIn">
+              <TabActiveToggleButton
+                feature="segnalazioni"
+                title="Segnalazioni Cittadine"
+                tabsConfig={tabsConfig}
+                onToggleTab={onToggleTab}
+                description="Permette ai cittadini di inviare segnalazioni geolocalizzate con foto dal quartiere."
+              />
+
               <div>
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <AlertTriangle className="w-5 h-5 text-amber-500" />
@@ -1359,6 +1551,14 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
           {/* TAB 4: VOLONTARIATO ("Serve una mano") */}
           {activeTab === 'volontari' && (
             <div className="space-y-4 animate-fadeIn">
+              <TabActiveToggleButton
+                feature="volontariato"
+                title="Volontariato Civico"
+                tabsConfig={tabsConfig}
+                onToggleTab={onToggleTab}
+                description="Mostra le iniziative civiche 'Serve una mano' e l'iscrizione all'albo volontari."
+              />
+
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -1526,6 +1726,14 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
           {/* TAB 5: PROPOSTE CITTADINI */}
           {activeTab === 'proposte' && (
             <div className="space-y-4 animate-fadeIn">
+              <TabActiveToggleButton
+                feature="proposte"
+                title="Idee & Proposte"
+                tabsConfig={tabsConfig}
+                onToggleTab={onToggleTab}
+                description="Consente ai residenti di proporre idee per il quartiere e votare le proposte comunitarie."
+              />
+
               <div>
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <Lightbulb className="w-5 h-5 text-amber-500" />
@@ -1567,11 +1775,31 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
           {/* TAB 6: CONFIGURAZIONE & PLUGIN ZIP */}
           {activeTab === 'config' && (
             <div className="space-y-6 animate-fadeIn">
+              {/* Notifiche Email Attive ad associazione@villaggioprenestino.it */}
+              <div className="p-4 rounded-2xl bg-teal-50 border-2 border-teal-300 text-teal-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-teal-500 animate-pulse" />
+                    <h4 className="text-xs font-black uppercase tracking-wider text-teal-900 flex items-center gap-1.5">
+                      <Mail className="w-4 h-4 text-teal-600" />
+                      Notifiche Email Automatiche Attive
+                    </h4>
+                  </div>
+                  <p className="text-xs text-teal-900 leading-relaxed max-w-xl">
+                    Ogni qualvolta viene inserita una <strong>nuova segnalazione</strong> o una <strong>nuova attività commerciale</strong>, viene recapitata automaticamente un'email di avviso a <strong>associazione@villaggioprenestino.it</strong> con tutti i dettagli e il link diretto alla moderazione.
+                  </p>
+                </div>
+                <div className="shrink-0 bg-white/95 border border-teal-200 rounded-xl px-3 py-2 text-center text-xs font-bold text-teal-800 shadow-2xs">
+                  <span>Destinatario:</span>
+                  <div className="font-mono text-[11px] text-teal-950">associazione@villaggioprenestino.it</div>
+                </div>
+              </div>
+
               {/* Box Download ZIP */}
               <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-50 via-teal-50 to-amber-50/50 border-2 border-emerald-300 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                   <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-600 text-white uppercase tracking-wider mb-1.5">
-                    Versione 1.4.0: Gestione Commercianti & Approvazione Moderatore
+                    Versione 1.5.0: Notifiche Email Associazione & Commercianti
                   </span>
                   <h3 className="text-base font-bold text-slate-900 leading-snug">
                     Scarica il Plugin WordPress: <code className="text-emerald-800">vp-quartiere.zip</code>

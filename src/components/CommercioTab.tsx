@@ -43,8 +43,10 @@ import {
   ChevronDown,
   KeyRound,
   Info,
+  Percent,
 } from 'lucide-react';
 import { CommercioSkeletonGrid } from './SkeletonLoaders';
+import { BannerOffertaCommercio } from './BannerOffertaCommercio';
 
 interface CommercioTabProps {
   attivita: AttivitaCommercio[];
@@ -151,7 +153,6 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
   const [onlyOffers, setOnlyOffers] = useState(false);
   const [onlyOpen, setOnlyOpen] = useState(false);
   const [selectedAttivitaId, setSelectedAttivitaId] = useState<number | null>(null);
-  const [mapFilterTipo, setMapFilterTipo] = useState<'tutti' | 'negozi' | 'eventi'>('tutti');
   const [mapCategoryFilter, setMapCategoryFilter] = useState<CategoriaCommercio | 'tutti'>('tutti');
   
   // Paginazione: massimo 6 commercianti per pagina
@@ -438,48 +439,48 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
 
   return (
     <div className="space-y-5 pb-20 animate-fadeIn">
-      {/* HERO BANNER ROSSO (Compatto con divulgazione progressiva) */}
+      {/* HERO BANNER ROSSO (Uniforme a tutte le schede) */}
       <section
-        className="rounded-3xl p-4 sm:p-6 text-white shadow-lg border border-black/10 relative overflow-hidden"
+        className="rounded-3xl p-5 sm:p-7 text-white shadow-lg border border-black/10 relative overflow-hidden"
         style={{
           background: 'linear-gradient(135deg, #781816 0%, #5a1210 100%)',
         }}
       >
         <div className="relative z-10">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] sm:text-xs font-black uppercase tracking-wider mb-1.5">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+            <div className="max-w-xl">
+              <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider mb-2">
                 Economia Locale
               </span>
               <h2 className="text-xl sm:text-2xl font-black leading-tight text-white tracking-tight">
                 Commercio di Quartiere
               </h2>
-              <p className="mt-1 text-xs sm:text-sm text-white/90 leading-relaxed">
+              <p className="mt-1.5 text-xs sm:text-sm text-white/90 leading-relaxed">
                 Sostieni le attività e i negozi di vicinato di Villaggio Prenestino.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0">
-              <button
-                type="button"
-                onClick={() => setShowHeroDetails((prev) => !prev)}
-                className="px-3 py-2 bg-white/10 hover:bg-white/20 active:bg-white/25 text-white text-xs font-semibold rounded-xl border border-white/20 transition flex items-center gap-1.5 cursor-pointer"
-                aria-expanded={showHeroDetails}
-              >
-                <span>Come funziona</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showHeroDetails ? 'rotate-180' : ''}`} />
-              </button>
-
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto shrink-0 mt-3 sm:mt-0">
               <button
                 type="button"
                 onClick={() => {
                   setRegisterSuccess(false);
                   setIsRegisterModalOpen(true);
                 }}
-                className="px-4 py-2 bg-amber-400 hover:bg-amber-300 active:bg-amber-500 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full sm:w-auto px-4 py-2.5 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <PlusCircle className="w-4 h-4 text-slate-950" />
                 <span>Iscrivi attività</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowHeroDetails((prev) => !prev)}
+                className="w-full sm:w-auto px-4 py-2.5 bg-white/15 hover:bg-white/25 active:bg-white/30 text-white font-bold text-xs sm:text-sm rounded-xl border border-white/25 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                aria-expanded={showHeroDetails}
+              >
+                <span>Come funziona</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showHeroDetails ? 'rotate-180' : ''}`} />
               </button>
             </div>
           </div>
@@ -504,95 +505,54 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
         </div>
       </section>
 
-      {/* SELETTORE VISTA (MAPPA / ELENCO) */}
-      <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-100 dark:bg-slate-800/60 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700">
+      {/* SELETTORE VISTA (MAPPA / ELENCO) - Ingombro compatto */}
+      <div className="flex items-center justify-center p-1 bg-slate-100 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700/80 shadow-2xs max-w-fit mx-auto">
         <div className="flex items-center gap-1">
           <button
+            type="button"
             onClick={() => setViewMode('both')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
               viewMode === 'both'
                 ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
           >
-            <Layers className="w-3.5 h-3.5" />
+            <Layers className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
             <span>Mappa & Vetrina</span>
           </button>
           <button
+            type="button"
             onClick={() => setViewMode('map-only')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
               viewMode === 'map-only'
                 ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
           >
-            <Map className="w-3.5 h-3.5" />
+            <Map className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
             <span>Solo Mappa</span>
           </button>
           <button
+            type="button"
             onClick={() => setViewMode('list-only')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
               viewMode === 'list-only'
                 ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
           >
-            <List className="w-3.5 h-3.5" />
+            <List className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             <span>Solo Vetrina</span>
           </button>
         </div>
-
-        <button
-          onClick={scrollToVetrina}
-          className="text-xs font-semibold text-[#781816] dark:text-amber-400 hover:underline flex items-center gap-1 px-2 cursor-pointer"
-        >
-          <span>Vai ai commercianti ({sortedAttivita.length})</span>
-          <ChevronRight className="w-3.5 h-3.5" />
-        </button>
       </div>
 
       {/* MAPPA INTERATTIVA GOOGLE MAPS */}
       {viewMode !== 'list-only' && (
         <section className="space-y-2.5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-            <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-amber-600" />
-                <span>Mappa Commerciale di Quartiere</span>
-              </h3>
-            </div>
-
-            {/* Menù a tendina per filtrare i pin sulla mappa per categoria */}
-            <div className="flex items-center gap-2">
-              <label htmlFor="map-pin-category-dropdown" className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 whitespace-nowrap">
-                <Filter className="w-3.5 h-3.5 text-amber-600" />
-                <span>Categoria</span>
-              </label>
-              <div className="relative">
-                <select
-                  id="map-pin-category-dropdown"
-                  value={mapCategoryFilter}
-                  onChange={(e) => setMapCategoryFilter(e.target.value as CategoriaCommercio | 'tutti')}
-                  className="py-1.5 pl-3 pr-8 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-100 shadow-2xs focus:ring-2 focus:ring-amber-500 focus:outline-none appearance-none cursor-pointer"
-                  title="Filtra i pin della mappa per categoria"
-                >
-                  <option value="tutti">🏪 Tutte le attività ({attivita.length})</option>
-                  <option value="alimentari">🛒 Alimentari ({attivita.filter(a => a.categoria === 'alimentari').length})</option>
-                  <option value="ristorazione">🍽️ Ristorazione & Bar ({attivita.filter(a => a.categoria === 'ristorazione').length})</option>
-                  <option value="salute">💊 Farmacia & Salute ({attivita.filter(a => a.categoria === 'salute').length})</option>
-                  <option value="servizi">🔧 Artigiani & Servizi ({attivita.filter(a => a.categoria === 'servizi').length})</option>
-                  <option value="casa">🏡 Casa & Brico ({attivita.filter(a => a.categoria === 'casa').length})</option>
-                </select>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              </div>
-            </div>
-          </div>
 
           <MappaQuartiere
             attivita={attivita}
-            eventi={eventi}
-            filterTipo={mapFilterTipo}
-            onFilterChange={(t) => setMapFilterTipo(t)}
             categoriaFilter={mapCategoryFilter}
             onCategoriaFilterChange={(cat) => setMapCategoryFilter(cat)}
             selectedAttivitaId={selectedAttivitaId}
@@ -647,11 +607,11 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                   onClick={() => setOnlyOffers(!onlyOffers)}
                   className={`px-3 py-2 rounded-2xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
                     onlyOffers
-                      ? 'bg-amber-400 text-slate-950 shadow-xs'
+                      ? 'bg-teal-600 text-white dark:bg-teal-500 dark:text-slate-950 shadow-xs'
                       : 'bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
                   }`}
                 >
-                  <Tag className="w-3.5 h-3.5" />
+                  <Percent className="w-3.5 h-3.5 stroke-[2.5]" />
                   <span>Con Offerte</span>
                 </button>
                 <button
@@ -924,20 +884,10 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
 
                         {/* Offerta attiva visibile se presente */}
                         {shop.offertaAttiva && (
-                          <div className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/50 space-y-1">
-                            <div className="flex items-center justify-between text-amber-900 dark:text-amber-200">
-                              <span className="text-xs font-black flex items-center gap-1">
-                                <Sparkles className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
-                                {shop.offertaAttiva.titolo}
-                              </span>
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-200">
-                                Coupon Quartiere
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
-                              {shop.offertaAttiva.dettaglio}
-                            </p>
-                          </div>
+                          <BannerOffertaCommercio
+                            offerta={shop.offertaAttiva}
+                            isDark={darkMode}
+                          />
                         )}
 
                         {/* COMPONENTE ACCORDION / COLLAPSIBLE PER DETTAGLI, ORARI E CONTATTI */}
@@ -1184,6 +1134,10 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                   <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 max-w-sm mx-auto">
                     La scheda verrà verificata dall'amministratore prima della pubblicazione nella vetrina e sulla mappa.
                   </p>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 mt-2 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 text-[11px] font-semibold text-teal-800 dark:text-teal-200 shadow-2xs">
+                    <Mail className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
+                    <span>Notifica email recapitata a <strong>associazione@villaggioprenestino.it</strong></span>
+                  </div>
                 </div>
 
                 {/* PROCEDURA DI APPROVAZIONE IN 3 PASSI */}
@@ -1648,10 +1602,10 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                   </div>
 
                   {/* Chiarimento offerta e gestione con PIN */}
-                  <div className="p-2.5 bg-amber-100/80 dark:bg-amber-900/40 rounded-xl border border-amber-300/80 dark:border-amber-700/60 text-[11px] text-amber-950 dark:text-amber-200 leading-relaxed space-y-1">
-                    <div className="flex items-center gap-1.5 font-bold text-amber-900 dark:text-amber-300">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                      <span>Promozione di prossimità:</span>
+                  <div className="p-2.5 bg-teal-50 dark:bg-teal-950/40 rounded-xl border border-teal-200 dark:border-teal-700/60 text-[11px] text-teal-950 dark:text-teal-200 leading-relaxed space-y-1">
+                    <div className="flex items-center gap-1.5 font-bold text-teal-900 dark:text-teal-300">
+                      <Percent className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0 stroke-[2.5]" />
+                      <span>Promozione di prossimità (%):</span>
                     </div>
                     <p>
                       L&apos;offerta sarà visibile a tutti i residenti di Villaggio Prenestino che mostrano l&apos;app in negozio. Potrai aggiornarla o modificarla in qualsiasi momento con il tuo PIN di gestione.

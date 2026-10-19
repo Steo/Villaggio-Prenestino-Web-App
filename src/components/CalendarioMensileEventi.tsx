@@ -15,6 +15,7 @@ import {
   Info,
   CalendarCheck,
   Tag,
+  ExternalLink,
 } from 'lucide-react';
 import { EventDescription } from './EventDescription';
 
@@ -654,10 +655,17 @@ export const CalendarioMensileEventi: React.FC<CalendarioMensileEventiProps> = (
                         <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
                         Ore {ev.ora}
                       </span>
-                      <span className="flex items-center gap-1 text-slate-700 dark:text-slate-300">
-                        <MapPin className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                        {ev.luogo}
-                      </span>
+                      <a
+                        href={ev.lat && ev.lng ? `https://www.google.com/maps/search/?api=1&query=${ev.lat},${ev.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ev.luogo + (ev.luogo.toLowerCase().includes('villaggio prenestino') ? '' : ', Villaggio Prenestino, Roma'))}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors group/calmap"
+                        title="Visualizza questo indirizzo su Google Maps"
+                      >
+                        <MapPin className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0 group-hover/calmap:scale-110 transition-transform" />
+                        <span className="underline decoration-slate-300 dark:decoration-slate-600 underline-offset-2">{ev.luogo}</span>
+                        <ExternalLink className="w-2.5 h-2.5 opacity-60 group-hover/calmap:opacity-100 shrink-0" />
+                      </a>
                     </div>
 
                     <EventDescription
@@ -774,9 +782,18 @@ export const CalendarioMensileEventi: React.FC<CalendarioMensileEventiProps> = (
                         {ev.t}
                       </p>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-2 mt-0.5">
-                        <span>Ore {ev.ora}</span>
                         <span>•</span>
-                        <span className="truncate">{ev.luogo}</span>
+                        <a
+                          href={ev.lat && ev.lng ? `https://www.google.com/maps/search/?api=1&query=${ev.lat},${ev.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ev.luogo + (ev.luogo.toLowerCase().includes('villaggio prenestino') ? '' : ', Villaggio Prenestino, Roma'))}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="truncate hover:text-blue-600 dark:hover:text-blue-400 underline decoration-slate-300 dark:decoration-slate-600 underline-offset-2 flex items-center gap-0.5"
+                          title="Visualizza questo indirizzo su Google Maps"
+                        >
+                          <span className="truncate">{ev.luogo}</span>
+                          <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                        </a>
                       </p>
                     </div>
                   </div>

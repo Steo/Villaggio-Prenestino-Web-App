@@ -79,7 +79,7 @@ export const ProposteAltroTab: React.FC<ProposteAltroTabProps> = ({
           background: 'linear-gradient(135deg, #781816 0%, #5a1210 100%)',
         }}
       >
-        <div className="relative z-10 max-w-2xl">
+        <div className="relative z-10 max-w-xl">
           <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider mb-2">
             Idee e Proposte
           </span>
@@ -96,7 +96,7 @@ export const ProposteAltroTab: React.FC<ProposteAltroTabProps> = ({
               <Lightbulb className="w-4 h-4 text-amber-400" />
               Cosa vorresti realizzare o migliorare a Villaggio Prenestino?
             </label>
-            <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex flex-col sm:flex-row gap-2.5">
               <input
                 type="text"
                 required
@@ -212,7 +212,16 @@ export const ProposteAltroTab: React.FC<ProposteAltroTabProps> = ({
 
         {/* Elenco Proposte (3 per pagina / tab ordinate per Mi piace) */}
         <div className="space-y-2.5 pt-0.5">
-          {visibleProposte.map((p) => {
+          {sortedProposte.length === 0 ? (
+            <div className="bg-white rounded-2xl p-6 sm:p-8 text-center border border-slate-200 text-slate-500 text-xs space-y-2">
+              <Lightbulb className="w-8 h-8 text-amber-500 mx-auto" />
+              <h4 className="text-sm font-bold text-slate-800">Nessuna proposta ancora inserita</h4>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+                Sii il primo residente a lanciare una proposta per il quartiere! Usa il box in alto per inviare la tua idea.
+              </p>
+            </div>
+          ) : (
+            visibleProposte.map((p) => {
             const hasVoted = votedProposte.includes(p.id);
             // Posizione in classifica generale
             const rank = sortedProposte.findIndex((item) => item.id === p.id) + 1;
@@ -304,7 +313,8 @@ export const ProposteAltroTab: React.FC<ProposteAltroTabProps> = ({
                 </div>
               </div>
             );
-          })}
+          })
+          )}
         </div>
 
         {/* Dettaglio footer con indicazione paginazione */}

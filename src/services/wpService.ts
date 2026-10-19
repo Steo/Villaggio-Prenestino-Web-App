@@ -10,6 +10,8 @@ import {
   StatoSegnalazione,
   AttivitaCommercio,
   NuovaAttivitaForm,
+  AppTabsConfig,
+  DEFAULT_TABS_CONFIG,
 } from '../types';
 import {
   INITIAL_NEWS,
@@ -19,6 +21,10 @@ import {
   INITIAL_PROPOSTE,
 } from '../data/mockData';
 import { syncRemoteLeaderboard } from './leaderboardService';
+import {
+  notifyAssociazioneNewSegnalazione,
+  notifyAssociazioneNewAttivita,
+} from './emailNotificationService';
 
 const CONFIG_KEY = 'vp_config_v1';
 const INTERACTIONS_KEY = 'vp_interactions_v1';
@@ -116,6 +122,62 @@ export function saveWpConfig(cfg: WpPluginConfig): void {
   localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
 }
 
+const TABS_CONFIG_KEY = 'vp_app_tabs_config_v1';
+
+export function getAppTabsConfig(): AppTabsConfig {
+  try {
+    const raw = localStorage.getItem(TABS_CONFIG_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        ...DEFAULT_TABS_CONFIG,
+        ...parsed,
+      };
+    }
+  } catch (e) {
+    console.error('Error loading tabs config', e);
+  }
+  return DEFAULT_TABS_CONFIG;
+}
+
+export function saveAppTabsConfig(cfg: AppTabsConfig): void {
+  try {
+    localStorage.setItem(TABS_CONFIG_KEY, JSON.stringify(cfg));
+  } catch (e) {
+    console.error('Error saving tabs config', e);
+  }
+}
+
+export async function setAppTabStatus(feature: keyof AppTabsConfig, active: boolean): Promise<AppTabsConfig> {
+  const current = getAppTabsConfig();
+  const next: AppTabsConfig = {
+    ...current,
+    [feature]: active,
+  };
+  saveAppTabsConfig(next);
+
+  // Se connesso a WordPress, invia aggiornamento al server WordPress
+  const apiBase = getEffectiveBaseUrl();
+  const cfg = getWpConfig();
+  if (cfg.useLiveApi) {
+    try {
+      await fetch(`${apiBase}/wp-json/vp/v1/tabs-config`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-VP-Key': cfg.apiKey,
+        },
+        body: JSON.stringify({ feature, active }),
+      });
+    } catch (e) {
+      console.warn('Sync tabs config to WP server failed:', e);
+    }
+  }
+
+  return next;
+}
+
+
 /**
  * Calcola l'URL base ottimale per le API:
  * Se l'app è in esecuzione su villaggioprenestino.it (es. /app/), restituisce stringa vuota ""
@@ -143,6 +205,7 @@ interface LocalDataStore {
   richieste: RichiestaVolontariato[];
   segnalazioni: SegnalazioneCittadina[];
   proposte: PropostaCittadina[];
+  commercio: AttivitaCommercio[];
   news: WpArticle[];
 }
 
@@ -151,25 +214,14 @@ function getLocalDataStore(): LocalDataStore {
     const raw = localStorage.getItem(LOCAL_STORE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      // Sincronizza INITIAL_EVENTI per includere nuovi eventi in programma ed eventi passati
-      if (parsed.eventi) {
-        const storedIds = new Set(parsed.eventi.map((e: any) => e.id));
-        const missing = INITIAL_EVENTI.filter((e) => !storedIds.has(e.id));
-        if (missing.length > 0) {
-          parsed.eventi = [...parsed.eventi, ...missing];
-          localStorage.setItem(LOCAL_STORE_KEY, JSON.stringify(parsed));
-        }
-      }
-      // Sincronizza INITIAL_PROPOSTE per includere la lista completa di proposte per la paginazione a schede
-      if (parsed.proposte) {
-        const storedPropIds = new Set(parsed.proposte.map((p: any) => p.id));
-        const missingProp = INITIAL_PROPOSTE.filter((p) => !storedPropIds.has(p.id));
-        if (missingProp.length > 0) {
-          parsed.proposte = [...parsed.proposte, ...missingProp];
-          localStorage.setItem(LOCAL_STORE_KEY, JSON.stringify(parsed));
-        }
-      }
-      return parsed;
+      return {
+        eventi: Array.isArray(parsed.eventi) ? parsed.eventi : [],
+        richieste: Array.isArray(parsed.richieste) ? parsed.richieste : [],
+        segnalazioni: Array.isArray(parsed.segnalazioni) ? parsed.segnalazioni : [],
+        proposte: Array.isArray(parsed.proposte) ? parsed.proposte : [],
+        commercio: Array.isArray(parsed.commercio) ? parsed.commercio : [],
+        news: Array.isArray(parsed.news) ? parsed.news : [],
+      };
     }
   } catch (e) {
     console.error('Error loading local store', e);
@@ -179,6 +231,7 @@ function getLocalDataStore(): LocalDataStore {
     richieste: INITIAL_RICHIESTE,
     segnalazioni: INITIAL_SEGNALAZIONI,
     proposte: INITIAL_PROPOSTE,
+    commercio: [],
     news: INITIAL_NEWS,
   };
 }
@@ -196,8 +249,10 @@ export async function fetchAllData(): Promise<{
   richieste: RichiestaVolontariato[];
   segnalazioni: SegnalazioneCittadina[];
   proposte: PropostaCittadina[];
+  commercio: AttivitaCommercio[];
   news: WpArticle[];
   isLive: boolean;
+  schedeAttive: AppTabsConfig;
 }> {
   const cfg = getWpConfig();
   const localStore = getLocalDataStore();
@@ -207,6 +262,7 @@ export async function fetchAllData(): Promise<{
   let liveRichieste = localStore.richieste;
   let liveSegnalazioni = localStore.segnalazioni;
   let liveProposte = localStore.proposte;
+  let liveCommercio = localStore.commercio;
   let liveNews = localStore.news;
   let connected = false;
 
@@ -246,13 +302,21 @@ export async function fetchAllData(): Promise<{
             });
           }
           if (Array.isArray(json.richieste)) {
-            liveRichieste = json.richieste;
+            liveRichieste = json.richieste.map((r: any) => ({
+              ...r,
+              data: r.data || '',
+              ora: r.ora || '',
+              data_ora: r.data_ora || (r.data ? `${r.data}${r.ora ? ` • ore ${r.ora}` : ''}` : (r.ora ? `Ore ${r.ora}` : '')),
+            }));
           }
           if (Array.isArray(json.segnalazioni)) {
             liveSegnalazioni = json.segnalazioni;
           }
           if (Array.isArray(json.proposte)) {
             liveProposte = json.proposte;
+          }
+          if (Array.isArray(json.commercio)) {
+            liveCommercio = json.commercio;
           }
           if (Array.isArray(json.classifica)) {
             syncRemoteLeaderboard(json.classifica);
@@ -267,6 +331,16 @@ export async function fetchAllData(): Promise<{
               img: item.img || 'https://images.unsplash.com/photo-1577495508048-b635879837f1?auto=format&fit=crop&w=700&q=80',
               autore: 'Associazione Villaggio Prenestino',
             }));
+          }
+          if (json.schede_attive && typeof json.schede_attive === 'object') {
+            const tabs: AppTabsConfig = {
+              eventi: json.schede_attive.eventi !== false,
+              segnalazioni: json.schede_attive.segnalazioni !== false,
+              commercio: json.schede_attive.commercio !== false,
+              volontariato: json.schede_attive.volontariato !== false,
+              proposte: json.schede_attive.proposte !== false,
+            };
+            saveAppTabsConfig(tabs);
           }
         }
       }
@@ -314,6 +388,7 @@ export async function fetchAllData(): Promise<{
   localStore.richieste = liveRichieste;
   localStore.segnalazioni = liveSegnalazioni;
   localStore.proposte = liveProposte;
+  localStore.commercio = liveCommercio;
   localStore.news = liveNews;
   saveLocalDataStore(localStore);
 
@@ -322,8 +397,10 @@ export async function fetchAllData(): Promise<{
     richieste: liveRichieste,
     segnalazioni: liveSegnalazioni,
     proposte: liveProposte,
+    commercio: liveCommercio,
     news: liveNews,
     isLive: connected,
+    schedeAttive: getAppTabsConfig(),
   };
 }
 
@@ -513,6 +590,21 @@ export async function submitSegnalazione(data: {
     }
   }
 
+  // Notifica email automatica ad associazione@villaggioprenestino.it
+  try {
+    await notifyAssociazioneNewSegnalazione({
+      id: newId,
+      titolo: data.titolo,
+      luogo: data.luogo,
+      descrizione: data.descrizione,
+      nome: data.nome,
+      telefono: data.telefono,
+      fotoCount: data.foto?.length || 0,
+    });
+  } catch (err) {
+    console.warn('Errore trigger notifica email segnalazione:', err);
+  }
+
   return { success: true, newId };
 }
 
@@ -634,6 +726,25 @@ export async function submitAttivitaCommercio(data: NuovaAttivitaForm & {
     } catch (e) {
       console.warn('Invio commercio a WP fallito, salvata localmente come in attesa:', e);
     }
+  }
+
+  // Notifica email automatica ad associazione@villaggioprenestino.it per nuova attività commerciale
+  try {
+    await notifyAssociazioneNewAttivita({
+      nome: data.nome,
+      categoria: data.categoria,
+      indirizzo: data.indirizzo,
+      telefono: data.telefono,
+      whatsapp: data.whatsapp,
+      orari: data.orari,
+      descrizione: data.descrizione,
+      offertaTitolo: data.offertaTitolo,
+      offertaDettaglio: data.offertaDettaglio,
+      nomeReferente: data.nomeReferente,
+      emailReferente: data.emailReferente,
+    });
+  } catch (err) {
+    console.warn('Errore trigger notifica email commercio:', err);
   }
 
   return {

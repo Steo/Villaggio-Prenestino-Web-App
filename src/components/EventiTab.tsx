@@ -14,10 +14,21 @@ import {
   History,
   LayoutList,
   CalendarDays,
+  ExternalLink,
 } from 'lucide-react';
 import { CalendarioMensileEventi } from './CalendarioMensileEventi';
 import { EventDescription } from './EventDescription';
 import { shareWithNativeOrWhatsApp } from '../utils/shareUtils';
+
+export const getGoogleMapsUrl = (luogo: string, lat?: number, lng?: number) => {
+  if (lat && lng) {
+    return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+  }
+  const cleanLuogo = luogo.toLowerCase().includes('villaggio prenestino')
+    ? luogo
+    : `${luogo}, Villaggio Prenestino, Roma`;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cleanLuogo)}`;
+};
 
 interface EventiTabProps {
   eventi: EventoQuartiere[];
@@ -147,7 +158,7 @@ export const EventiTab: React.FC<EventiTabProps> = ({
           </div>
 
           {/* Filtri con stesso stile dei bottoni del banner Home */}
-          <div className="flex items-center gap-2 self-start sm:self-center shrink-0 w-full sm:w-auto">
+          <div className="flex items-center gap-2.5 self-start sm:self-center shrink-0 w-full sm:w-auto">
             <button
               onClick={() => setFiltro('tutti')}
               className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs sm:text-sm transition cursor-pointer flex items-center justify-center gap-1.5 ${
@@ -296,10 +307,19 @@ export const EventiTab: React.FC<EventiTabProps> = ({
                       <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
                       Ore {ev.ora}
                     </span>
-                    <span className="flex items-center gap-1 text-slate-700 dark:text-slate-300">
-                      <MapPin className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                      {ev.luogo}
-                    </span>
+                    <a
+                      href={getGoogleMapsUrl(ev.luogo, ev.lat, ev.lng)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors group/map"
+                      title="Visualizza questo indirizzo su Google Maps"
+                    >
+                      <MapPin className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0 group-hover/map:scale-110 transition-transform" />
+                      <span className="underline decoration-slate-300 dark:decoration-slate-600 underline-offset-2">
+                        {ev.luogo}
+                      </span>
+                      <ExternalLink className="w-2.5 h-2.5 opacity-60 group-hover/map:opacity-100 shrink-0" />
+                    </a>
                   </div>
 
                   <EventDescription
@@ -445,10 +465,19 @@ export const EventiTab: React.FC<EventiTabProps> = ({
                       <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                       Ore {ev.ora}
                     </span>
-                    <span className="flex items-center gap-1 text-slate-500">
+                    <a
+                      href={getGoogleMapsUrl(ev.luogo, ev.lat, ev.lng)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors"
+                      title="Visualizza questo indirizzo su Google Maps"
+                    >
                       <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      {ev.luogo}
-                    </span>
+                      <span className="underline decoration-slate-300 dark:decoration-slate-700 underline-offset-2">
+                        {ev.luogo}
+                      </span>
+                      <ExternalLink className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                    </a>
                   </div>
 
                   <EventDescription

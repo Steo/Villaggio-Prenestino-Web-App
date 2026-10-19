@@ -5,6 +5,9 @@ import subprocess
 
 def main():
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    print("0. Generating official CdQ PWA icons...")
+    subprocess.run(["node", "scripts/generate_pwa_icons.cjs"], cwd=root_dir, check=True)
+
     print("1. Compiling production build with Vite...")
     subprocess.run(["npm", "run", "build"], cwd=root_dir, check=True)
 

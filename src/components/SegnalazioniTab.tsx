@@ -16,6 +16,7 @@ import {
   Sparkles,
   BellRing,
   ChevronDown,
+  Mail,
 } from 'lucide-react';
 import { shareToWhatsApp } from '../utils/shareUtils';
 import { compressMultipleImages } from '../utils/imageCompressor';
@@ -292,55 +293,55 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
 
   return (
     <div className="space-y-4 pb-20 animate-fadeIn">
-      {/* Banner informativo compatto con divulgazione progressiva */}
+      {/* Banner informativo uniforme con divulgazione progressiva */}
       <section
-        className="rounded-3xl p-4 sm:p-6 text-white shadow-lg border border-black/10 relative overflow-hidden"
+        className="rounded-3xl p-5 sm:p-7 text-white shadow-lg border border-black/10 relative overflow-hidden"
         style={{
           background: 'linear-gradient(135deg, #781816 0%, #5a1210 100%)',
         }}
       >
         <div className="relative z-10">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] sm:text-xs font-black uppercase tracking-wider mb-1.5">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+            <div className="max-w-xl">
+              <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider mb-2">
                 Segnalazioni & Decoro
               </span>
               <h2 className="text-xl sm:text-2xl font-black leading-tight text-white tracking-tight">
                 Segnalazioni Territoriali
               </h2>
-              <p className="mt-1 text-xs sm:text-sm text-white/90 leading-relaxed">
+              <p className="mt-1.5 text-xs sm:text-sm text-white/90 leading-relaxed">
                 Invia e monitora disservizi, guasti e decoro a Villaggio Prenestino.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0">
-              <button
-                type="button"
-                onClick={() => setShowIterInfo((prev) => !prev)}
-                className="px-3 py-2 bg-white/10 hover:bg-white/20 active:bg-white/25 text-white text-xs font-semibold rounded-xl border border-white/20 transition flex items-center gap-1.5 cursor-pointer"
-                aria-expanded={showIterInfo}
-              >
-                <span>Iter 3 stati</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showIterInfo ? 'rotate-180' : ''}`} />
-              </button>
-
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto shrink-0 mt-3 sm:mt-0">
               <button
                 type="button"
                 onClick={() => {
                   setMostraForm(!mostraForm);
                   if (inviataSuccesso) setInviataSuccesso(false);
                 }}
-                className="px-4 py-2 bg-amber-400 hover:bg-amber-300 active:bg-amber-500 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full sm:w-auto px-4 py-2.5 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                {mostraForm ? <X className="w-4 h-4" /> : <Camera className="w-4 h-4" />}
+                {mostraForm ? <X className="w-4 h-4 text-slate-950" /> : <Camera className="w-4 h-4 text-slate-950" />}
                 <span>{mostraForm ? 'Chiudi' : 'Nuova segnalazione'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowIterInfo((prev) => !prev)}
+                className="w-full sm:w-auto px-4 py-2.5 bg-white/15 hover:bg-white/25 active:bg-white/30 text-white font-bold text-xs sm:text-sm rounded-xl border border-white/25 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                aria-expanded={showIterInfo}
+              >
+                <span>Iter 3 stati</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showIterInfo ? 'rotate-180' : ''}`} />
               </button>
             </div>
           </div>
 
           {/* Infografica espandibile: I 3 stati delle Segnalazioni (Progressive Disclosure) */}
           {showIterInfo && (
-            <div className="mt-3.5 pt-3.5 border-t border-white/15 animate-fadeIn space-y-2">
+            <div className="mt-4 pt-4 border-t border-white/15 animate-fadeIn space-y-2.5">
               <p className="text-[11px] text-white/80">
                 I guasti urgenti vengono inoltrati subito; le richieste strutturali vengono aggregate prima della trasmissione agli uffici competenti.
               </p>
@@ -392,6 +393,10 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
                 <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 max-w-md mx-auto">
                   Grazie per il tuo contributo al decoro del quartiere. L'Associazione prenderà in carico la segnalazione per l'inoltro agli organi competenti.
                 </p>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 mt-2.5 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 text-[11px] font-semibold text-teal-800 dark:text-teal-200 shadow-2xs">
+                  <Mail className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
+                  <span>Notifica email recapitata a <strong>associazione@villaggioprenestino.it</strong></span>
+                </div>
               </div>
 
               {/* Tasto 1-Click Condivisione su WhatsApp del problema */}

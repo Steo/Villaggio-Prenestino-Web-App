@@ -14,7 +14,7 @@ import {
   HeartHandshake,
   Lightbulb,
 } from 'lucide-react';
-import { UserInteractions } from '../types';
+import { UserInteractions, AppTabsConfig } from '../types';
 import { getFullLeaderboard } from '../services/leaderboardService';
 
 interface ClassificaCittadiniProps {
@@ -23,6 +23,7 @@ interface ClassificaCittadiniProps {
   onOpenPuntiModal?: () => void;
   onUpdateUserNome?: (nome: string) => void;
   darkMode?: boolean;
+  tabsConfig?: AppTabsConfig;
 }
 
 export const ClassificaCittadini: React.FC<ClassificaCittadiniProps> = ({
@@ -31,6 +32,7 @@ export const ClassificaCittadini: React.FC<ClassificaCittadiniProps> = ({
   onOpenPuntiModal,
   onUpdateUserNome,
   darkMode = false,
+  tabsConfig,
 }) => {
   const [editingName, setEditingName] = useState(false);
   const [nomeInput, setNomeInput] = useState(interactions.contattiSalvati?.nome || '');
@@ -493,122 +495,128 @@ export const ClassificaCittadini: React.FC<ClassificaCittadiniProps> = ({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <button
-            type="button"
-            onClick={() => onSelectTab('segnalazioni')}
-            className={`p-2.5 rounded-xl border transition text-left flex items-center justify-between group cursor-pointer shadow-2xs ${
-              darkMode
-                ? 'bg-slate-900 border-slate-700/80 hover:border-amber-500'
-                : 'bg-white border-slate-200 hover:border-amber-400 hover:bg-amber-50/30'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <Camera className="w-4 h-4 text-amber-500 group-hover:scale-110 transition-transform" />
-              <div className="min-w-0">
-                <div
-                  className={`text-xs font-bold leading-tight ${
-                    darkMode ? 'text-white' : 'text-slate-900'
-                  }`}
-                >
-                  Invia Segnalazione
-                </div>
-                <div
-                  className={`text-[10px] ${
-                    darkMode ? 'text-slate-400' : 'text-slate-600'
-                  }`}
-                >
-                  Buche o decoro
-                </div>
-              </div>
-            </div>
-            <span
-              className={`px-1.5 py-0.5 rounded text-[10px] font-black border shrink-0 ${
+          {tabsConfig?.segnalazioni !== false && (
+            <button
+              type="button"
+              onClick={() => onSelectTab('segnalazioni')}
+              className={`p-2.5 rounded-xl border transition text-left flex items-center justify-between group cursor-pointer shadow-2xs ${
                 darkMode
-                  ? 'bg-amber-950 text-amber-300 border-amber-800'
-                  : 'bg-amber-100 text-amber-950 border-amber-300'
+                  ? 'bg-slate-900 border-slate-700/80 hover:border-amber-500'
+                  : 'bg-white border-slate-200 hover:border-amber-400 hover:bg-amber-50/30'
               }`}
             >
-              +5 pts
-            </span>
-          </button>
+              <div className="flex items-center gap-2">
+                <Camera className="w-4 h-4 text-amber-500 group-hover:scale-110 transition-transform" />
+                <div className="min-w-0">
+                  <div
+                    className={`text-xs font-bold leading-tight ${
+                      darkMode ? 'text-white' : 'text-slate-900'
+                    }`}
+                  >
+                    Invia Segnalazione
+                  </div>
+                  <div
+                    className={`text-[10px] ${
+                      darkMode ? 'text-slate-400' : 'text-slate-600'
+                    }`}
+                  >
+                    Buche o decoro
+                  </div>
+                </div>
+              </div>
+              <span
+                className={`px-1.5 py-0.5 rounded text-[10px] font-black border shrink-0 ${
+                  darkMode
+                    ? 'bg-amber-950 text-amber-300 border-amber-800'
+                    : 'bg-amber-100 text-amber-950 border-amber-300'
+                }`}
+              >
+                +5 pts
+              </span>
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => onSelectTab('volontariato')}
-            className={`p-2.5 rounded-xl border transition text-left flex items-center justify-between group cursor-pointer shadow-2xs ${
-              darkMode
-                ? 'bg-slate-900 border-slate-700/80 hover:border-emerald-500'
-                : 'bg-white border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/30'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <HeartHandshake className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform" />
-              <div className="min-w-0">
-                <div
-                  className={`text-xs font-bold leading-tight ${
-                    darkMode ? 'text-white' : 'text-slate-900'
-                  }`}
-                >
-                  Serve una Mano
-                </div>
-                <div
-                  className={`text-[10px] ${
-                    darkMode ? 'text-slate-400' : 'text-slate-600'
-                  }`}
-                >
-                  Volontariato attivo
-                </div>
-              </div>
-            </div>
-            <span
-              className={`px-1.5 py-0.5 rounded text-[10px] font-black border shrink-0 ${
+          {tabsConfig?.volontariato !== false && (
+            <button
+              type="button"
+              onClick={() => onSelectTab('volontariato')}
+              className={`p-2.5 rounded-xl border transition text-left flex items-center justify-between group cursor-pointer shadow-2xs ${
                 darkMode
-                  ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
-                  : 'bg-emerald-100 text-emerald-950 border-emerald-300'
+                  ? 'bg-slate-900 border-slate-700/80 hover:border-emerald-500'
+                  : 'bg-white border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/30'
               }`}
             >
-              +10 pts
-            </span>
-          </button>
+              <div className="flex items-center gap-2">
+                <HeartHandshake className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform" />
+                <div className="min-w-0">
+                  <div
+                    className={`text-xs font-bold leading-tight ${
+                      darkMode ? 'text-white' : 'text-slate-900'
+                    }`}
+                  >
+                    Serve una Mano
+                  </div>
+                  <div
+                    className={`text-[10px] ${
+                      darkMode ? 'text-slate-400' : 'text-slate-600'
+                    }`}
+                  >
+                    Volontariato attivo
+                  </div>
+                </div>
+              </div>
+              <span
+                className={`px-1.5 py-0.5 rounded text-[10px] font-black border shrink-0 ${
+                  darkMode
+                    ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
+                    : 'bg-emerald-100 text-emerald-950 border-emerald-300'
+                }`}
+              >
+                +10 pts
+              </span>
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => onSelectTab('proposte')}
-            className={`p-2.5 rounded-xl border transition text-left flex items-center justify-between group cursor-pointer shadow-2xs ${
-              darkMode
-                ? 'bg-slate-900 border-slate-700/80 hover:border-purple-500'
-                : 'bg-white border-slate-200 hover:border-purple-400 hover:bg-purple-50/30'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <Lightbulb className="w-4 h-4 text-purple-500 group-hover:scale-110 transition-transform" />
-              <div className="min-w-0">
-                <div
-                  className={`text-xs font-bold leading-tight ${
-                    darkMode ? 'text-white' : 'text-slate-900'
-                  }`}
-                >
-                  Proponi & Vota
-                </div>
-                <div
-                  className={`text-[10px] ${
-                    darkMode ? 'text-slate-400' : 'text-slate-600'
-                  }`}
-                >
-                  Idee per il quartiere
-                </div>
-              </div>
-            </div>
-            <span
-              className={`px-1.5 py-0.5 rounded text-[10px] font-black border shrink-0 ${
+          {tabsConfig?.proposte !== false && (
+            <button
+              type="button"
+              onClick={() => onSelectTab('proposte')}
+              className={`p-2.5 rounded-xl border transition text-left flex items-center justify-between group cursor-pointer shadow-2xs ${
                 darkMode
-                  ? 'bg-purple-950 text-purple-300 border-purple-800'
-                  : 'bg-purple-100 text-purple-950 border-purple-300'
+                  ? 'bg-slate-900 border-slate-700/80 hover:border-purple-500'
+                  : 'bg-white border-slate-200 hover:border-purple-400 hover:bg-purple-50/30'
               }`}
             >
-              +5 pts
-            </span>
-          </button>
+              <div className="flex items-center gap-2">
+                <Lightbulb className="w-4 h-4 text-purple-500 group-hover:scale-110 transition-transform" />
+                <div className="min-w-0">
+                  <div
+                    className={`text-xs font-bold leading-tight ${
+                      darkMode ? 'text-white' : 'text-slate-900'
+                    }`}
+                  >
+                    Proponi & Vota
+                  </div>
+                  <div
+                    className={`text-[10px] ${
+                      darkMode ? 'text-slate-400' : 'text-slate-600'
+                    }`}
+                  >
+                    Idee per il quartiere
+                  </div>
+                </div>
+              </div>
+              <span
+                className={`px-1.5 py-0.5 rounded text-[10px] font-black border shrink-0 ${
+                  darkMode
+                    ? 'bg-purple-950 text-purple-300 border-purple-800'
+                    : 'bg-purple-100 text-purple-950 border-purple-300'
+                }`}
+              >
+                +5 pts
+              </span>
+            </button>
+          )}
         </div>
       </div>
     </section>

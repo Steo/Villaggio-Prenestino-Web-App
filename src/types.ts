@@ -97,6 +97,9 @@ export interface RichiestaVolontariato {
   have: number;        // Volontari attualmente aderiti
   need: number;        // Volontari necessari
   urgente?: boolean;
+  data?: string;       // Data dell'attività (es. "Sabato 24 Maggio" o "24/05/2026")
+  ora?: string;        // Orario dell'attività (es. "09:30" o "09:30 - 12:30")
+  data_ora?: string;   // Riferimento testuale combinato data e orario (da WordPress)
 }
 
 export type StatoSegnalazione = 1 | 2 | 3; // 1: Ricevuta, 2: Inoltrata all'ente preposto, 3: Risolta
@@ -153,6 +156,22 @@ export interface UserInteractions {
   mieAttivita?: number[];        // IDs delle attività commerciali inserite dall'utente
   notificheAbilitate?: boolean;  // Preferenza abilitazione notifiche
 }
+
+export interface AppTabsConfig {
+  eventi: boolean;
+  segnalazioni: boolean;
+  commercio: boolean;
+  volontariato: boolean;
+  proposte: boolean;
+}
+
+export const DEFAULT_TABS_CONFIG: AppTabsConfig = {
+  eventi: true,
+  segnalazioni: true,
+  commercio: true,
+  volontariato: true,
+  proposte: true,
+};
 
 export interface WpPluginConfig {
   baseUrl: string;

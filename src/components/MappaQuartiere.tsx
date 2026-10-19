@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { APIProvider, Map, InfoWindow, ColorScheme, useMap } from '@vis.gl/react-google-maps';
+import { APIProvider, Map, ColorScheme, useMap } from '@vis.gl/react-google-maps';
 import { CustomMapPin } from './CustomMapPin';
 import { CustomMapMarker } from './CustomMapMarker';
 import { AttivitaCommercio, EventoQuartiere, CategoriaCommercio } from '../types';
 import { 
-  Store, 
-  Calendar, 
   MapPin, 
   Navigation, 
   Crosshair, 
@@ -14,20 +12,20 @@ import {
   Clock, 
   Tag, 
   ExternalLink, 
-  Layers, 
-  Sparkles,
-  Filter,
-  KeyRound,
-  ShieldCheck,
+  Filter, 
+  KeyRound, 
+  ShieldCheck, 
+  Percent, 
+  X,
 } from 'lucide-react';
 
 interface MappaQuartiereProps {
   attivita: AttivitaCommercio[];
-  eventi: EventoQuartiere[];
+  eventi?: EventoQuartiere[];
   selectedAttivitaId: number | null;
   onSelectAttivita: (id: number | null) => void;
-  filterTipo: 'tutti' | 'negozi' | 'eventi';
-  onFilterChange: (tipo: 'tutti' | 'negozi' | 'eventi') => void;
+  filterTipo?: 'tutti' | 'negozi' | 'eventi';
+  onFilterChange?: (tipo: 'tutti' | 'negozi' | 'eventi') => void;
   categoriaFilter?: CategoriaCommercio | 'tutti';
   onCategoriaFilterChange?: (cat: CategoriaCommercio | 'tutti') => void;
   onOpenManagement?: (shop: AttivitaCommercio) => void;
@@ -295,9 +293,8 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
 }) => {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
   const [selectedItem, setSelectedItem] = useState<{
-    tipo: 'negozio' | 'evento';
-    negozio?: AttivitaCommercio;
-    evento?: EventoQuartiere;
+    tipo: 'negozio';
+    negozio: AttivitaCommercio;
   } | null>(null);
 
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -360,6 +357,18 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
     }
   }, [selectedAttivitaId, attivita]);
 
+  // Gestione tasto ESC per chiusura comoda del popup modale
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedItem) {
+        setSelectedItem(null);
+        onSelectAttivita(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedItem, onSelectAttivita]);
+
   const handleLocateMe = () => {
     if (!navigator.geolocation) {
       setGeoError('Geolocalizzazione non supportata dal tuo browser');
@@ -396,97 +405,58 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
     ? attivita.filter(a => a.categoria === categoriaFilter)
     : attivita;
 
-  const visibleShops = (filterTipo === 'tutti' || filterTipo === 'negozi') ? shopsByCategory : [];
-  const visibleEvents = (filterTipo === 'tutti' || filterTipo === 'eventi') ? eventi.filter(e => !e.passato && e.lat && e.lng) : [];
+  const visibleShops = shopsByCategory;
 
   return (
     <div className="relative w-full rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 shadow-sm transition-all">
       {/* Top Controls Overlay */}
-      <div className="absolute top-3 left-3 right-3 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-        {/* Toggle Filters & Dropdown Categoria */}
-        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-xl shadow-md border border-slate-200 dark:border-slate-800 pointer-events-auto">
-          <button
-            onClick={() => onFilterChange('tutti')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-              filterTipo === 'tutti'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            Tutti ({attivita.length + visibleEvents.length})
-          </button>
-          <button
-            onClick={() => onFilterChange('negozi')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-              filterTipo === 'negozi'
-                ? 'bg-amber-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <Store className="w-3.5 h-3.5" />
-            Commercianti ({shopsByCategory.length})
-          </button>
-          <button
-            onClick={() => onFilterChange('eventi')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-              filterTipo === 'eventi'
-                ? 'bg-purple-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <Calendar className="w-3.5 h-3.5" />
-            Eventi ({visibleEvents.length})
-          </button>
-
-          {/* Menù a tendina integrato per categoria */}
-          {onCategoriaFilterChange && filterTipo !== 'eventi' && (
-            <div className="flex items-center gap-1.5 pl-1.5 border-l border-slate-200 dark:border-slate-700">
-              <Filter className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
-              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                Categoria
-              </span>
-              <select
-                value={categoriaFilter || 'tutti'}
-                onChange={(e) => onCategoriaFilterChange(e.target.value as CategoriaCommercio | 'tutti')}
-                className="text-[11px] font-bold bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer py-1 pr-1"
-                title="Filtra i pin sulla mappa per categoria"
-                aria-label="Categoria"
-              >
-                <option value="tutti" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">Tutte ({attivita.length})</option>
-                <option value="alimentari" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">🛒 Alimentari</option>
-                <option value="ristorazione" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">🍽️ Ristorazione & Bar</option>
-                <option value="salute" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">💊 Farmacia & Salute</option>
-                <option value="servizi" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">🔧 Artigiani & Servizi</option>
-                <option value="casa" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">🏡 Casa & Brico</option>
-              </select>
-            </div>
-          )}
-        </div>
+      <div className="absolute top-2.5 left-2.5 right-2.5 z-10 flex items-center justify-between gap-1.5 pointer-events-none">
+        {/* Solo Filtro Categorie a ingombro minimo */}
+        {onCategoriaFilterChange ? (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-xl shadow-md border border-slate-200/90 dark:border-slate-800 pointer-events-auto">
+            <Filter className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+            <select
+              value={categoriaFilter || 'tutti'}
+              onChange={(e) => onCategoriaFilterChange(e.target.value as CategoriaCommercio | 'tutti')}
+              className="text-xs font-bold bg-transparent text-slate-800 dark:text-slate-100 focus:outline-hidden cursor-pointer py-0.5 pr-1 max-w-[155px] sm:max-w-none truncate"
+              title="Filtra i pin sulla mappa per categoria"
+              aria-label="Filtra per categoria"
+            >
+              <option value="tutti" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">Tutte le botteghe ({attivita.length})</option>
+              <option value="alimentari" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">🛒 Alimentari ({attivita.filter(a => a.categoria === 'alimentari').length})</option>
+              <option value="ristorazione" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">🍽️ Ristorazione ({attivita.filter(a => a.categoria === 'ristorazione').length})</option>
+              <option value="salute" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">💊 Salute & Farmacia ({attivita.filter(a => a.categoria === 'salute').length})</option>
+              <option value="servizi" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">🔧 Servizi & Artigiani ({attivita.filter(a => a.categoria === 'servizi').length})</option>
+              <option value="casa" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">🏡 Casa & Brico ({attivita.filter(a => a.categoria === 'casa').length})</option>
+            </select>
+          </div>
+        ) : <div />}
 
         {/* Locate me button & Centra su Villaggio Prenestino Via Fosso dell'Osa */}
-        <div className="flex items-center gap-2 pointer-events-auto">
+        <div className="flex items-center gap-1.5 pointer-events-auto shrink-0">
           <button
+            type="button"
             onClick={handleLocateMe}
             disabled={geoLoading}
             title="Centra sulla mia posizione"
-            className="flex items-center gap-1.5 px-3 py-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-xl shadow-md border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-all disabled:opacity-50"
+            className="flex items-center gap-1 px-2.5 py-1.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-xl shadow-md border border-slate-200/90 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-all disabled:opacity-50 cursor-pointer"
           >
             <Crosshair className={`w-3.5 h-3.5 text-blue-600 dark:text-blue-400 ${geoLoading ? 'animate-spin' : ''}`} />
             <span className="hidden sm:inline">Vicino a me</span>
           </button>
 
           <button
+            type="button"
             onClick={() => {
               setMapCenter(VILLAGGIO_PRENESTINO_CENTER);
               setMapZoom(15);
             }}
             title="Centra su Villaggio Prenestino (Via Fosso dell'Osa)"
-            className="flex items-center gap-1.5 px-3 py-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-xl shadow-md border border-slate-200 dark:border-slate-800 text-xs font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-all cursor-pointer"
+            className="flex items-center gap-1 px-2.5 py-1.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-xl shadow-md border border-slate-200/90 dark:border-slate-800 text-xs font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-all cursor-pointer"
           >
             <MapPin className="w-3.5 h-3.5 text-amber-600" />
             <span className="hidden sm:inline">Via Fosso dell'Osa</span>
-            <span className="sm:hidden">Centro</span>
+            <span className="sm:hidden text-[11px] font-bold">Centro</span>
           </button>
         </div>
       </div>
@@ -565,214 +535,6 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
                 );
               })}
 
-              {/* Event Markers con Pin Sagomato Personalizzato per Eventi */}
-              {visibleEvents.map((evento) => {
-                if (!evento.lat || !evento.lng) return null;
-                const isSelected = selectedItem?.evento?.id === evento.id;
-
-                return (
-                  <CustomMapMarker
-                    key={`event-${evento.id}`}
-                    position={{ lat: evento.lat, lng: evento.lng }}
-                    zIndex={isSelected ? 45 : 15}
-                    onClick={() => {
-                      setSelectedItem({ tipo: 'evento', evento });
-                      onSelectAttivita(null);
-                    }}
-                  >
-                    <CustomMapPin
-                      tipo="evento"
-                      isSelected={isSelected}
-                      label={evento.t}
-                    />
-                  </CustomMapMarker>
-                );
-              })}
-
-              {/* InfoWindow for Selected Item */}
-              {selectedItem && (
-                <InfoWindow
-                  position={{
-                    lat: selectedItem.negozio?.lat || selectedItem.evento?.lat || VILLAGGIO_PRENESTINO_CENTER.lat,
-                    lng: selectedItem.negozio?.lng || selectedItem.evento?.lng || VILLAGGIO_PRENESTINO_CENTER.lng,
-                  }}
-                  onCloseClick={() => {
-                    setSelectedItem(null);
-                    onSelectAttivita(null);
-                  }}
-                  maxWidth={320}
-                  className={isDark ? 'gm-dark-infowindow' : 'gm-light-infowindow'}
-                >
-                  <div className={`p-1.5 max-w-[285px] rounded-2xl transition-colors ${
-                    isDark ? 'bg-[#0b1329] text-slate-100' : 'bg-white text-slate-900'
-                  }`}>
-                    {selectedItem.tipo === 'negozio' && selectedItem.negozio && (
-                      <div className="space-y-2.5">
-                        {selectedItem.negozio.immagine && (
-                          <div className="relative h-28 w-full rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-800/80">
-                            <img
-                              src={selectedItem.negozio.immagine}
-                              alt={selectedItem.negozio.nome}
-                              className="w-full h-full object-cover"
-                              style={{ filter: 'none' }}
-                            />
-                            {selectedItem.negozio.offertaAttiva && (
-                              <div className="absolute top-1.5 left-1.5 bg-amber-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full shadow-md flex items-center gap-1">
-                                <Sparkles className="w-2.5 h-2.5" />
-                                <span>Offerta Attiva</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        <div>
-                          <div className="flex items-center justify-between gap-1 mb-1">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] uppercase font-black tracking-wider border ${
-                              CATEGORIA_BADGE_STYLE[selectedItem.negozio.categoria]?.text || 'text-amber-600 dark:text-amber-400'
-                            } ${
-                              CATEGORIA_BADGE_STYLE[selectedItem.negozio.categoria]?.bg || 'bg-amber-50 dark:bg-amber-950/60'
-                            } ${
-                              CATEGORIA_BADGE_STYLE[selectedItem.negozio.categoria]?.border || 'border-amber-200 dark:border-amber-800'
-                            }`}>
-                              {selectedItem.negozio.categoria}
-                            </span>
-                            {selectedItem.negozio.verificato && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                                <ShieldCheck className="w-3.5 h-3.5" />
-                                <span>Verificato</span>
-                              </span>
-                            )}
-                          </div>
-                          <h4 className={`font-extrabold text-sm leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                            {selectedItem.negozio.nome}
-                          </h4>
-                          <p className={`text-xs flex items-center gap-1 mt-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                            <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                            <span>{selectedItem.negozio.indirizzo}</span>
-                          </p>
-                        </div>
-
-                        {selectedItem.negozio.offertaAttiva && (
-                          <div className={`border rounded-xl p-2.5 text-xs space-y-1 ${
-                            isDark
-                              ? 'bg-amber-950/40 border-amber-600/40 text-amber-200'
-                              : 'bg-amber-50 border-amber-200 text-amber-950'
-                          }`}>
-                            <div className={`font-bold flex items-center gap-1.5 ${isDark ? 'text-amber-300' : 'text-amber-900'}`}>
-                              <Tag className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                              <span>{selectedItem.negozio.offertaAttiva.titolo}</span>
-                            </div>
-                            <p className={`text-[11px] leading-relaxed line-clamp-2 ${isDark ? 'text-amber-200/90' : 'text-amber-800'}`}>
-                              {selectedItem.negozio.offertaAttiva.dettaglio}
-                            </p>
-                          </div>
-                        )}
-
-                        <div className={`text-[11px] flex items-center gap-1.5 px-0.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                          <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                          <span>{selectedItem.negozio.orari}</span>
-                        </div>
-
-                        {/* Action buttons */}
-                        <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-slate-200/80 dark:border-slate-800">
-                          {selectedItem.negozio.whatsapp ? (
-                            <a
-                              href={`https://wa.me/${selectedItem.negozio.whatsapp}?text=${encodeURIComponent(
-                                `Buongiorno! Vi contatto tramite l'App di Quartiere di Villaggio Prenestino per informazioni su: ${selectedItem.negozio.nome}`
-                              )}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-2 py-2 bg-[#25D366] hover:bg-[#20ba59] active:bg-[#1da850] text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 text-center shadow-xs transition"
-                            >
-                              <MessageCircle className="w-3.5 h-3.5" />
-                              <span>WhatsApp</span>
-                            </a>
-                          ) : (
-                            <a
-                              href={`tel:${selectedItem.negozio.telefono.replace(/\s+/g, '')}`}
-                              className="px-2 py-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 text-center shadow-xs transition"
-                            >
-                              <Phone className="w-3.5 h-3.5" />
-                              <span>Chiama</span>
-                            </a>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleOpenDirections(
-                                selectedItem.negozio!.indirizzo,
-                                selectedItem.negozio!.lat,
-                                selectedItem.negozio!.lng
-                              )
-                            }
-                            className={`px-2 py-2 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer ${
-                              isDark
-                                ? 'bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700'
-                                : 'bg-slate-900 hover:bg-slate-800 text-white shadow-xs'
-                            }`}
-                          >
-                            <Navigation className="w-3.5 h-3.5 text-amber-400" />
-                            <span>Indicazioni</span>
-                          </button>
-                        </div>
-
-                        {onOpenManagement && (
-                          <div className="pt-1.5 border-t border-slate-200/80 dark:border-slate-800 flex items-center justify-between text-[10px]">
-                            <button
-                              type="button"
-                              onClick={() => onOpenManagement(selectedItem.negozio!)}
-                              className="inline-flex items-center gap-1 text-slate-500 hover:text-amber-600 dark:hover:text-amber-400 cursor-pointer group"
-                            >
-                              <KeyRound className="w-3 h-3 text-slate-400 group-hover:text-amber-500" />
-                              <span className="underline decoration-slate-300 dark:decoration-slate-700 underline-offset-2">
-                                Sei il titolare? Gestisci scheda
-                              </span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {selectedItem.tipo === 'evento' && selectedItem.evento && (
-                      <div className="space-y-2.5">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 bg-[#781816]/15 dark:bg-[#781816]/30 text-[#781816] dark:text-rose-300 border border-[#781816]/30 text-[10px] font-black rounded-md uppercase">
-                            Evento Associazione
-                          </span>
-                          <span className={`text-[11px] font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                            {selectedItem.evento.d} {selectedItem.evento.m} • {selectedItem.evento.ora}
-                          </span>
-                        </div>
-                        <h4 className={`font-extrabold text-sm leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                          {selectedItem.evento.t}
-                        </h4>
-                        <p className={`text-xs leading-relaxed line-clamp-2 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                          {selectedItem.evento.p}
-                        </p>
-                        <p className={`text-xs flex items-center gap-1.5 font-medium ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                          <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                          <span>{selectedItem.evento.luogo}</span>
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleOpenDirections(
-                              selectedItem.evento!.luogo,
-                              selectedItem.evento!.lat,
-                              selectedItem.evento!.lng
-                            )
-                          }
-                          className="w-full py-2 bg-[#781816] hover:bg-[#5a1210] active:scale-[0.98] text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 mt-1 cursor-pointer shadow-xs transition"
-                        >
-                          <Navigation className="w-3.5 h-3.5 text-white" />
-                          <span>Indicazioni per l'evento</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </InfoWindow>
-              )}
             </Map>
           </APIProvider>
         ) : (
@@ -791,6 +553,191 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
           <span className="font-medium">Mappa quartiere: negozi Google nascosti • Solo commercianti locali & fermate ATAC</span>
         </div>
       </div>
+
+      {/* POPUP MODALE CENTRATO AD ALTA LEGGIBILITÀ (Sostituisce il vecchio fumetto InfoWindow compresso) */}
+      {selectedItem?.negozio && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/70 backdrop-blur-xs animate-fadeIn"
+          onClick={() => {
+            setSelectedItem(null);
+            onSelectAttivita(null);
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-shop-title"
+        >
+          <div
+            className={`relative w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl border transition-all flex flex-col max-h-[90vh] animate-scaleUp ${
+              isDark 
+                ? 'bg-[#0b1329] text-slate-100 border-slate-700/80' 
+                : 'bg-white text-slate-900 border-slate-200'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Tasto X Chiudi in primo piano chiaro, luminoso e ad alto contrasto */}
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedItem(null);
+                onSelectAttivita(null);
+              }}
+              className="absolute top-3 right-3 z-30 p-2.5 rounded-full bg-white text-slate-900 shadow-xl border border-slate-200 hover:bg-slate-100 active:scale-90 transition cursor-pointer"
+              title="Chiudi scheda"
+              aria-label="Chiudi scheda attività"
+            >
+              <X className="w-5 h-5 stroke-[2.8]" />
+            </button>
+
+            {/* Immagine di copertina */}
+            <div className="relative h-44 sm:h-52 w-full overflow-hidden bg-slate-100 dark:bg-slate-800 shrink-0">
+              <img
+                src={selectedItem.negozio.immagine || 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=800&q=80'}
+                alt={selectedItem.negozio.nome}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none" />
+
+              {/* Badge Categoria ed eventuale Offerta Attiva */}
+              <div className="absolute bottom-3 left-3 right-16 flex flex-wrap items-center gap-2">
+                <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs uppercase font-black tracking-wider border shadow-sm ${
+                  CATEGORIA_BADGE_STYLE[selectedItem.negozio.categoria]?.text || 'text-amber-300'
+                } ${
+                  CATEGORIA_BADGE_STYLE[selectedItem.negozio.categoria]?.bg || 'bg-black/60'
+                } ${
+                  CATEGORIA_BADGE_STYLE[selectedItem.negozio.categoria]?.border || 'border-amber-400/50'
+                }`}>
+                  {selectedItem.negozio.categoria}
+                </span>
+
+                {selectedItem.negozio.verificato && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-950/85 text-emerald-300 border border-emerald-500/50 shadow-sm backdrop-blur-xs">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Verificato</span>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Corpo con scroll interno fluido */}
+            <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1">
+              {/* Titolo e indirizzo */}
+              <div>
+                <h3 id="modal-shop-title" className={`text-xl sm:text-2xl font-black leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  {selectedItem.negozio.nome}
+                </h3>
+                <div className="flex items-center gap-2 mt-1.5 text-xs sm:text-sm font-semibold">
+                  <span className={`flex items-center gap-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                    <MapPin className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>{selectedItem.negozio.indirizzo}</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Box Offerta Esclusiva Residenti (se presente) */}
+              {selectedItem.negozio.offertaAttiva && (
+                <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-rose-500/10 to-amber-500/15 border border-amber-500/40 space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs font-black uppercase text-amber-600 dark:text-amber-400">
+                    <Percent className="w-4 h-4" />
+                    <span>Promozione Riservata ai Residenti</span>
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                    {selectedItem.negozio.offertaAttiva.titolo}
+                  </h4>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                    {selectedItem.negozio.offertaAttiva.dettaglio}
+                  </p>
+                </div>
+              )}
+
+              {/* Orari di apertura */}
+              <div className={`p-3 rounded-2xl border text-xs sm:text-sm flex items-start gap-2.5 ${
+                isDark ? 'bg-slate-800/40 border-slate-700/80 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-700'
+              }`}>
+                <Clock className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                <div>
+                  <span className="block font-bold text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Orari di Apertura</span>
+                  <span className="font-semibold leading-relaxed">{selectedItem.negozio.orari}</span>
+                </div>
+              </div>
+
+              {/* Descrizione dell'attività */}
+              {selectedItem.negozio.descrizione && (
+                <div className="space-y-1">
+                  <span className="block font-bold text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Presentazione</span>
+                  <p className={`text-xs sm:text-sm leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                    {selectedItem.negozio.descrizione}
+                  </p>
+                </div>
+              )}
+
+              {/* Contatti Rapidi e Azioni */}
+              <div className="pt-2 space-y-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {/* Chiama ora */}
+                  {selectedItem.negozio.telefono && (
+                    <a
+                      href={`tel:${selectedItem.negozio.telefono.replace(/\s+/g, '')}`}
+                      className="py-2.5 px-3.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-xs transition"
+                    >
+                      <Phone className="w-4 h-4" />
+                      <span>Chiama: {selectedItem.negozio.telefono}</span>
+                    </a>
+                  )}
+
+                  {/* Scrivi su WhatsApp */}
+                  {selectedItem.negozio.whatsapp && (
+                    <a
+                      href={`https://wa.me/${selectedItem.negozio.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(
+                        `Buongiorno! Vi contatto tramite la Web App di Villaggio Prenestino per informazioni su: ${selectedItem.negozio.nome}`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="py-2.5 px-3.5 bg-[#25D366] hover:bg-[#20ba59] active:bg-[#1da850] text-white rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-xs transition"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      <span>WhatsApp</span>
+                    </a>
+                  )}
+                </div>
+
+                {/* Calcola percorso su Google Maps */}
+                <button
+                  type="button"
+                  onClick={() => handleOpenDirections(selectedItem.negozio.indirizzo, selectedItem.negozio.lat, selectedItem.negozio.lng)}
+                  className={`w-full py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition cursor-pointer shadow-xs ${
+                    isDark
+                      ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-black'
+                      : 'bg-slate-900 hover:bg-slate-800 text-white'
+                  }`}
+                >
+                  <Navigation className="w-4 h-4" />
+                  <span>Apri percorso su Google Maps</span>
+                </button>
+
+                {/* Sei il titolare? */}
+                {onOpenManagement && (
+                  <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800 text-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const shop = selectedItem.negozio;
+                        setSelectedItem(null);
+                        onOpenManagement(shop);
+                      }}
+                      className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-amber-600 dark:hover:text-amber-400 font-semibold cursor-pointer py-1"
+                    >
+                      <KeyRound className="w-3.5 h-3.5 text-amber-500" />
+                      <span className="underline decoration-slate-300 dark:decoration-slate-700 underline-offset-2">
+                        Sei il titolare? Gestisci scheda e offerte con PIN
+                      </span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

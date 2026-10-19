@@ -4,6 +4,7 @@ import {
   EventoQuartiere,
   RichiestaVolontariato,
   UserInteractions,
+  AppTabsConfig,
 } from '../types';
 import {
   Calendar,
@@ -43,6 +44,7 @@ interface HomeTabProps {
   onOpenExportModal?: () => void;
   onOpenTour?: () => void;
   loading?: boolean;
+  tabsConfig?: AppTabsConfig;
 }
 
 export const HomeTab: React.FC<HomeTabProps> = ({
@@ -61,6 +63,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   onOpenExportModal,
   onOpenTour,
   loading = false,
+  tabsConfig,
 }) => {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -133,9 +136,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({
           background: 'linear-gradient(135deg, #781816 0%, #5a1210 100%)',
         }}
       >
-        <div className="relative z-10 max-w-lg">
+        <div className="relative z-10 max-w-xl">
           <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider mb-2">
-            Il quartiere siamo noi
+            Insieme, per il quartiere.
           </span>
           <h2 className="text-xl sm:text-2xl font-black leading-tight text-white tracking-tight">
             Partecipa alla vita di Villaggio Prenestino
@@ -144,27 +147,31 @@ export const HomeTab: React.FC<HomeTabProps> = ({
             Scopri le iniziative, dai una mano per le attività o segnala un problema nel quartiere.
           </p>
 
-          {/* Bottoni Principali Arancioni */}
-          <div className="mt-4 flex flex-wrap gap-2.5">
-            <button
-              onClick={() => onSelectTab('segnalazioni')}
-              className="flex-1 sm:flex-initial px-4 py-2.5 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <Megaphone className="w-4 h-4" />
-              Invia Segnalazione
-            </button>
-            <button
-              onClick={() => onSelectTab('volontariato')}
-              className="flex-1 sm:flex-initial px-4 py-2.5 bg-white/15 hover:bg-white/25 active:bg-white/30 text-white font-bold text-xs sm:text-sm rounded-xl border border-white/25 transition flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <HeartHandshake className="w-4 h-4 text-amber-300" />
-              Diventa Volontario
-            </button>
+          {/* Bottoni Principali Uniformi */}
+          <div className="mt-4 flex flex-col sm:flex-row flex-wrap gap-2.5">
+            {tabsConfig?.segnalazioni !== false && (
+              <button
+                onClick={() => onSelectTab('segnalazioni')}
+                className="w-full sm:w-auto px-4 py-2.5 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Megaphone className="w-4 h-4" />
+                Invia Segnalazione
+              </button>
+            )}
+            {tabsConfig?.volontariato !== false && (
+              <button
+                onClick={() => onSelectTab('volontariato')}
+                className="w-full sm:w-auto px-4 py-2.5 bg-white/15 hover:bg-white/25 active:bg-white/30 text-white font-bold text-xs sm:text-sm rounded-xl border border-white/25 transition flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <HeartHandshake className="w-4 h-4 text-amber-300" />
+                Diventa Volontario
+              </button>
+            )}
             {onOpenTour && (
               <button
                 type="button"
                 onClick={onOpenTour}
-                className="w-full sm:w-auto px-3.5 py-2.5 bg-black/25 hover:bg-black/35 text-amber-200 hover:text-white font-bold text-xs rounded-xl border border-amber-400/30 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full sm:w-auto px-4 py-2.5 bg-white/10 hover:bg-white/20 active:bg-white/25 text-amber-200 hover:text-white font-bold text-xs sm:text-sm rounded-xl border border-amber-400/30 transition flex items-center justify-center gap-1.5 cursor-pointer"
                 title="Rivedi la guida e il tour delle sezioni principali"
               >
                 <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
@@ -194,6 +201,10 @@ export const HomeTab: React.FC<HomeTabProps> = ({
 
         {loading ? (
           <NewsSkeletonList count={3} />
+        ) : news.length === 0 ? (
+          <div className="bg-white rounded-2xl p-6 text-center border border-slate-200/90 shadow-2xs text-xs text-slate-500">
+            Nessun articolo pubblicato di recente.
+          </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
             {news.slice(0, 3).map((art) => (
@@ -255,7 +266,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({
       </section>
 
       {/* SEZIONE: Volontariato: Serve una mano */}
-      <section className="rounded-3xl p-4 sm:p-5 border border-amber-200/80 bg-amber-50/50 space-y-3">
+      {tabsConfig?.volontariato !== false && (
+        <section className="rounded-3xl p-4 sm:p-5 border border-amber-200/80 bg-amber-50/50 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div
@@ -281,35 +293,56 @@ export const HomeTab: React.FC<HomeTabProps> = ({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-          {richieste.slice(0, 4).map((r) => {
-            const hasJoined = interactions.richiesteAderite.includes(r.id);
-            const percentage = Math.min(100, Math.round((r.have / Math.max(1, r.need)) * 100));
+        {richieste.length === 0 ? (
+          <div className="bg-white rounded-2xl p-5 text-center border border-amber-200/70 shadow-2xs space-y-1.5">
+            <p className="text-xs font-bold text-slate-800">Nessuna attività di volontariato aperta al momento</p>
+            <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+              Iscriviti al nostro registro volontari per ricevere aggiornamenti sulle future iniziative.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            {richieste.slice(0, 4).map((r) => {
+              const hasJoined = interactions.richiesteAderite.includes(r.id);
+              const percentage = Math.min(100, Math.round((r.have / Math.max(1, r.need)) * 100));
+              const riferimentiTemporali = r.data || r.ora || r.data_ora
+                ? (r.data ? `${r.data}${r.ora ? ` • ore ${r.ora}` : ''}` : (r.ora ? `Ore ${r.ora}` : r.data_ora || ''))
+                : null;
 
-            return (
-              <div
-                key={r.id}
-                className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-1.5">
-                    <h4 className="text-sm font-bold text-slate-900 leading-snug">
-                      {r.t}
-                    </h4>
-                    {r.urgente && (
-                      <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-slate-950">
-                        Urgente
+              return (
+                <div
+                  key={r.id}
+                  className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-1.5">
+                      <h4 className="text-sm font-bold text-slate-900 leading-snug">
+                        {r.t}
+                      </h4>
+                      {r.urgente && (
+                        <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-slate-950">
+                          Urgente
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-semibold mt-1">
+                      <span className="flex items-center gap-1 text-amber-800">
+                        <MapPin className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                        <span className="truncate">{r.w}</span>
                       </span>
-                    )}
+                      {riferimentiTemporali && (
+                        <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-950 px-1.5 py-0.5 rounded text-[11px] font-medium border border-amber-200/70">
+                          <Calendar className="w-3 h-3 text-amber-700 shrink-0" />
+                          <span>{riferimentiTemporali}</span>
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-slate-600 mt-1.5 line-clamp-2 leading-relaxed">
+                      {r.desc}
+                    </p>
                   </div>
-                  <p className="text-xs text-amber-800 font-semibold flex items-center gap-1 mt-1">
-                    <MapPin className="w-3 h-3 text-amber-600 shrink-0" />
-                    {r.w}
-                  </p>
-                  <p className="text-xs text-slate-600 mt-1.5 line-clamp-2 leading-relaxed">
-                    {r.desc}
-                  </p>
-                </div>
 
                 <div className="mt-3 pt-2.5 border-t border-slate-100">
                   <div className="flex items-center justify-between text-xs mb-1 font-semibold text-slate-700">
@@ -363,10 +396,13 @@ export const HomeTab: React.FC<HomeTabProps> = ({
             );
           })}
         </div>
-      </section>
+      )}
+    </section>
+    )}
 
       {/* SEZIONE: Prossimi Eventi */}
-      <section className="space-y-3">
+      {tabsConfig?.eventi !== false && (
+        <section className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <h3 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
             <Calendar className="w-5 h-5 text-amber-600" />
@@ -380,8 +416,13 @@ export const HomeTab: React.FC<HomeTabProps> = ({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-          {eventi.filter((ev) => !ev.passato).slice(0, 2).map((ev) => {
+        {eventi.filter((ev) => !ev.passato).length === 0 ? (
+          <div className="bg-white rounded-2xl p-6 text-center border border-slate-200/90 shadow-2xs text-xs text-slate-500">
+            Nessun evento in programma al momento. I prossimi appuntamenti verranno annunciati a breve.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {eventi.filter((ev) => !ev.passato).slice(0, 2).map((ev) => {
             const isAttending = interactions.eventiPartecipati.includes(ev.id);
             const isPagamento = ev.tipo === 'pagamento';
 
@@ -467,7 +508,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({
             );
           })}
         </div>
+        )}
       </section>
+      )}
 
       {/* SEZIONE: Classifica dei Cittadini Attivi (Top 5 con più Punti Civici) */}
       <ClassificaCittadini
@@ -476,6 +519,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
         onOpenPuntiModal={onOpenPuntiModal}
         onUpdateUserNome={onUpdateUserNome}
         darkMode={darkMode}
+        tabsConfig={tabsConfig}
       />
 
       {/* BANNER: Canale WhatsApp Ufficiale del Quartiere */}

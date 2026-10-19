@@ -90,9 +90,11 @@ export const PwaInstallBanner: React.FC = () => {
         className="mx-3.5 sm:mx-auto max-w-4xl my-3 p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700/60 shadow-lg flex flex-col sm:flex-row items-center justify-between gap-3 relative animate-fadeIn"
       >
         <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="w-11 h-11 rounded-xl bg-[#781816] text-white flex items-center justify-center shrink-0 shadow-sm">
-            <Smartphone className="w-6 h-6 text-amber-400" />
-          </div>
+          <img
+            src="/pwa-192x192.png"
+            alt="Icona CdQ"
+            className="w-11 h-11 rounded-xl shadow-md shrink-0 border border-amber-400/30 object-cover"
+          />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className="text-xs font-black uppercase tracking-wider text-amber-800 dark:text-amber-400">
@@ -144,10 +146,12 @@ export const PwaInstallBanner: React.FC = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-[#781816] flex items-center justify-center text-white font-black text-xs">
-                  VP
-                </div>
+              <div className="flex items-center gap-2.5">
+                <img
+                  src="/pwa-192x192.png"
+                  alt="Icona CdQ"
+                  className="w-9 h-9 rounded-xl shadow-xs shrink-0 object-cover"
+                />
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                   Installa su iPhone o Android
                 </h3>

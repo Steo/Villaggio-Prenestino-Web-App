@@ -1,129 +1,71 @@
-# Piano di Semplificazione UX e Sintesi Testi dell'Applicazione
+# Scheda Attività Modale ad Alta Leggibilità da Mappa
 
-Piano dettagliato per snellire l'interfaccia utente, ridurre il carico cognitivo ed eliminare i blocchi di testo ridondanti nell'applicazione, con priorità su **Scheda Commercio & Registrazione Attività** e **Scheda Segnalazioni & Form Guidato**, implementando la tecnica della **divulgazione progressiva** (*progressive disclosure*: testi essenziali visibili subito, approfondimenti espandibili su richiesta).
+Sostituzione dell'attuale fumetto nativo InfoWindow di Google Maps con un popup modale dedicato, spazioso e ad alto contrasto, che si apre direttamente al tocco del pin per garantire la massima leggibilità e usabilità sia su smartphone che su desktop.
 
----
+## User Review & Critical Decisions
 
-## 1. Analisi delle Criticità Attuali e Obiettivi UX
-
-### Criticità Riscontrate:
-1. **Hero Banner troppo carichi di testo descrittivo**: Sia in Commercio che in Segnalazioni, la parte superiore della schermata è occupata da lunghi paragrafi esplicativi e infografiche che spingono verso il basso i contenuti operativi (mappa, vetrina negozi, form di invio).
-2. **Form di inserimento con doppie spiegazioni**: I campi modulo contengono sia etichette estese che lunghi paragrafi di istruzioni (es. spiegazioni sul formato JPG, sull'orario spezzato, sulla moderazione amministratore) che allungano lo scroll verticale da mobile.
-3. **Card con testi lunghi non formattati**: Descrizioni delle attività commerciali e delle segnalazioni occupano molto spazio visivo senza un meccanismo compatto di anteprima/espansione (*"Leggi tutto"*).
-4. **Sovrabbondanza di note e avvisi informativi**: Ripetizione di chiarimenti procedurali che possono essere racchiusi in modali/tooltip discreti o accordion richiudibili.
-
-### Obiettivi:
-- **Immediatezza visiva**: L'utente deve poter agire (cercare un negozio, consultare la mappa, inviare una segnalazione) entro 2 secondi dall'apertura della tab.
-- **Divulgazione Progressiva**: Mostrare 1-2 frasi chiave per contestualizzare, offrendo pulsanti discreti come *"Come funziona? (Dettagli)"* o *"Linee guida"* per chi desidera approfondire senza appesantire la UI per gli utenti abituali.
-- **Micro-copy orientato all'azione**: Sostituire spiegazioni prolisse con badge compatti, icone semantiche e placeholder esplicativi nei campi di input.
+> [!IMPORTANT]
+> **Decisioni confermate dall'utente nella fase di intervista:**
+> - **Tipo di interfaccia**: Popup modale centrato ad alta leggibilità (anziché bottom sheet o solo scorrimento).
+> - **Comportamento di apertura**: Apertura immediata della scheda completa al tocco del pin sulla mappa (senza passaggi intermedi o mini-anteprime).
 
 ---
 
-## 2. Dettaglio Interventi: Scheda Commercio e Form Registrazione
+## 1. Overview & Core Concept
 
-### A. Hero Banner & Selettori di Vista
-- **Hero Banner compatto**:
-  - Titolo chiaro: *"Commercio di Quartiere"*.
-  - Sottotitolo sintetico (1 riga): *"Sostieni le attività e i negozi di vicinato di Villaggio Prenestino."*
-  - Elemento espandibile discreto: *"Come iscriversi o gestire la propria scheda ▾"* che, al tocco, mostra in un micro-accordion i dettagli sui vantaggi e sulla gratuità.
-  - CTA primaria rapida: *"Iscrivi attività"* (bottone compatto con icona).
-- **Barra Mappa & Vetrina**:
-  - Riduzione delle altezze dei selettori; uniformazione immediata dei filtri con dicitura univoca *"Categoria"*.
-
-### B. Vetrina Negozi & Card Commercianti
-- **Card Negozi snelle**:
-  - Intestazione con Logo/Foto a sinistra o in testata compatta, nome, badge di categoria colorato e stato apertura immediato (*"Aperto"* / *"Chiuso"*).
-  - Descrizione limitata a 2 righe con sfumatura e pulsante inline *"Mostra altro / Meno"* per testi prolissi.
-  - Orari e contatti raggruppati in una barra icone compatta (Telefono, WhatsApp diretto, Mappa, Promo).
-  - Tasto titolare compatto e pulito: *"Gestisci con PIN"*.
-
-### C. Modale di Registrazione Attività Commerciale
-- **Header del Modale**:
-  - Rimozione del blocco descrittivo introduttivo di 4 righe. Sostituzione con badge di stato compatto: *"Iscrizione Gratuita • Moderazione Rapida"*.
-- **Area Foto/Logo (.JPG)**:
-  - Eliminazione delle 3 righe di testo descrittivo.
-  - Riquadro di upload compatto con icona fotocamera, anteprima immediata e label essenziale: *"Foto o Logo (.jpg)"*.
-- **Configuratore Orari Standardizzato**:
-  - Snellite le istruzioni: via il testo esplicativo, mantenimento dei preset rapidi (*"Lun-Sab"*, *"Tutti i giorni"*, *"Lun-Ven"*) e selettori orario compatti.
-- **Schermata di Conferma Invio (In moderazione)**:
-  - Presentazione visiva a 3 step orizzontale compatto invece di card verticali ingombranti, con pulsante primario chiaro *"Ho capito / Chiudi"*.
+- **Problema attuale**: L'InfoWindow nativo di Google Maps inserito all'interno del riquadro cartografico è vincolato a dimensioni ristrette (~285px) e alle coordinate del pin. Su schermi piccoli, le informazioni (foto, categoria, orari, indirizzo, offerte promozionali e bottoni di chiamata/indicazioni) risultano compresse e difficili da consultare.
+- **Soluzione**: Al tocco di un pin commerciante sulla mappa, viene visualizzato un **popup modale dedicato centrato a schermo** con backdrop semi-trasparente e sfumato, scroll fluido dei contenuti, tipografia nitida, immagini ad alta risoluzione, pulsante di chiusura chiaro e ben visibile sia in modalità giorno che notte, e azioni rapide dirette (WhatsApp, Telefono, Indicazioni stradali, Gestione scheda con PIN).
 
 ---
 
-## 3. Dettaglio Interventi: Scheda Segnalazioni e Form Guidato
+## 2. User Experience & Visual Design
 
-### A. Hero Banner & Infografica 3 Stati
-- **Banner compatto**:
-  - Titolo essenziale: *"Segnalazioni Territoriali"*.
-  - Sottotitolo: *"Invia e monitora disservizi, guasti e decoro a Villaggio Prenestino."*
-  - CTA rapida: *"Nuova Segnalazione"* con icona fotocamera.
-  - **Infografica dei 3 Stati (Ricevuta, Inoltrata, Risolta)**: trasformata in un drawer/accordion compatto con toggle *"Come funziona l'iter di gestione (3 stati) ▾"*, visualizzato solo se l'utente richiede spiegazioni, risparmiando oltre 200px di altezza su mobile.
+### Flusso Utente
+1. L'utente naviga la mappa e tocca/clicca su un pin commerciante.
+2. La mappa centra dolcemente il pin selezionato e compare immediatamente il popup modale con animazione fluida di apertura (`scaleUp` / `fadeIn`).
+3. L'utente può consultare tutti i dettagli senza sovrapposizioni:
+   - **Copertina & Badge**: Immagine del negozio ben dimensionata con badge offerta attiva.
+   - **Intestazione**: Nome dell'attività in grande rilievo, categoria commerciale e badge di verifica associazione.
+   - **Info Pratiche**: Indirizzo completo, orari di apertura chiari con icona orologio.
+   - **Box Offerta Promozionale**: Se presente un'offerta attiva per i residenti del quartiere, è mostrata in un riquadro dedicato con dettagli chiari.
+   - **Descrizione**: Testo descrittivo del negozio senza tagli o troncamenti forzati.
+   - **Pulsanti di Azione Rapida**:
+     - *Chiama subito* (telefono)
+     - *Invia messaggio WhatsApp* (apertura diretta chat)
+     - *Indicazioni Stradali* (apre Google Maps per calcolo percorso a piedi o in auto)
+     - *Gestisci scheda* (per i commercianti con PIN)
+4. La modale si chiude toccando il tasto "X" chiaro in alto a destra, toccando lo sfondo scuro, o premendo il tasto ESC.
 
-### B. Wizard di Inserimento in 3 Passi
-- **Passo 1 (Cosa è successo?)**:
-  - Riduzione delle didascalie: chip di categoria frequente (es. *"Buca"*, *"Lampione"*, *"Rifiuti"*, *"Verde"*) a tocco singolo.
-  - Campo titolo con placeholder chiaro; campo foto compatto con pulsante fotocamera immediato; campo descrizione con placeholder esplicativo senza testi di contorno superflui.
-- **Passo 2 (Posizione & GPS)**:
-  - Box GPS sintetico: pulsante ben visibile *"Rileva con GPS"* che compila istantaneamente la via, evitando testi ridondanti sul funzionamento del browser.
-  - Campo indirizzo pulito.
-- **Passo 3 (Riepilogo & Invio)**:
-  - Tabella di riepilogo a badge compatti (Categoria, Indirizzo, Foto allegate).
-  - Campi nome/telefono raggruppati con etichette sintetiche: *"Nome (facoltativo)"*, *"Telefono (facoltativo)"*.
-
-### C. Feed delle Segnalazioni
-- **Card Segnalazione ottimizzata**:
-  - Badge di stato compatto e data in testata.
-  - Titolo in evidenza con indirizzo su riga singola con icona pin.
-  - Testo descrizione con troncamento automatico dopo 2 righe ed espansione on-demand (*"Leggi tutto"*).
-  - Galleria foto con miniature orizzontali compatte apribili a tutto schermo al tap.
+### Adattamento Mobile e Dark Mode
+- **Mobile verticale**: Larghezza fluida del 94% con altezza massima dell'85vh e scroll interno per garantire che nessun elemento venga tagliato anche sui dispositivi più compatti.
+- **Dark Mode**: Sfondo scuro elegante `#0b1329` / `bg-slate-900`, bordi sottili in `slate-700`, testi bianchi ad alto contrasto, e tasto "X" chiaro e nitido.
 
 ---
 
-## 4. Architettura dei Componenti & Pattern di Codice
+## 3. Key Product Decisions & Trade-Offs
+
+- **Rimozione di InfoWindow a favore della modale dedicata**:
+  - *Scelta*: Disabilitare il rendering del componente `InfoWindow` di `@vis.gl/react-google-maps` per evitare vincoli di overflow e posizionamento forzato dal motore di Google Maps.
+  - *Vantaggi*: Controllo totale su accessibilità, contrasto, scroll touch, responsive design e animazioni.
+- **Apertura diretta senza schermata intermedia**:
+  - *Scelta*: Come confermato dall'utente, al tocco del pin si apre subito la scheda ricca e completa, riducendo i passaggi a vuoto e facilitando il contatto immediato con il commerciante.
+
+---
+
+## 4. Technical Architecture & Data Strategy
 
 ```
-┌────────────────────────────────────────────────────────┐
-│                   CommercioTab                         │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │ Hero Banner Compatto + Accordion "Come funziona" │  │
-│  └──────────────────────────────────────────────────┘  │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │ Vetrina: Card con preview testo + "Leggi tutto"  │  │
-│  └──────────────────────────────────────────────────┘  │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │ Modale Registrazione: Campi diretti, zero slop   │  │
-│  └──────────────────────────────────────────────────┘  │
-└────────────────────────────────────────────────────────┘
-
-┌────────────────────────────────────────────────────────┐
-│                 SegnalazioniTab                        │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │ Hero Banner + Toggle "Iter dei 3 stati ▾"        │  │
-│  └──────────────────────────────────────────────────┘  │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │ Wizard a 3 step snello (Foto rapida, GPS 1-tap)  │  │
-│  └──────────────────────────────────────────────────┘  │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │ Feed: Card sintetiche con espansione controllata │  │
-│  └──────────────────────────────────────────────────┘  │
-└────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│ CommercioTab / MappaQuartiere                                │
+│                                                              │
+│  ┌───────────────────────┐       ┌────────────────────────┐  │
+│  │ Google Maps API       │       │ ModalSchedaCommerciante│  │
+│  │ CustomMapMarker (Pin) │──────>│ (Popup Modale Centrato)│  │
+│  └───────────────────────┘       └────────────────────────┘  │
+│             │                                 │              │
+│       onSelectAttivita             Azioni: Tel / WA / Mappe  │
+└──────────────────────────────────────────────────────────────┘
 ```
 
----
-
-## 5. File Coinvolti e Piano di Esecuzione
-
-1. **`src/components/CommercioTab.tsx`**:
-   - Ristrutturazione dell'hero banner con pillole sintetiche e testo riassunto.
-   - Aggiunta stato collassabile `showInfoDetails` per le istruzioni estese.
-   - Snellimento del modale di registrazione: rimozione istruzioni ridondanti sui campi, compattazione dell'upload foto JPG e del selettore orari.
-   - Troncamento descrizioni negozi con toggle compatto *"Mostra tutto / Riduci"*.
-
-2. **`src/components/SegnalazioniTab.tsx`**:
-   - Compattazione dell'hero banner e conversione dell'infografica sui 3 stati in sezione espandibile on-demand.
-   - Semplificazione del wizard in 3 passi (micro-copy essenziale, rimozione testi descrittivi nei singoli passaggi a favore di placeholder parlanti).
-   - Card del feed segnalazioni con troncamento intelligente delle descrizioni lunghe.
-
-3. **Verifica & Collaudo**:
-   - Verifica conformità TypeScript con `lint_applet` e `compile_applet`.
-   - Verifica dell'adattabilità responsive su schermi mobile (360px - 414px) e desktop.
+- **Componente**: Implementazione di un componente modale ad alta leggibilità in `MappaQuartiere` o `CommercioTab` pilotato dallo stato `selectedItem` / `selectedAttivitaId`.
+- **Integrazione**: Mantenimento della sincronizzazione tra la selezione da mappa e la vetrina commercianti sottostante.

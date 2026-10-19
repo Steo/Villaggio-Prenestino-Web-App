@@ -6,7 +6,7 @@ import {
   Wrench, 
   Home, 
   Calendar,
-  Sparkles,
+  Percent,
   Store
 } from 'lucide-react';
 import { CategoriaCommercio } from '../types';
@@ -143,13 +143,13 @@ export const CustomMapPin: React.FC<CustomMapPinProps> = ({
           {config.renderIcon()}
         </div>
 
-        {/* Badge speciale Offerta Attiva 🔥 */}
+        {/* Badge speciale Offerta Attiva % */}
         {hasOffer && (
           <div
-            className="absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 rounded-full bg-amber-400 text-slate-950 shadow-md ring-2 ring-white animate-pulse"
+            className="absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 rounded-full bg-teal-500 text-white shadow-md ring-2 ring-white dark:ring-slate-900 animate-pulse"
             title="Offerta speciale attiva per chi mostra l'app"
           >
-            <Sparkles className="w-3 h-3 text-amber-950 fill-amber-950" />
+            <Percent className="w-3 h-3 text-white stroke-[3]" />
           </div>
         )}
 

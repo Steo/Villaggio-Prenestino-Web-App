@@ -227,22 +227,66 @@ html.dark .gm-style .gm-style-iw-d h4,
   color: #ffffff !important;
 }
 
-/* Pulsante 'X' di chiusura del popup in Dark Mode */
+/* Pulsante 'X' di chiusura del popup in Dark Mode: stile chiaro, luminoso e ad alto contrasto */
 .dark .gm-style button.gm-ui-hover-effect,
 html.dark .gm-style button.gm-ui-hover-effect,
+.dark .gm-style-iw-c button.gm-ui-hover-effect,
+html.dark .gm-style-iw-c button.gm-ui-hover-effect,
 .dark button.gm-ui-hover-effect,
 html.dark button.gm-ui-hover-effect,
-.gm-dark-infowindow button.gm-ui-hover-effect {
-  filter: invert(1) brightness(2) !important;
-  opacity: 0.85 !important;
-  top: 6px !important;
-  right: 6px !important;
+.gm-dark-infowindow button.gm-ui-hover-effect,
+.dark .gm-style button[aria-label="Close"],
+.dark .gm-style button[aria-label="Chiudi"],
+html.dark .gm-style button[aria-label="Close"],
+html.dark .gm-style button[aria-label="Chiudi"] {
+  background-color: #ffffff !important;
+  border: 1.5px solid #cbd5e1 !important;
+  border-radius: 9999px !important;
+  width: 28px !important;
+  height: 28px !important;
+  top: 8px !important;
+  right: 8px !important;
+  opacity: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45) !important;
+  cursor: pointer !important;
+  transition: transform 0.15s ease, background-color 0.15s ease !important;
+  filter: none !important;
+  z-index: 40 !important;
 }
 
 .dark .gm-style button.gm-ui-hover-effect:hover,
 html.dark .gm-style button.gm-ui-hover-effect:hover,
-.gm-dark-infowindow button.gm-ui-hover-effect:hover {
+.dark .gm-style-iw-c button.gm-ui-hover-effect:hover,
+.dark button.gm-ui-hover-effect:hover {
+  background-color: #f1f5f9 !important;
+  border-color: #94a3b8 !important;
+  transform: scale(1.08) !important;
+}
+
+/* Icona X interna al pulsante: scura ad alto contrasto sul dischetto bianco */
+.dark .gm-style button.gm-ui-hover-effect > span,
+html.dark .gm-style button.gm-ui-hover-effect > span,
+.dark .gm-style-iw-c button.gm-ui-hover-effect > span,
+html.dark .gm-style-iw-c button.gm-ui-hover-effect > span,
+.dark button.gm-ui-hover-effect > span,
+html.dark button.gm-ui-hover-effect > span,
+.gm-dark-infowindow button.gm-ui-hover-effect > span,
+.dark .gm-style button[aria-label="Close"] > span,
+.dark .gm-style button[aria-label="Chiudi"] > span,
+html.dark .gm-style button[aria-label="Close"] > span,
+html.dark .gm-style button[aria-label="Chiudi"] > span {
+  background-color: #0f172a !important;
+  color: #0f172a !important;
+  filter: none !important;
   opacity: 1 !important;
+}
+
+.dark .gm-style button.gm-ui-hover-effect img,
+html.dark .gm-style button.gm-ui-hover-effect img {
+  filter: none !important;
 }
 
 /* --------------------------------------------------------------------------

@@ -10,6 +10,8 @@ import {
   TipoEvento,
   AppNotification,
   StatoSegnalazione,
+  AppTabsConfig,
+  DEFAULT_TABS_CONFIG,
 } from './types';
 import {
   fetchAllData,
@@ -26,6 +28,8 @@ import {
   adminCreateRichiesta,
   syncCitizenPointsToWp,
   submitAttivitaCommercio,
+  getAppTabsConfig,
+  setAppTabStatus,
 } from './services/wpService';
 import {
   triggerNotification,
@@ -52,7 +56,6 @@ import { NotificationCenterModal } from './components/NotificationCenterModal';
 import { ExportModal } from './components/ExportModal';
 import { PwaInstallBanner } from './components/PwaInstallBanner';
 import { GuidaTourModal } from './components/GuidaTourModal';
-import { INITIAL_ATTIVITA_COMMERCIO } from './data/mockData';
 import { AttivitaCommercio } from './types';
 import {
   NuovoLivelloModal,
@@ -75,7 +78,30 @@ export type TabType = 'home' | 'eventi' | 'commercio' | 'segnalazioni' | 'volont
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('home');
+  const [tabsConfig, setTabsConfig] = useState<AppTabsConfig>(getAppTabsConfig);
   const [interactions, setInteractions] = useState<UserInteractions>(getUserInteractions);
+
+  // Se l'amministratore disattiva la scheda attualmente aperta, torna automaticamente alla Home
+  useEffect(() => {
+    if (activeTab !== 'home' && tabsConfig[activeTab] === false) {
+      setActiveTab('home');
+    }
+  }, [tabsConfig, activeTab]);
+
+  const handleToggleTab = async (tab: keyof AppTabsConfig) => {
+    const currentVal = tabsConfig[tab] !== false;
+    const nextVal = !currentVal;
+    const updated = await setAppTabStatus(tab, nextVal);
+    setTabsConfig(updated);
+    const tabLabels: Record<keyof AppTabsConfig, string> = {
+      eventi: 'Eventi',
+      segnalazioni: 'Segnalazioni',
+      commercio: 'Commercianti',
+      volontariato: 'Volontari',
+      proposte: 'Idee e Proposte',
+    };
+    showToast(nextVal ? `Scheda "${tabLabels[tab]}" attivata nell'app!` : `Scheda "${tabLabels[tab]}" disattivata nell'app.`);
+  };
 
   // Modalità Scura / Chiara
   const [darkMode, setDarkMode] = useState<boolean>(() => {
@@ -115,29 +141,19 @@ export default function App() {
   const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null);
   const [loadingData, setLoadingData] = useState<boolean>(true);
 
-  // Vetrina Commercio & Mappa Attività
+  // Vetrina Commercio & Mappa Attività (Sincronizzata con database WordPress)
   const [attivitaCommercio, setAttivitaCommercio] = useState<AttivitaCommercio[]>(() => {
     try {
       const saved = localStorage.getItem('vp_attivita_commercio');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((item: AttivitaCommercio) => {
-            const init = INITIAL_ATTIVITA_COMMERCIO.find((x) => x.id === item.id);
-            return {
-              ...item,
-              lat: init ? init.lat : item.lat,
-              lng: init ? init.lng : item.lng,
-              indirizzo: init ? init.indirizzo : item.indirizzo,
-              miPiace: typeof item.miPiace === 'number' ? item.miPiace : (init?.miPiace || 10),
-              pinGestione: item.pinGestione || init?.pinGestione || '1234',
-            };
-          });
+        if (Array.isArray(parsed)) {
+          return parsed;
         }
       }
-      return INITIAL_ATTIVITA_COMMERCIO;
+      return [];
     } catch {
-      return INITIAL_ATTIVITA_COMMERCIO;
+      return [];
     }
   });
 
@@ -212,6 +228,7 @@ export default function App() {
 
     const updatedMie = Array.from(new Set([...(interactions.mieAttivita || []), nuova.id]));
     addPunti(5, 'Registrazione nuova attività commerciale', { mieAttivita: updatedMie });
+    showToast('Bottega registrata! Notifica email inviata ad associazione@villaggioprenestino.it');
   };
 
   const handleApprovaAttivita = (id: number) => {
@@ -510,6 +527,17 @@ export default function App() {
       setRichieste(data.richieste);
       setSegnalazioni(data.segnalazioni);
       setProposte(data.proposte);
+      if (data.schedeAttive) {
+        setTabsConfig(data.schedeAttive);
+      }
+      if (Array.isArray(data.commercio)) {
+        setAttivitaCommercio(data.commercio);
+        try {
+          localStorage.setItem('vp_attivita_commercio', JSON.stringify(data.commercio));
+        } catch {
+          // ignore
+        }
+      }
     } catch (err) {
       console.error('Errore durante il caricamento dati:', err);
     } finally {
@@ -753,6 +781,7 @@ export default function App() {
       requestBrowserNotificationPermission();
     }
 
+    showToast('Segnalazione inviata! Notifica email recapitata ad associazione@villaggioprenestino.it');
     loadData();
   };
 
@@ -834,10 +863,11 @@ export default function App() {
             onOpenExportModal={() => setExportModalOpen(true)}
             onOpenTour={() => setTourModalOpen(true)}
             loading={loadingData}
+            tabsConfig={tabsConfig}
           />
         )}
 
-        {activeTab === 'eventi' && (
+        {activeTab === 'eventi' && tabsConfig.eventi !== false && (
           <EventiTab
             eventi={eventi}
             interactions={interactions}
@@ -845,7 +875,7 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'segnalazioni' && (
+        {activeTab === 'segnalazioni' && tabsConfig.segnalazioni !== false && (
           <SegnalazioniTab
             segnalazioni={segnalazioni}
             mieSegnalazioni={interactions.mieSegnalazioni}
@@ -856,7 +886,7 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'volontariato' && (
+        {activeTab === 'volontariato' && tabsConfig.volontariato !== false && (
           <VolontariatoTab
             richieste={richieste}
             joinedRichieste={interactions.richiesteAderite}
@@ -867,7 +897,7 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'commercio' && (
+        {activeTab === 'commercio' && tabsConfig.commercio !== false && (
           <CommercioTab
             attivita={attivitaCommercio}
             eventi={eventi}
@@ -881,7 +911,7 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'proposte' && (
+        {activeTab === 'proposte' && tabsConfig.proposte !== false && (
           <ProposteAltroTab
             proposte={proposte}
             votedProposte={interactions.proposteVotate}
@@ -893,7 +923,7 @@ export default function App() {
         )}
       </main>
 
-      {/* Bottom Navigation Bar per Smartphone & Desktop */}
+      {/* Bottom Navigation Bar per Smartphone & Desktop (La Home è sempre visibile, le altre schede sono gestite dall'amministratore) */}
       <nav className={`fixed bottom-0 left-0 right-0 z-40 backdrop-blur-md border-t shadow-md transition-colors duration-200 ${
         darkMode ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200'
       }`}>
@@ -911,77 +941,87 @@ export default function App() {
             <span>Home</span>
           </button>
 
-          <button
-            onClick={() => setActiveTab('eventi')}
-            className={`flex flex-col items-center py-1.5 px-2 rounded-xl transition text-[10px] sm:text-[11px] font-bold ${
-              activeTab === 'eventi'
-                ? 'scale-105'
-                : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900'
-            }`}
-            style={{ color: activeTab === 'eventi' ? (darkMode ? '#fca5a5' : '#781816') : undefined }}
-          >
-            <Calendar className="w-5 h-5 mb-0.5" />
-            <span>Eventi</span>
-          </button>
+          {tabsConfig.eventi !== false && (
+            <button
+              onClick={() => setActiveTab('eventi')}
+              className={`flex flex-col items-center py-1.5 px-2 rounded-xl transition text-[10px] sm:text-[11px] font-bold ${
+                activeTab === 'eventi'
+                  ? 'scale-105'
+                  : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900'
+              }`}
+              style={{ color: activeTab === 'eventi' ? (darkMode ? '#fca5a5' : '#781816') : undefined }}
+            >
+              <Calendar className="w-5 h-5 mb-0.5" />
+              <span>Eventi</span>
+            </button>
+          )}
 
-          <button
-            onClick={() => setActiveTab('commercio')}
-            className={`flex flex-col items-center py-1.5 px-2 rounded-xl transition text-[10px] sm:text-[11px] font-bold ${
-              activeTab === 'commercio'
-                ? 'scale-105 text-amber-600'
-                : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900'
-            }`}
-            style={{ color: activeTab === 'commercio' ? (darkMode ? '#fbbf24' : '#d97706') : undefined }}
-          >
-            <div className="relative">
-              <Store className="w-5 h-5 mb-0.5" />
-              {attivitaCommercio.some(a => !!a.offertaAttiva) && (
-                <span className="absolute -top-0.5 -right-1 w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-              )}
-            </div>
-            <span>Commercianti</span>
-          </button>
+          {tabsConfig.commercio !== false && (
+            <button
+              onClick={() => setActiveTab('commercio')}
+              className={`flex flex-col items-center py-1.5 px-2 rounded-xl transition text-[10px] sm:text-[11px] font-bold ${
+                activeTab === 'commercio'
+                  ? 'scale-105 text-amber-600'
+                  : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900'
+              }`}
+              style={{ color: activeTab === 'commercio' ? (darkMode ? '#fbbf24' : '#d97706') : undefined }}
+            >
+              <div className="relative">
+                <Store className="w-5 h-5 mb-0.5" />
+                {attivitaCommercio.some(a => !!a.offertaAttiva) && (
+                  <span className="absolute -top-0.5 -right-1 w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
+                )}
+              </div>
+              <span>Commercianti</span>
+            </button>
+          )}
 
-          <button
-            onClick={() => setActiveTab('segnalazioni')}
-            className={`flex flex-col items-center py-1.5 px-2 rounded-xl transition text-[10px] sm:text-[11px] font-bold ${
-              activeTab === 'segnalazioni'
-                ? 'scale-105 text-amber-500'
-                : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900'
-            }`}
-          >
-            <div className="relative">
-              <Camera className="w-5 h-5 mb-0.5" />
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-500" />
-            </div>
-            <span>Segnala</span>
-          </button>
+          {tabsConfig.segnalazioni !== false && (
+            <button
+              onClick={() => setActiveTab('segnalazioni')}
+              className={`flex flex-col items-center py-1.5 px-2 rounded-xl transition text-[10px] sm:text-[11px] font-bold ${
+                activeTab === 'segnalazioni'
+                  ? 'scale-105 text-amber-500'
+                  : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              <div className="relative">
+                <Camera className="w-5 h-5 mb-0.5" />
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-500" />
+              </div>
+              <span>Segnala</span>
+            </button>
+          )}
 
-          <button
-            onClick={() => setActiveTab('volontariato')}
-            className={`flex flex-col items-center py-1.5 px-2 rounded-xl transition text-[10px] sm:text-[11px] font-bold ${
-              activeTab === 'volontariato'
-                ? 'scale-105'
-                : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900'
-            }`}
-            style={{ color: activeTab === 'volontariato' ? (darkMode ? '#fca5a5' : '#781816') : undefined }}
-          >
-            <HeartHandshake className="w-5 h-5 mb-0.5" />
-            <span>Volontari</span>
-          </button>
+          {tabsConfig.volontariato !== false && (
+            <button
+              onClick={() => setActiveTab('volontariato')}
+              className={`flex flex-col items-center py-1.5 px-2 rounded-xl transition text-[10px] sm:text-[11px] font-bold ${
+                activeTab === 'volontariato'
+                  ? 'scale-105'
+                  : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900'
+              }`}
+              style={{ color: activeTab === 'volontariato' ? (darkMode ? '#fca5a5' : '#781816') : undefined }}
+            >
+              <HeartHandshake className="w-5 h-5 mb-0.5" />
+              <span>Volontari</span>
+            </button>
+          )}
 
-          <button
-            onClick={() => setActiveTab('proposte')}
-            className={`flex flex-col items-center py-1.5 px-2 rounded-xl transition text-[10px] sm:text-[11px] font-bold ${
-              activeTab === 'proposte'
-                ? 'scale-105'
-                : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900'
-            }`}
-            style={{ color: activeTab === 'proposte' ? (darkMode ? '#fca5a5' : '#781816') : undefined }}
-          >
-            <Lightbulb className="w-5 h-5 mb-0.5" />
-            <span>Idee</span>
-          </button>
+          {tabsConfig.proposte !== false && (
+            <button
+              onClick={() => setActiveTab('proposte')}
+              className={`flex flex-col items-center py-1.5 px-2 rounded-xl transition text-[10px] sm:text-[11px] font-bold ${
+                activeTab === 'proposte'
+                  ? 'scale-105'
+                  : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900'
+              }`}
+              style={{ color: activeTab === 'proposte' ? (darkMode ? '#fca5a5' : '#781816') : undefined }}
+            >
+              <Lightbulb className="w-5 h-5 mb-0.5" />
+              <span>Idee</span>
+            </button>
+          )}
         </div>
       </nav>
 

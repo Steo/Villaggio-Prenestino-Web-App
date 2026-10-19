@@ -4,7 +4,7 @@ import {
   Lock,
   Unlock,
   KeyRound,
-  Sparkles,
+  Percent,
   Clock,
   Phone,
   MessageCircle,
@@ -338,12 +338,12 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
                 </div>
               )}
 
-              {/* SEZIONE 1: OFFERTA SPECIALE & COUPON */}
-              <div className="p-4 rounded-2xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 space-y-3.5">
+              {/* SEZIONE 1: OFFERTA SPECIALE & COUPON % */}
+              <div className="p-4 rounded-2xl bg-teal-50/60 dark:bg-teal-950/30 border border-teal-200/70 dark:border-teal-800/40 space-y-3.5">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs font-bold text-amber-950 dark:text-amber-200">
-                    <Sparkles className="w-4 h-4 text-amber-500" />
-                    <span>Offerta Speciale / Coupon di Quartiere</span>
+                  <div className="flex items-center gap-2 text-xs font-bold text-teal-950 dark:text-teal-200">
+                    <Percent className="w-4 h-4 text-teal-600 dark:text-teal-400 stroke-[2.5]" />
+                    <span>Offerta Speciale / Promozione (%) di Quartiere</span>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input
@@ -352,7 +352,7 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
                       onChange={(e) => setHasOffer(e.target.checked)}
                       className="sr-only peer"
                     />
-                    <div className="w-9 h-5 bg-slate-300 peer-focus:outline-hidden rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                    <div className="w-9 h-5 bg-slate-300 peer-focus:outline-hidden rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-teal-600"></div>
                   </label>
                 </div>
 
@@ -367,7 +367,7 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
                         value={offerTitle}
                         onChange={(e) => setOfferTitle(e.target.value)}
                         placeholder="Es. Sconto 15% sulla panificazione artigianale"
-                        className="w-full text-xs py-2 px-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
+                        className="w-full text-xs py-2 px-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                         required={hasOffer}
                       />
                     </div>
@@ -381,7 +381,7 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
                         value={offerDetail}
                         onChange={(e) => setOfferDetail(e.target.value)}
                         placeholder="Descrivi cosa include l'offerta o se serve menzionare l'app in cassa..."
-                        className="w-full text-xs py-2 px-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
+                        className="w-full text-xs py-2 px-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                         required={hasOffer}
                       />
                     </div>
@@ -400,7 +400,7 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
                             setOfferDiscount(e.target.value === '' ? '' : Number(e.target.value))
                           }
                           placeholder="es. 15"
-                          className="w-full text-xs py-2 px-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
+                          className="w-full text-xs py-2 px-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                         />
                       </div>
                       <div>
@@ -412,7 +412,7 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
                           value={offerExpiry}
                           onChange={(e) => setOfferExpiry(e.target.value)}
                           placeholder="Es. Attiva questo mese, Tutti i martedì..."
-                          className="w-full text-xs py-2 px-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
+                          className="w-full text-xs py-2 px-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                         />
                       </div>
                     </div>

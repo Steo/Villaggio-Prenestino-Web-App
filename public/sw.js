@@ -1,8 +1,14 @@
-const CACHE_NAME = 'cdq-prenestino-v1';
+const CACHE_NAME = 'cdq-prenestino-v2';
 const ASSETS_TO_CACHE = [
   './',
   './manifest.webmanifest',
-  './logo-cdq.svg',
+  './manifest.json',
+  './pwa-icon.svg',
+  './pwa-192x192.png',
+  './pwa-512x512.png',
+  './pwa-maskable-512x512.png',
+  './apple-touch-icon.png',
+  './favicon-32x32.png',
   './logoo-cdq-2019-BIANCO-ORIZZONTALE.png'
 ];
 
