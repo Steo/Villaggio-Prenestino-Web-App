@@ -81,12 +81,12 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
 
   const categorieRapide = [
-    'Buca stradale',
-    'Lampione spento',
+    'Pericolo generico',
+    'Illuminazione pubblica',
     'Rifiuti abbandonati',
-    'Erba alta / Verde',
+    'Erba alta/verde pubblico',
     'Segnaletica',
-    'Dissesto marciapiede',
+    'Dissesto stradale',
     'Altro',
   ];
 
@@ -820,11 +820,11 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
         </div>
       )}
 
-      {/* FILTRI STATO */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs font-bold">
+      {/* FILTRI STATO: Su mobile verticale su 2 righe (Tutte e Ricevute sopra, Inoltrate e Risolte sotto), su tablet/desktop in riga unica */}
+      <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-1.5 text-xs font-bold">
         <button
           onClick={() => setFiltroStato(0)}
-          className={`px-3 py-1.5 rounded-full transition shrink-0 ${
+          className={`w-full sm:w-auto px-3 py-1.5 rounded-full transition text-center shrink-0 ${
             filtroStato === 0
               ? 'bg-slate-950 text-white'
               : 'bg-white border border-slate-200 text-slate-600'
@@ -834,7 +834,7 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
         </button>
         <button
           onClick={() => setFiltroStato(1)}
-          className={`px-3 py-1.5 rounded-full transition shrink-0 ${
+          className={`w-full sm:w-auto px-3 py-1.5 rounded-full transition text-center shrink-0 ${
             filtroStato === 1
               ? 'bg-amber-500 text-slate-950'
               : 'bg-white border border-slate-200 text-slate-600'
@@ -844,7 +844,7 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
         </button>
         <button
           onClick={() => setFiltroStato(2)}
-          className={`px-3 py-1.5 rounded-full transition shrink-0 ${
+          className={`w-full sm:w-auto px-3 py-1.5 rounded-full transition text-center shrink-0 ${
             filtroStato === 2
               ? 'bg-sky-600 text-white'
               : 'bg-white border border-slate-200 text-slate-600'
@@ -854,7 +854,7 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
         </button>
         <button
           onClick={() => setFiltroStato(3)}
-          className={`px-3 py-1.5 rounded-full transition shrink-0 ${
+          className={`w-full sm:w-auto px-3 py-1.5 rounded-full transition text-center shrink-0 ${
             filtroStato === 3
               ? 'bg-emerald-600 text-white'
               : 'bg-white border border-slate-200 text-slate-600'

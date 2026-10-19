@@ -214,6 +214,8 @@ export default function App() {
         emailReferente: nuova.emailReferente,
         lat: nuova.lat,
         lng: nuova.lng,
+        immagine: nuova.immagine,
+        logo: nuova.logo,
       });
     } catch (e) {
       console.warn('Errore invio commercio a WP:', e);

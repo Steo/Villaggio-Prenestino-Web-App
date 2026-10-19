@@ -434,7 +434,7 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
               title="Filtra i pin sulla mappa per categoria"
               aria-label="Filtra per categoria"
             >
-              <option value="tutti" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">Tutte le botteghe ({attivita.length})</option>
+              <option value="tutti" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">Tutte le attività ({attivita.length})</option>
               <option value="alimentari" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">🍞 Alimentari ({attivita.filter(a => a.categoria === 'alimentari').length})</option>
               <option value="ristorazione" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">🍕 Ristorazione ({attivita.filter(a => a.categoria === 'ristorazione').length})</option>
               <option value="salute" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">💊 Farmacie & salute ({attivita.filter(a => a.categoria === 'salute').length})</option>

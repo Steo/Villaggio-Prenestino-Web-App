@@ -88,7 +88,7 @@ export async function geocodeAndValidateAddress(addressInput: string): Promise<G
             lng,
             distanceKm: Math.round(dist * 10) / 10,
             formattedAddress: candidate.address || trimmed,
-            errorMsg: 'L\'indirizzo si trova fuori dal raggio consentito (oltre 3 km da Via Fosso dell\'Osa 507, Villaggio Prenestino).',
+            errorMsg: 'L\'indirizzo si trova fuori da Villaggio Prenestino.',
           };
         }
 
@@ -129,7 +129,7 @@ export async function geocodeAndValidateAddress(addressInput: string): Promise<G
             lng,
             distanceKm: Math.round(dist * 10) / 10,
             formattedAddress: formatted,
-            errorMsg: 'L\'indirizzo si trova fuori dal raggio consentito (oltre 3 km da Via Fosso dell\'Osa 507, Villaggio Prenestino).',
+            errorMsg: 'L\'indirizzo si trova fuori da Villaggio Prenestino.',
           };
         }
 

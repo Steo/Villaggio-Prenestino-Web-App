@@ -682,6 +682,7 @@ export async function submitAttivitaCommercio(data: NuovaAttivitaForm & {
   lat?: number;
   lng?: number;
   immagine?: string;
+  logo?: string;
 }): Promise<{
   success: boolean;
   newId: number;

@@ -579,7 +579,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                     Esporta per il tuo Sito Web & Hosting
                   </h4>
                   <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-600 text-white">
-                    v1.4.0
+                    v1.5.0
                   </span>
                 </div>
                 <p className={`text-xs mt-0.5 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>

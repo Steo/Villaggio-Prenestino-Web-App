@@ -165,7 +165,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                       Plugin WordPress Ufficiale
                     </h4>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-600/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                      v1.4.0
+                      v1.5.0
                     </span>
                   </div>
                   <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">

@@ -313,8 +313,8 @@ export const ProposteAltroTab: React.FC<ProposteAltroTabProps> = ({
                     onClick={() => onVoteProposta(p)}
                     className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 ${
                       hasVoted
-                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 cursor-default opacity-95 shadow-2xs'
-                        : 'bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 cursor-pointer shadow-2xs'
+                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 cursor-default opacity-95 shadow-2xs animate-heartbeat'
+                        : 'bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 cursor-pointer shadow-2xs'
                     }`}
                     title={
                       hasVoted

@@ -855,12 +855,28 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                     }`}
                   >
                     <div>
-                      {/* Immagine con badge classifica e categoria */}
-                      <div className="relative h-44 overflow-hidden bg-slate-100 dark:bg-slate-800">
+                      {/* Immagine con badge classifica e categoria - Cliccabile per aprire il popup della mappa */}
+                      <div 
+                        onClick={() => {
+                          setSelectedAttivitaId(shop.id);
+                          // Se la mappa è nascosta (solo vetrina), attivala o scrolla in alto
+                          if (viewMode === 'list-only') {
+                            setViewMode('both');
+                          }
+                          const mapEl = document.getElementById('commercio-mappa-sezione');
+                          if (mapEl) {
+                            mapEl.scrollIntoView({ behavior: 'smooth' });
+                          } else {
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }
+                        }}
+                        className="relative h-44 overflow-hidden bg-slate-100 dark:bg-slate-800 cursor-pointer group"
+                        title="Clicca per aprire la scheda dettagliata sulla mappa"
+                      >
                         <img
                           src={shop.immagine}
                           alt={shop.nome}
-                          className="w-full h-full object-cover transition duration-300 hover:scale-105"
+                          className="w-full h-full object-cover transition duration-300 group-hover:scale-105"
                           loading="lazy"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
@@ -889,7 +905,7 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                         {/* Titolo e indirizzo sovrapposti all'immagine */}
                         <div className="absolute bottom-3 left-3 right-3 text-white">
                           <div className="flex items-center gap-1.5 mb-0.5">
-                            <h4 className="font-black text-base leading-tight drop-shadow-md text-white line-clamp-1">
+                            <h4 className="font-black text-base leading-tight drop-shadow-md text-white line-clamp-1 group-hover:underline">
                               {shop.nome}
                             </h4>
                             {shop.verificato ? (
@@ -923,12 +939,12 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                             disabled={hasVoted}
                             className={`w-full py-2.5 px-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer ${
                               hasVoted
-                                ? 'bg-amber-100/90 text-amber-900 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-300/80 dark:border-amber-700/60 cursor-default'
+                                ? 'bg-amber-100/90 text-amber-900 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-300/80 dark:border-amber-700/60 cursor-default animate-heartbeat'
                                 : 'bg-[#781816] hover:bg-[#5a1210] active:scale-[0.98] text-white hover:shadow-md'
                             }`}
                             title={hasVoted ? 'Hai già consigliato questa attività (+2 Punti Civici registrati)' : 'Esprimi Mi piace per consigliare questa attività ai vicini (+2 Punti Civici)'}
                           >
-                            <ThumbsUp className={`w-4 h-4 shrink-0 transition-transform ${hasVoted ? 'fill-amber-800 dark:fill-amber-300' : ''}`} />
+                            <ThumbsUp className={`w-4 h-4 shrink-0 transition-transform ${hasVoted ? 'fill-amber-800 dark:fill-amber-300 scale-110' : ''}`} />
                             <span>{hasVoted ? 'Consigliato' : 'Mi piace'}</span>
                             <span className={`ml-1 px-2.5 py-0.5 rounded-full text-xs font-black shrink-0 ${
                               hasVoted
@@ -1161,8 +1177,8 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
 
       {/* MODALE REGISTRAZIONE COMMERCIANTE CON GESTIONE APPROVAZIONE WORDPRESS */}
       {isRegisterModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 space-y-4 my-auto relative animate-scaleUp">
+        <div className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-start justify-center pt-16 sm:pt-20 pb-6 px-3 sm:px-4 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-xl w-full max-h-[85vh] sm:max-h-[88vh] overflow-y-auto shadow-2xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 space-y-4 relative animate-scaleUp">
             
             {/* Tasto X di chiusura SEMPRE visibile e accessibile in alto a destra */}
             <button
@@ -1369,7 +1385,7 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
 
                 <div className="space-y-1">
                   <label className="font-semibold text-slate-700 dark:text-slate-300">
-                    Numero WhatsApp per Ordini (Opzionale)
+                    Numero WhatsApp per contatto diretto (Opzionale)
                   </label>
                   <input
                     type="tel"
@@ -1669,7 +1685,7 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                       className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
                     />
                     <input
-                      type="email"
+                      type="text"
                       placeholder="Email o cellulare referente"
                       value={formData.emailReferente || ''}
                       onChange={(e) => setFormData({ ...formData, emailReferente: e.target.value })}

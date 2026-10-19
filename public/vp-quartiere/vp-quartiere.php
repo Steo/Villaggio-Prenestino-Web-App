@@ -3,7 +3,7 @@
  * Plugin Name: VP Quartiere - Gestione Web App Villaggio Prenestino
  * Plugin URI:  https://www.villaggioprenestino.it
  * Description: Plugin ufficiale per la gestione della Web App di quartiere: gestisce commercianti e negozi locali con approvazione moderatore, segnalazioni con foto, richieste di volontariato con contatti dei cittadini, eventi, proposte, dashboard Insight e REST API.
- * Version:     1.4.0
+ * Version:     1.5.0
  * Author:      Associazione di Quartiere Villaggio Prenestino
  * Author URI:  https://www.villaggioprenestino.it
  * License:     GPL-2.0+
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('VPQ_VERSION', '1.4.0');
+define('VPQ_VERSION', '1.5.0');
 define('VPQ_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('VPQ_PLUGIN_URL', plugin_dir_url(__FILE__));
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cdq-prenestino-v2';
+const CACHE_NAME = 'cdq-prenestino-v1.5.0';
 const ASSETS_TO_CACHE = [
   './',
   './manifest.webmanifest',
@@ -31,28 +31,41 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Gestione richieste GET per file statici e navigazione
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
-  // Non cachare chiamate API WordPress o server esterno
   if (url.pathname.includes('/wp-json/') || url.pathname.includes('/api/')) {
+    return;
+  }
+
+  // Network-first per la pagina principale index.html per garantire sempre l'ultimo bundle aggiornato
+  if (event.request.mode === 'navigate' || url.pathname.endsWith('index.html') || url.pathname === '/') {
+    event.respondWith(
+      fetch(event.request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+        }
+        return networkResponse;
+      }).catch(() => {
+        return caches.match(event.request);
+      })
+    );
     return;
   }
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Restituisci la cache e aggiorna in background (stale-while-revalidate per shell)
         fetch(event.request).then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(event.request, networkResponse);
             });
           }
-        }).catch(() => {
-          // Offline, niente da fare
-        });
+        }).catch(() => {});
         return cachedResponse;
       }
 

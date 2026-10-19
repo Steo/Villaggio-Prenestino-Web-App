@@ -429,7 +429,7 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                villaggioprenestino.it • Plugin VP Quartiere v1.4.0 (Moderazione Commercianti & Negozi)
+                villaggioprenestino.it • Plugin VP Quartiere v1.5.0 (Moderazione Commercianti & Negozi)
               </p>
             </div>
           </div>
@@ -2236,7 +2236,7 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
                     className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-emerald-700/20 transition flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <Download className="w-4 h-4" />
-                    <span>Scarica ZIP (v1.4.0)</span>
+                    <span>Scarica ZIP (v1.5.0)</span>
                   </button>
                   <button
                     onClick={handleCopiaCodice}
@@ -2541,7 +2541,7 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
         {/* Footer */}
         <div className="bg-slate-100 px-6 py-3 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 shrink-0">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-700">Plugin WordPress VP Quartiere v1.4.0</span>
+            <span className="font-semibold text-slate-700">Plugin WordPress VP Quartiere v1.5.0</span>
             <span className="text-slate-300">•</span>
             <span>Associazione di Quartiere Villaggio Prenestino</span>
           </div>
