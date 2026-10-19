@@ -65,6 +65,8 @@ interface WpPluginPanelProps {
   onCreateEvento?: (evento: Omit<EventoQuartiere, 'id'>) => void;
   onCreateRichiesta?: (richiesta: Omit<RichiestaVolontariato, 'id' | 'have'>) => void;
   onApprovaAttivita?: (id: number) => void;
+  onUpdateSegnalazioneModerazione?: (id: number, stato: 'approvata' | 'rifiutata' | 'in_attesa', motivazione?: string) => void;
+  onUpdatePropostaModerazione?: (id: number, stato: 'approvata' | 'rifiutata' | 'in_attesa', motivazione?: string) => void;
   onDeactivateAdmin?: () => void;
   tabsConfig?: AppTabsConfig;
   onToggleTab?: (tab: keyof AppTabsConfig) => void;
@@ -155,6 +157,8 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
   onCreateEvento,
   onCreateRichiesta,
   onApprovaAttivita,
+  onUpdateSegnalazioneModerazione,
+  onUpdatePropostaModerazione,
   onDeactivateAdmin,
   tabsConfig = DEFAULT_TABS_CONFIG,
   onToggleTab,
@@ -163,6 +167,17 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
     'insights' | 'commercianti' | 'eventi' | 'segnalazioni' | 'volontari' | 'proposte' | 'config'
   >('insights');
   const [commercioStatoFiltro, setCommercioStatoFiltro] = useState<'tutti' | 'pending' | 'publish'>('tutti');
+  const [segnalazioniStatoFiltro, setSegnalazioniStatoFiltro] = useState<'tutti' | 'in_attesa' | 'approvata' | 'rifiutata'>('tutti');
+  const [proposteStatoFiltro, setProposteStatoFiltro] = useState<'tutti' | 'in_attesa' | 'approvata' | 'rifiutata'>('tutti');
+
+  // Modale per inserire la motivazione del rifiuto
+  const [rejectionModalItem, setRejectionModalItem] = useState<{
+    type: 'segnalazione' | 'proposta' | 'commercio';
+    id: number;
+    titolo: string;
+  } | null>(null);
+  const [rejectionReasonInput, setRejectionReasonInput] = useState('');
+  const [rejectionError, setRejectionError] = useState<string | null>(null);
 
   // Config fields
   const [baseUrl, setBaseUrl] = useState(config.baseUrl);
@@ -1027,6 +1042,108 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
                 </div>
               </div>
 
+              {/* Grafico a Barre: Distribuzione Attività Commerciali per Categoria */}
+              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-xl bg-amber-100 text-amber-800 border border-amber-200">
+                      <BarChart3 className="w-5 h-5 text-amber-700" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-sm sm:text-base leading-tight">
+                        Varietà dell'Offerta Commerciale Locale per Categoria
+                      </h4>
+                      <p className="text-xs text-slate-500">
+                        Analisi della distribuzione delle {attivitaCommercio.length} attività commerciali registrate nel quartiere.
+                      </p>
+                    </div>
+                  </div>
+
+                  <span className="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1 rounded-xl border border-slate-200 self-start sm:self-auto">
+                    {[
+                      'alimentari',
+                      'ristorazione',
+                      'salute',
+                      'artigiani',
+                      'servizi_persona',
+                      'servizi_animali',
+                      'casa',
+                    ].filter((c) => attivitaCommercio.some((a) => a.categoria === c)).length} di 7 Categorie Attive
+                  </span>
+                </div>
+
+                {/* Lista Barre per Categoria */}
+                <div className="space-y-3 pt-1">
+                  {[
+                    { key: 'alimentari', label: 'Alimentari', icon: '🍞', color: 'bg-emerald-500' },
+                    { key: 'ristorazione', label: 'Ristorazione', icon: '🍕', color: 'bg-amber-500' },
+                    { key: 'salute', label: 'Farmacie & salute', icon: '💊', color: 'bg-rose-500' },
+                    { key: 'artigiani', label: 'Artigiani', icon: '🔨', color: 'bg-purple-500' },
+                    { key: 'servizi_persona', label: 'Servizi alla persona', icon: '💇', color: 'bg-indigo-500' },
+                    { key: 'servizi_animali', label: 'Servizi per animali', icon: '🐾', color: 'bg-teal-500' },
+                    { key: 'casa', label: 'Casa, fai da te & hobby', icon: '🏡', color: 'bg-sky-500' },
+                  ].map((cat) => {
+                    const count = attivitaCommercio.filter((a) => a.categoria === cat.key).length;
+                    const totalShops = attivitaCommercio.length;
+                    const perc = totalShops > 0 ? Math.round((count / totalShops) * 100) : 0;
+
+                    return (
+                      <div key={cat.key} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs font-semibold">
+                          <span className="text-slate-800 flex items-center gap-1.5">
+                            <span className="text-sm">{cat.icon}</span>
+                            <span>{cat.label}</span>
+                          </span>
+                          <span className="text-slate-600 font-mono">
+                            <strong>{count}</strong> {count === 1 ? 'attività' : 'attività'} ({perc}%)
+                          </span>
+                        </div>
+
+                        {/* Barra Visiva */}
+                        <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-200/80">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${cat.color}`}
+                            style={{ width: `${Math.max(perc, count > 0 ? 5 : 0)}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Barra Stacked Cumulativa */}
+                {attivitaCommercio.length > 0 && (
+                  <div className="pt-2 border-t border-slate-100">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+                      Composizione percentuale complessiva dell'offerta locale:
+                    </span>
+                    <div className="w-full h-2.5 rounded-full overflow-hidden flex bg-slate-100 border border-slate-200/60">
+                      {[
+                        { key: 'alimentari', label: 'Alimentari', color: 'bg-emerald-500' },
+                        { key: 'ristorazione', label: 'Ristorazione', color: 'bg-amber-500' },
+                        { key: 'salute', label: 'Farmacie & salute', color: 'bg-rose-500' },
+                        { key: 'artigiani', label: 'Artigiani', color: 'bg-purple-500' },
+                        { key: 'servizi_persona', label: 'Servizi alla persona', color: 'bg-indigo-500' },
+                        { key: 'servizi_animali', label: 'Servizi per animali', color: 'bg-teal-500' },
+                        { key: 'casa', label: 'Casa, fai da te & hobby', color: 'bg-sky-500' },
+                      ].map((cat) => {
+                        const count = attivitaCommercio.filter((a) => a.categoria === cat.key).length;
+                        const perc = (count / attivitaCommercio.length) * 100;
+                        if (perc <= 0) return null;
+                        return (
+                          <div
+                            key={cat.key}
+                            className={`h-full ${cat.color}`}
+                            style={{ width: `${perc}%` }}
+                            title={`${cat.label}: ${count} (${Math.round(perc)}%)`}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Filtri rapidi stato */}
               <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
                 <button
@@ -1471,79 +1588,227 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
                 description="Permette ai cittadini di inviare segnalazioni geolocalizzate con foto dal quartiere."
               />
 
-              <div>
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5 text-amber-500" />
-                  Gestione & Avanzamento Segnalazioni Territoriali
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Aggiorna lo stato delle segnalazioni inviate dai cittadini. Lo stato viene sincronizzato in tempo reale con l'app.
-                </p>
-              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-500" />
+                    Gestione & Moderazione Segnalazioni Territoriali
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Esamina, approva o rifiuta le segnalazioni inviate dai residenti. In caso di rifiuto, l'utente riceverà una notifica con la tua motivazione.
+                  </p>
+                </div>
 
-              <div className="space-y-3">
-                {segnalazioni.map((seg) => (
-                  <div
-                    key={seg.id}
-                    className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-                  >
-                    <div className="flex items-start gap-3">
-                      {seg.ph && seg.ph[0] ? (
-                        <img
-                          src={seg.ph[0]}
-                          alt={seg.t}
-                          className="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-200"
-                        />
-                      ) : (
-                        <div className="w-14 h-14 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
-                          <Eye className="w-5 h-5" />
-                        </div>
-                      )}
-
-                      <div className="space-y-1">
-                        <h4 className="text-xs sm:text-sm font-bold text-slate-900">{seg.t}</h4>
-                        <p className="text-[11px] text-slate-500 flex items-center gap-1">
-                          <MapPin className="w-3 h-3 text-slate-400 shrink-0" /> {seg.w} • Data: {seg.data}
-                        </p>
-                        {seg.desc && (
-                          <p className="text-[11px] text-slate-600 line-clamp-1">{seg.desc}</p>
-                        )}
-                        {seg.cittadinoNome && (
-                          <p className="text-[10px] text-slate-400">
-                            Inviata da: <strong>{seg.cittadinoNome}</strong>
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-between sm:justify-end pt-2 sm:pt-0 border-t sm:border-0 border-slate-100">
-                      <label className="text-xs font-semibold text-slate-600 sm:sr-only">
-                        Cambia Stato:
-                      </label>
-                      <select
-                        value={seg.s}
-                        onChange={(e) => {
-                          const newStato = Number(e.target.value) as StatoSegnalazione;
-                          if (onUpdateSegnalazioneStato) {
-                            onUpdateSegnalazioneStato(seg.id, newStato);
-                            loadInsights();
-                          }
-                        }}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition cursor-pointer ${
-                          seg.s === 3
-                            ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                            : seg.s === 2
-                            ? 'bg-blue-50 text-blue-800 border-blue-300'
-                            : 'bg-amber-50 text-amber-800 border-amber-300'
+                {/* Filtri Stato Moderazione */}
+                <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl shrink-0 self-start sm:self-center">
+                  {(['tutti', 'in_attesa', 'approvata', 'rifiutata'] as const).map((f) => {
+                    const count = segnalazioni.filter((s) => {
+                      if (f === 'tutti') return true;
+                      const st = s.statoApprovazione || 'approvata';
+                      return st === f;
+                    }).length;
+                    const labels = {
+                      tutti: 'Tutte',
+                      in_attesa: 'In Attesa',
+                      approvata: 'Approvate',
+                      rifiutata: 'Rifiutate',
+                    };
+                    return (
+                      <button
+                        key={f}
+                        type="button"
+                        onClick={() => setSegnalazioniStatoFiltro(f)}
+                        className={`px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                          segnalazioniStatoFiltro === f
+                            ? 'bg-white text-slate-900 shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
-                        <option value={1}>🟡 Ricevuta (Presa in carico)</option>
-                        <option value={2}>🔵 Inoltrata al Municipio VI</option>
-                        <option value={3}>🟢 Risolta con successo</option>
-                      </select>
-                    </div>
-                  </div>
-                ))}
+                        <span>{labels[f]}</span>
+                        <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 text-slate-700">
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Tabella di Amministrazione Segnalazioni con Colonna Azioni */}
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                        <th className="py-3 px-4">Segnalazione & Foto</th>
+                        <th className="py-3 px-4">Luogo & Cittadino</th>
+                        <th className="py-3 px-4">Stato Moderazione</th>
+                        <th className="py-3 px-4">Avanzamento</th>
+                        <th className="py-3 px-4 text-right">Azioni</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-xs">
+                      {segnalazioni
+                        .filter((seg) => {
+                          if (segnalazioniStatoFiltro === 'tutti') return true;
+                          const st = seg.statoApprovazione || 'approvata';
+                          return st === segnalazioniStatoFiltro;
+                        })
+                        .map((seg) => {
+                          const stMod = seg.statoApprovazione || 'approvata';
+                          const isPending = stMod === 'in_attesa';
+                          const isRejected = stMod === 'rifiutata';
+                          const isApproved = stMod === 'approvata';
+
+                          return (
+                            <tr
+                              key={seg.id}
+                              className={`transition-colors ${
+                                isPending
+                                  ? 'bg-amber-50/40 hover:bg-amber-50/70'
+                                  : isRejected
+                                  ? 'bg-rose-50/30 hover:bg-rose-50/50'
+                                  : 'hover:bg-slate-50/80'
+                              }`}
+                            >
+                              {/* Colonna 1: Segnalazione & Foto */}
+                              <td className="py-3.5 px-4 align-top">
+                                <div className="flex items-start gap-3 min-w-[200px]">
+                                  {seg.ph && seg.ph[0] ? (
+                                    <img
+                                      src={seg.ph[0]}
+                                      alt={seg.t}
+                                      className="w-12 h-12 rounded-xl object-cover shrink-0 border border-slate-200 shadow-2xs"
+                                    />
+                                  ) : (
+                                    <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
+                                      <Eye className="w-5 h-5" />
+                                    </div>
+                                  )}
+                                  <div className="space-y-0.5">
+                                    <h4 className="font-bold text-slate-900 text-xs sm:text-sm leading-snug">{seg.t}</h4>
+                                    {seg.desc && (
+                                      <p className="text-[11px] text-slate-600 line-clamp-2">{seg.desc}</p>
+                                    )}
+                                    {isRejected && seg.motivazioneRifiuto && (
+                                      <div className="p-2 rounded-lg bg-rose-100/80 border border-rose-200 text-rose-900 text-[11px] mt-1">
+                                        <strong>Motivazione Rifiuto:</strong> "{seg.motivazioneRifiuto}"
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* Colonna 2: Luogo & Cittadino */}
+                              <td className="py-3.5 px-4 align-top shrink-0 min-w-[150px]">
+                                <div className="space-y-1">
+                                  <p className="text-[11px] font-medium text-slate-700 flex items-center gap-1">
+                                    <MapPin className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                    <span>{seg.w}</span>
+                                  </p>
+                                  <p className="text-[10px] text-slate-500">
+                                    Data: <strong>{seg.data}</strong>
+                                  </p>
+                                  {seg.cittadinoNome && (
+                                    <p className="text-[10px] text-slate-500">
+                                      Da: <strong>{seg.cittadinoNome}</strong> {seg.cittadinoTel ? `(${seg.cittadinoTel})` : ''}
+                                    </p>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Colonna 3: Stato Moderazione */}
+                              <td className="py-3.5 px-4 align-top whitespace-nowrap">
+                                {isPending && (
+                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 inline-flex items-center gap-1">
+                                    <Clock className="w-3 h-3 text-amber-600" />
+                                    <span>In Attesa di Moderazione</span>
+                                  </span>
+                                )}
+                                {isApproved && (
+                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                    <span>Approvata e Pubblicata</span>
+                                  </span>
+                                )}
+                                {isRejected && (
+                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-800 border border-rose-300 inline-flex items-center gap-1">
+                                    <X className="w-3 h-3 text-rose-600 stroke-[3]" />
+                                    <span>Rifiutata</span>
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* Colonna 4: Avanzamento Risoluzione */}
+                              <td className="py-3.5 px-4 align-top whitespace-nowrap">
+                                <select
+                                  value={seg.s}
+                                  onChange={(e) => {
+                                    const newStato = Number(e.target.value) as StatoSegnalazione;
+                                    if (onUpdateSegnalazioneStato) {
+                                      onUpdateSegnalazioneStato(seg.id, newStato);
+                                      loadInsights();
+                                    }
+                                  }}
+                                  className={`px-2.5 py-1 text-[11px] font-bold rounded-xl border transition cursor-pointer ${
+                                    seg.s === 3
+                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                      : seg.s === 2
+                                      ? 'bg-blue-50 text-blue-800 border-blue-300'
+                                      : 'bg-amber-50 text-amber-800 border-amber-300'
+                                  }`}
+                                >
+                                  <option value={1}>🟡 Ricevuta</option>
+                                  <option value={2}>🔵 Inoltrata Municipio VI</option>
+                                  <option value={3}>🟢 Risolta</option>
+                                </select>
+                              </td>
+
+                              {/* Colonna 5: Azioni */}
+                              <td className="py-3.5 px-4 align-top text-right whitespace-nowrap">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {/* Bottone Approva */}
+                                  {!isApproved && onUpdateSegnalazioneModerazione && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        onUpdateSegnalazioneModerazione(seg.id, 'approvata');
+                                        loadInsights();
+                                      }}
+                                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs rounded-xl shadow-2xs transition inline-flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                      <span>Approva</span>
+                                    </button>
+                                  )}
+
+                                  {/* Bottone Rifiuta */}
+                                  {!isRejected && onUpdateSegnalazioneModerazione && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setRejectionModalItem({
+                                          type: 'segnalazione',
+                                          id: seg.id,
+                                          titolo: seg.t,
+                                        });
+                                        setRejectionReasonInput('');
+                                        setRejectionError(null);
+                                      }}
+                                      className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-bold text-xs rounded-xl shadow-2xs transition inline-flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                                      <span>Rifiuta</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -1724,6 +1989,7 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
           )}
 
           {/* TAB 5: PROPOSTE CITTADINI */}
+          {/* TAB 5: PROPOSTE CITTADINI */}
           {activeTab === 'proposte' && (
             <div className="space-y-4 animate-fadeIn">
               <TabActiveToggleButton
@@ -1734,40 +2000,194 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
                 description="Consente ai residenti di proporre idee per il quartiere e votare le proposte comunitarie."
               />
 
-              <div>
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <Lightbulb className="w-5 h-5 text-amber-500" />
-                  Idee & Proposte Avanzate dai Residenti
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Idee civiche proposte per migliorare Villaggio Prenestino con il conteggio dei voti "Mi piace".
-                </p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <Lightbulb className="w-5 h-5 text-amber-500" />
+                    Idee & Proposte Avanzate dai Residenti
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Esamina e modera le idee e proposte civiche dei residenti con conteggio voti e stato approvazione.
+                  </p>
+                </div>
+
+                {/* Filtri Stato Moderazione Proposte */}
+                <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl shrink-0 self-start sm:self-center">
+                  {(['tutti', 'in_attesa', 'approvata', 'rifiutata'] as const).map((f) => {
+                    const count = proposte.filter((p) => {
+                      if (f === 'tutti') return true;
+                      const st = p.statoApprovazione || 'approvata';
+                      return st === f;
+                    }).length;
+                    const labels = {
+                      tutti: 'Tutte',
+                      in_attesa: 'In Attesa',
+                      approvata: 'Approvate',
+                      rifiutata: 'Rifiutate',
+                    };
+                    return (
+                      <button
+                        key={f}
+                        type="button"
+                        onClick={() => setProposteStatoFiltro(f)}
+                        className={`px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1 ${
+                          proposteStatoFiltro === f
+                            ? 'bg-white text-slate-900 shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <span>{labels[f]}</span>
+                        <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 text-slate-700">
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              <div className="space-y-2.5">
-                {[...proposte].sort((a, b) => b.v - a.v).map((p, idx) => (
-                  <div
-                    key={p.id}
-                    className="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-3"
-                  >
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
-                          #{idx + 1}
-                        </span>
-                        <h4 className="text-xs sm:text-sm font-bold text-slate-900">{p.t}</h4>
-                      </div>
-                      <span className="text-[10px] text-slate-400">ID #{p.id}</span>
-                    </div>
+              {/* Tabella di Amministrazione Proposte con Colonna Azioni */}
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                        <th className="py-3 px-4"># Posizione & Titolo Proposta</th>
+                        <th className="py-3 px-4">Proponente & Data</th>
+                        <th className="py-3 px-4">Voti Community</th>
+                        <th className="py-3 px-4">Stato Moderazione</th>
+                        <th className="py-3 px-4 text-right">Azioni</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-xs">
+                      {[...proposte]
+                        .filter((p) => {
+                          if (proposteStatoFiltro === 'tutti') return true;
+                          const st = p.statoApprovazione || 'approvata';
+                          return st === proposteStatoFiltro;
+                        })
+                        .sort((a, b) => b.v - a.v)
+                        .map((p, idx) => {
+                          const stMod = p.statoApprovazione || 'approvata';
+                          const isPending = stMod === 'in_attesa';
+                          const isRejected = stMod === 'rifiutata';
+                          const isApproved = stMod === 'approvata';
 
-                    <div className="shrink-0 flex items-center gap-2">
-                      <span className="px-2.5 py-1 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold flex items-center gap-1">
-                        <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
-                        {p.v} voti
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                          return (
+                            <tr
+                              key={p.id}
+                              className={`transition-colors ${
+                                isPending
+                                  ? 'bg-amber-50/40 hover:bg-amber-50/70'
+                                  : isRejected
+                                  ? 'bg-rose-50/30 hover:bg-rose-50/50'
+                                  : 'hover:bg-slate-50/80'
+                              }`}
+                            >
+                              {/* Colonna 1: # Posizione & Titolo Proposta */}
+                              <td className="py-3.5 px-4 align-top">
+                                <div className="space-y-1 min-w-[200px]">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-black text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                                      #{idx + 1}
+                                    </span>
+                                    <h4 className="font-bold text-slate-900 text-xs sm:text-sm leading-snug">{p.t}</h4>
+                                  </div>
+                                  {isRejected && p.motivazioneRifiuto && (
+                                    <div className="p-2 rounded-lg bg-rose-100/80 border border-rose-200 text-rose-900 text-[11px] mt-1">
+                                      <strong>Motivazione Rifiuto:</strong> "{p.motivazioneRifiuto}"
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Colonna 2: Proponente & Data */}
+                              <td className="py-3.5 px-4 align-top shrink-0 min-w-[140px]">
+                                <div className="space-y-0.5">
+                                  <p className="text-[11px] font-medium text-slate-700">
+                                    {p.cittadinoNome ? <strong>{p.cittadinoNome}</strong> : <span className="text-slate-400">Anonimo</span>}
+                                  </p>
+                                  <p className="text-[10px] text-slate-400">
+                                    ID #{p.id} {p.data ? `• ${p.data}` : ''}
+                                  </p>
+                                </div>
+                              </td>
+
+                              {/* Colonna 3: Voti Community */}
+                              <td className="py-3.5 px-4 align-top whitespace-nowrap">
+                                <span className="px-2.5 py-1 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold inline-flex items-center gap-1">
+                                  <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+                                  {p.v} voti
+                                </span>
+                              </td>
+
+                              {/* Colonna 4: Stato Moderazione */}
+                              <td className="py-3.5 px-4 align-top whitespace-nowrap">
+                                {isPending && (
+                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 inline-flex items-center gap-1">
+                                    <Clock className="w-3 h-3 text-amber-600" />
+                                    <span>In Attesa di Approvazione</span>
+                                  </span>
+                                )}
+                                {isApproved && (
+                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                    <span>Approvata</span>
+                                  </span>
+                                )}
+                                {isRejected && (
+                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-800 border border-rose-300 inline-flex items-center gap-1">
+                                    <X className="w-3 h-3 text-rose-600 stroke-[3]" />
+                                    <span>Rifiutata</span>
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* Colonna 5: Azioni */}
+                              <td className="py-3.5 px-4 align-top text-right whitespace-nowrap">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {/* Bottone Approva */}
+                                  {!isApproved && onUpdatePropostaModerazione && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        onUpdatePropostaModerazione(p.id, 'approvata');
+                                        loadInsights();
+                                      }}
+                                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs rounded-xl shadow-2xs transition inline-flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                      <span>Approva</span>
+                                    </button>
+                                  )}
+
+                                  {/* Bottone Rifiuta */}
+                                  {!isRejected && onUpdatePropostaModerazione && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setRejectionModalItem({
+                                          type: 'proposta',
+                                          id: p.id,
+                                          titolo: p.t,
+                                        });
+                                        setRejectionReasonInput('');
+                                        setRejectionError(null);
+                                      }}
+                                      className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-bold text-xs rounded-xl shadow-2xs transition inline-flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                                      <span>Rifiuta</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -1996,6 +2416,127 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
             </div>
           )}
         </div>
+
+        {/* Modale Pop-Up Motivazione Rifiuto Admin (Obbligatoria) */}
+        {rejectionModalItem && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-xs animate-fadeIn">
+            <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-rose-200 space-y-4">
+              <div className="flex items-center justify-between border-b pb-3 border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2.5 rounded-2xl bg-rose-100 text-rose-700 border border-rose-200">
+                    <AlertTriangle className="w-5 h-5 stroke-[2.5]" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                      Campo Obbligatorio
+                    </span>
+                    <h4 className="font-black text-slate-900 text-base leading-tight mt-0.5">
+                      Motivazione Rifiuto
+                    </h4>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRejectionModalItem(null);
+                    setRejectionError(null);
+                  }}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Stai rifiutando la {rejectionModalItem.type === 'segnalazione' ? 'segnalazione' : rejectionModalItem.type === 'proposta' ? 'proposta' : 'attività'}:
+                  <strong className="block text-slate-900 font-bold mt-0.5 text-xs sm:text-sm bg-slate-50 p-2 rounded-xl border border-slate-200">
+                    "{rejectionModalItem.titolo}"
+                  </strong>
+                </p>
+                <p className="text-[11px] text-slate-500 italic">
+                  Per procedere con il rifiuto è <strong>obbligatorio</strong> specificare una motivazione. Il testo inserito verrà salvato e recapitato direttamente al cittadino via notifica e pop-up all'avvio dell'app.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center justify-between">
+                  <span>Motivazione del Rifiuto <span className="text-rose-600 font-black">*</span></span>
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    {rejectionReasonInput.length} caratteri
+                  </span>
+                </label>
+                <textarea
+                  rows={4}
+                  required
+                  value={rejectionReasonInput}
+                  onChange={(e) => {
+                    setRejectionReasonInput(e.target.value);
+                    if (rejectionError) setRejectionError(null);
+                  }}
+                  placeholder="Scrivi qui la motivazione dettagliata (es. 'La proposta riguarda un'area privata non di competenza comunale' oppure 'Segnalazione già presa in carico dal Dipartimento Lavori Pubblici')..."
+                  className={`w-full px-3.5 py-2.5 text-xs bg-slate-50 border rounded-2xl text-slate-900 focus:outline-none focus:ring-2 transition ${
+                    rejectionError
+                      ? 'border-rose-500 focus:ring-rose-500 bg-rose-50/50'
+                      : 'border-slate-300 focus:ring-rose-500 focus:bg-white'
+                  }`}
+                />
+                {rejectionError && (
+                  <p className="text-[11px] font-bold text-rose-600 mt-1.5 flex items-center gap-1 animate-fadeIn">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    {rejectionError}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRejectionModalItem(null);
+                    setRejectionError(null);
+                  }}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer transition"
+                >
+                  Annulla
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const cleanReason = rejectionReasonInput.trim();
+                    if (!cleanReason) {
+                      setRejectionError('La motivazione del rifiuto è obbligatoria. Inserisci un testo per inviare la notifica.');
+                      return;
+                    }
+
+                    if (rejectionModalItem.type === 'segnalazione' && onUpdateSegnalazioneModerazione) {
+                      onUpdateSegnalazioneModerazione(
+                        rejectionModalItem.id,
+                        'rifiutata',
+                        cleanReason
+                      );
+                    } else if (rejectionModalItem.type === 'proposta' && onUpdatePropostaModerazione) {
+                      onUpdatePropostaModerazione(
+                        rejectionModalItem.id,
+                        'rifiutata',
+                        cleanReason
+                      );
+                    }
+
+                    setRejectionModalItem(null);
+                    setRejectionReasonInput('');
+                    setRejectionError(null);
+                    if (typeof loadInsights === 'function') loadInsights();
+                  }}
+                  className="px-5 py-2.5 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white cursor-pointer shadow-md shadow-rose-600/25 transition flex items-center gap-1.5"
+                >
+                  <X className="w-4 h-4 stroke-[3]" />
+                  <span>Conferma Rifiuto e Invia Notifica</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="bg-slate-100 px-6 py-3 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 shrink-0">

@@ -3,11 +3,15 @@ import {
   ShoppingBag, 
   UtensilsCrossed, 
   HeartPulse, 
-  Wrench, 
+  Hammer, 
+  Sparkles, 
+  Dog, 
   Home, 
   Calendar,
   Percent,
-  Store
+  Store,
+  Wrench,
+  UserCheck
 } from 'lucide-react';
 import { CategoriaCommercio } from '../types';
 
@@ -42,28 +46,42 @@ const PIN_CONFIGS: Record<PinTipo, PinConfig> = {
     bg: '#d97706', // Ambra / Arancio
     border: '#b45309',
     iconColor: '#d97706',
-    label: 'Bar & Cucina',
+    label: 'Ristorazione',
     renderIcon: () => <UtensilsCrossed className="w-3.5 h-3.5 stroke-[2.5]" />,
   },
   salute: {
     bg: '#e11d48', // Rubino / Rosa scuro
     border: '#be123c',
     iconColor: '#e11d48',
-    label: 'Farmacia & Salute',
+    label: 'Farmacie & salute',
     renderIcon: () => <HeartPulse className="w-3.5 h-3.5 stroke-[2.5]" />,
   },
-  servizi: {
+  artigiani: {
+    bg: '#7c3aed', // Viola / Purple
+    border: '#6d28d9',
+    iconColor: '#7c3aed',
+    label: 'Artigiani',
+    renderIcon: () => <Hammer className="w-3.5 h-3.5 stroke-[2.5]" />,
+  },
+  servizi_persona: {
     bg: '#4f46e5', // Indaco / Blu reale
     border: '#4338ca',
     iconColor: '#4f46e5',
-    label: 'Artigiani & Servizi',
-    renderIcon: () => <Wrench className="w-3.5 h-3.5 stroke-[2.5]" />,
+    label: 'Servizi alla persona',
+    renderIcon: () => <Sparkles className="w-3.5 h-3.5 stroke-[2.5]" />,
+  },
+  servizi_animali: {
+    bg: '#0d9488', // Teal / Ottanio
+    border: '#0f766e',
+    iconColor: '#0d9488',
+    label: 'Servizi per animali',
+    renderIcon: () => <Dog className="w-3.5 h-3.5 stroke-[2.5]" />,
   },
   casa: {
     bg: '#0284c7', // Celeste / Sky
     border: '#0369a1',
     iconColor: '#0284c7',
-    label: 'Casa & Brico',
+    label: 'Casa, fai da te & hobby',
     renderIcon: () => <Home className="w-3.5 h-3.5 stroke-[2.5]" />,
   },
   evento: {
@@ -77,7 +95,7 @@ const PIN_CONFIGS: Record<PinTipo, PinConfig> = {
     bg: '#781816',
     border: '#53100e',
     iconColor: '#781816',
-    label: 'Generale',
+    label: 'Tutte le Categorie',
     renderIcon: () => <Store className="w-3.5 h-3.5 stroke-[2.5]" />,
   },
 };

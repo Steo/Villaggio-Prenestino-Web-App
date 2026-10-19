@@ -221,25 +221,37 @@ const CATEGORIA_BADGE_STYLE: Record<
     border: 'border-emerald-300 dark:border-emerald-700/80',
   },
   ristorazione: {
-    label: 'Bar & Cucina',
+    label: 'Ristorazione',
     text: 'text-amber-700 dark:text-amber-400',
     bg: 'bg-amber-50 dark:bg-amber-950/60',
     border: 'border-amber-300 dark:border-amber-700/80',
   },
   salute: {
-    label: 'Farmacia & Salute',
+    label: 'Farmacie & salute',
     text: 'text-rose-700 dark:text-rose-400',
     bg: 'bg-rose-50 dark:bg-rose-950/60',
     border: 'border-rose-300 dark:border-rose-700/80',
   },
-  servizi: {
-    label: 'Artigiani & Servizi',
+  artigiani: {
+    label: 'Artigiani',
+    text: 'text-purple-700 dark:text-purple-400',
+    bg: 'bg-purple-50 dark:bg-purple-950/60',
+    border: 'border-purple-300 dark:border-purple-700/80',
+  },
+  servizi_persona: {
+    label: 'Servizi alla persona',
     text: 'text-indigo-700 dark:text-indigo-400',
     bg: 'bg-indigo-50 dark:bg-indigo-950/60',
     border: 'border-indigo-300 dark:border-indigo-700/80',
   },
+  servizi_animali: {
+    label: 'Servizi per animali',
+    text: 'text-teal-700 dark:text-teal-400',
+    bg: 'bg-teal-50 dark:bg-teal-950/60',
+    border: 'border-teal-300 dark:border-teal-700/80',
+  },
   casa: {
-    label: 'Casa & Brico',
+    label: 'Casa, fai da te & hobby',
     text: 'text-sky-700 dark:text-sky-400',
     bg: 'bg-sky-50 dark:bg-sky-950/60',
     border: 'border-sky-300 dark:border-sky-700/80',
@@ -423,11 +435,13 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
               aria-label="Filtra per categoria"
             >
               <option value="tutti" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">Tutte le botteghe ({attivita.length})</option>
-              <option value="alimentari" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">🛒 Alimentari ({attivita.filter(a => a.categoria === 'alimentari').length})</option>
-              <option value="ristorazione" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">🍽️ Ristorazione ({attivita.filter(a => a.categoria === 'ristorazione').length})</option>
-              <option value="salute" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">💊 Salute & Farmacia ({attivita.filter(a => a.categoria === 'salute').length})</option>
-              <option value="servizi" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">🔧 Servizi & Artigiani ({attivita.filter(a => a.categoria === 'servizi').length})</option>
-              <option value="casa" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">🏡 Casa & Brico ({attivita.filter(a => a.categoria === 'casa').length})</option>
+              <option value="alimentari" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">🍞 Alimentari ({attivita.filter(a => a.categoria === 'alimentari').length})</option>
+              <option value="ristorazione" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">🍕 Ristorazione ({attivita.filter(a => a.categoria === 'ristorazione').length})</option>
+              <option value="salute" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">💊 Farmacie & salute ({attivita.filter(a => a.categoria === 'salute').length})</option>
+              <option value="artigiani" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">🔨 Artigiani ({attivita.filter(a => a.categoria === 'artigiani').length})</option>
+              <option value="servizi_persona" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">💇 Servizi alla persona ({attivita.filter(a => a.categoria === 'servizi_persona').length})</option>
+              <option value="servizi_animali" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">🐾 Servizi per animali ({attivita.filter(a => a.categoria === 'servizi_animali').length})</option>
+              <option value="casa" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">🏡 Casa, fai da te & hobby ({attivita.filter(a => a.categoria === 'casa').length})</option>
             </select>
           </div>
         ) : <div />}

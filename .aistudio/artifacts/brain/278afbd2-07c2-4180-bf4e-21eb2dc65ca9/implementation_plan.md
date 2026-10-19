@@ -1,71 +1,31 @@
-# Scheda Attività Modale ad Alta Leggibilità da Mappa
+# Piano d'Azione: Gestione e Approvazione/Rifiuto Proposte e Segnalazioni nel Plugin WordPress
 
-Sostituzione dell'attuale fumetto nativo InfoWindow di Google Maps con un popup modale dedicato, spazioso e ad alto contrasto, che si apre direttamente al tocco del pin per garantire la massima leggibilità e usabilità sia su smartphone che su desktop.
-
-## User Review & Critical Decisions
-
-> [!IMPORTANT]
-> **Decisioni confermate dall'utente nella fase di intervista:**
-> - **Tipo di interfaccia**: Popup modale centrato ad alta leggibilità (anziché bottom sheet o solo scorrimento).
-> - **Comportamento di apertura**: Apertura immediata della scheda completa al tocco del pin sulla mappa (senza passaggi intermedi o mini-anteprime).
+Questo piano definisce l'implementazione per visualizzare tutte le proposte ed il report delle segnalazioni (inclusi gli elementi con stato "in attesa" o "da approvare") all'interno della dashboard del plugin WordPress (`WpPluginPanel`), fornendo all'amministratore i comandi per approvare o rifiutare le sottomissioni e notificando gli utenti tramite pop-up e centro notifiche.
 
 ---
 
-## 1. Overview & Core Concept
-
-- **Problema attuale**: L'InfoWindow nativo di Google Maps inserito all'interno del riquadro cartografico è vincolato a dimensioni ristrette (~285px) e alle coordinate del pin. Su schermi piccoli, le informazioni (foto, categoria, orari, indirizzo, offerte promozionali e bottoni di chiamata/indicazioni) risultano compresse e difficili da consultare.
-- **Soluzione**: Al tocco di un pin commerciante sulla mappa, viene visualizzato un **popup modale dedicato centrato a schermo** con backdrop semi-trasparente e sfumato, scroll fluido dei contenuti, tipografia nitida, immagini ad alta risoluzione, pulsante di chiusura chiaro e ben visibile sia in modalità giorno che notte, e azioni rapide dirette (WhatsApp, Telefono, Indicazioni stradali, Gestione scheda con PIN).
-
----
-
-## 2. User Experience & Visual Design
-
-### Flusso Utente
-1. L'utente naviga la mappa e tocca/clicca su un pin commerciante.
-2. La mappa centra dolcemente il pin selezionato e compare immediatamente il popup modale con animazione fluida di apertura (`scaleUp` / `fadeIn`).
-3. L'utente può consultare tutti i dettagli senza sovrapposizioni:
-   - **Copertina & Badge**: Immagine del negozio ben dimensionata con badge offerta attiva.
-   - **Intestazione**: Nome dell'attività in grande rilievo, categoria commerciale e badge di verifica associazione.
-   - **Info Pratiche**: Indirizzo completo, orari di apertura chiari con icona orologio.
-   - **Box Offerta Promozionale**: Se presente un'offerta attiva per i residenti del quartiere, è mostrata in un riquadro dedicato con dettagli chiari.
-   - **Descrizione**: Testo descrittivo del negozio senza tagli o troncamenti forzati.
-   - **Pulsanti di Azione Rapida**:
-     - *Chiama subito* (telefono)
-     - *Invia messaggio WhatsApp* (apertura diretta chat)
-     - *Indicazioni Stradali* (apre Google Maps per calcolo percorso a piedi o in auto)
-     - *Gestisci scheda* (per i commercianti con PIN)
-4. La modale si chiude toccando il tasto "X" chiaro in alto a destra, toccando lo sfondo scuro, o premendo il tasto ESC.
-
-### Adattamento Mobile e Dark Mode
-- **Mobile verticale**: Larghezza fluida del 94% con altezza massima dell'85vh e scroll interno per garantire che nessun elemento venga tagliato anche sui dispositivi più compatti.
-- **Dark Mode**: Sfondo scuro elegante `#0b1329` / `bg-slate-900`, bordi sottili in `slate-700`, testi bianchi ad alto contrasto, e tasto "X" chiaro e nitido.
+### 1. Visualizzazione e Azioni nella Dashboard WordPress (`WpPluginPanel.tsx`)
+- **Tabelle Proposte e Segnalazioni**: Modificare la logica di filtraggio nelle tabelle delle tab del plugin per mostrare sia gli elementi approvati sia quelli con stato "in attesa" / "in_attesa" o "da approvare".
+- **Badge di Stato e Pulsanti di Azione**:
+  - Aggiungere un badge distintivo per lo stato (es. "In attesa di approvazione", "Approvato", "Rifiutato").
+  - Aggiungere i pulsanti **"Approva"** (con icona di spunta verde) e **"Rifiuta"** (con icona X rossa) su ogni riga non ancora processata.
+- **Azione Approva**: Aggiorna direttamente lo stato della segnalazione/proposta impostandolo come approvato e pubblicandolo nell'app.
 
 ---
 
-## 3. Key Product Decisions & Trade-Offs
-
-- **Rimozione di InfoWindow a favore della modale dedicata**:
-  - *Scelta*: Disabilitare il rendering del componente `InfoWindow` di `@vis.gl/react-google-maps` per evitare vincoli di overflow e posizionamento forzato dal motore di Google Maps.
-  - *Vantaggi*: Controllo totale su accessibilità, contrasto, scroll touch, responsive design e animazioni.
-- **Apertura diretta senza schermata intermedia**:
-  - *Scelta*: Come confermato dall'utente, al tocco del pin si apre subito la scheda ricca e completa, riducendo i passaggi a vuoto e facilitando il contatto immediato con il commerciante.
+### 2. Modale di Rifiuto per l'Amministratore
+- **Modale Motivazione Rifiuto**: Alla pressione del pulsante "Rifiuta", apre un pop-up modale dove l'amministratore può scrivere una motivazione personalizzata spiegando il motivo del rifiuto.
+- **Invio e Conferma**: Al confermare il rifiuto, il sistema imposta lo stato della sottomissione a "Rifiutato" e registra il messaggio dell'amministratore accoppiato all'utente o all'ID dell'inserimento.
 
 ---
 
-## 4. Technical Architecture & Data Strategy
+### 3. Notifica Pop-up e Centro Notifiche per l'Utente (`NotificationCenterModal.tsx` & `App.tsx`)
+- **Generazione Notifica**: Registra la notifica di rifiuto contenente la motivazione dell'amministratore ed il titolo della proposta/segnalazione rifiutata.
+- **Pop-up Informativo all'Avvio**: Se l'utente ha una o più notifiche di rifiuto non ancora lette o appena ricevute, mostra automaticamente un pop-up informativo all'avvio dell'applicazione.
+- **Integrazione Centro Notifiche**: Visualizza la notifica dettagliata anche nell'elenco della campanella delle notifiche per consultazioni successive.
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│ CommercioTab / MappaQuartiere                                │
-│                                                              │
-│  ┌───────────────────────┐       ┌────────────────────────┐  │
-│  │ Google Maps API       │       │ ModalSchedaCommerciante│  │
-│  │ CustomMapMarker (Pin) │──────>│ (Popup Modale Centrato)│  │
-│  └───────────────────────┘       └────────────────────────┘  │
-│             │                                 │              │
-│       onSelectAttivita             Azioni: Tel / WA / Mappe  │
-└──────────────────────────────────────────────────────────────┘
-```
+---
 
-- **Componente**: Implementazione di un componente modale ad alta leggibilità in `MappaQuartiere` o `CommercioTab` pilotato dallo stato `selectedItem` / `selectedAttivitaId`.
-- **Integrazione**: Mantenimento della sincronizzazione tra la selezione da mappa e la vetrina commercianti sottostante.
+### 4. Verifiche e Compilazione
+- Esecuzione di `compile_applet` e `lint_applet` per verificare che non vi siano errori di tipo o sintassi TypeScript.
+- Verifica del corretto riavvio del dev server e fruibilità completa dell'interfaccia.

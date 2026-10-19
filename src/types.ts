@@ -29,13 +29,16 @@ export interface EventoQuartiere {
   lng?: number;
 }
 
-export type CategoriaCommercio = 
-  | 'tutti' 
+export type CategoriaCommercioKey = 
   | 'alimentari' 
   | 'ristorazione' 
   | 'salute' 
-  | 'servizi' 
+  | 'artigiani' 
+  | 'servizi_persona' 
+  | 'servizi_animali' 
   | 'casa';
+
+export type CategoriaCommercio = 'tutti' | CategoriaCommercioKey;
 
 export interface OffertaCommercio {
   titolo: string;
@@ -47,7 +50,7 @@ export interface OffertaCommercio {
 export interface AttivitaCommercio {
   id: number;
   nome: string;
-  categoria: 'alimentari' | 'ristorazione' | 'salute' | 'servizi' | 'casa';
+  categoria: CategoriaCommercioKey;
   descrizione: string;
   indirizzo: string;
   lat: number;
@@ -74,7 +77,7 @@ export interface AttivitaCommercio {
 
 export interface NuovaAttivitaForm {
   nome: string;
-  categoria: 'alimentari' | 'ristorazione' | 'salute' | 'servizi' | 'casa';
+  categoria: CategoriaCommercioKey;
   indirizzo: string;
   telefono: string;
   whatsapp: string;
@@ -109,17 +112,24 @@ export interface SegnalazioneCittadina {
   t: string;           // Titolo / Tipo problema
   w: string;           // Luogo / Indirizzo esatto
   desc: string;        // Descrizione
-  s: StatoSegnalazione;// Stato
+  s: StatoSegnalazione;// Stato (1: Ricevuta, 2: Inoltrata, 3: Risolta)
   ph: string[];        // Foto (URL o base64)
   data: string;        // Data
   cittadinoNome?: string;
   cittadinoTel?: string;
+  statoApprovazione?: 'in_attesa' | 'approvata' | 'rifiutata';
+  motivazioneRifiuto?: string;
 }
 
 export interface PropostaCittadina {
   id: number;
   t: string;           // Titolo proposta
   v: number;           // Numero voti "Mi piace"
+  desc?: string;       // Descrizione proposta
+  data?: string;       // Data
+  cittadinoNome?: string;
+  statoApprovazione?: 'in_attesa' | 'approvata' | 'rifiutata';
+  motivazioneRifiuto?: string;
 }
 
 export interface CandidaturaVolontario {

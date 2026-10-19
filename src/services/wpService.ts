@@ -561,6 +561,7 @@ export async function submitSegnalazione(data: {
     data: new Date().toLocaleDateString('it-IT'),
     cittadinoNome: data.nome,
     cittadinoTel: data.telefono,
+    statoApprovazione: 'in_attesa',
   };
 
   store.segnalazioni.unshift(newSegnalazione);
@@ -649,6 +650,8 @@ export async function submitProposta(titolo: string): Promise<{ success: boolean
     id: newId,
     t: titolo,
     v: 1, // Voto iniziale di chi propone
+    statoApprovazione: 'in_attesa',
+    data: new Date().toLocaleDateString('it-IT'),
   });
   saveLocalDataStore(store);
 
@@ -827,6 +830,74 @@ export async function adminUpdateSegnalazioneStato(
       });
     } catch (e) {
       console.warn('Aggiornamento stato segnalazione su WordPress fallito:', e);
+    }
+  }
+
+  return true;
+}
+
+export async function adminUpdateSegnalazioneModerazione(
+  id: number,
+  statoApprovazione: 'approvata' | 'rifiutata' | 'in_attesa',
+  motivazioneRifiuto?: string
+): Promise<boolean> {
+  const store = getLocalDataStore();
+  const seg = store.segnalazioni.find((s) => s.id === id);
+  if (seg) {
+    seg.statoApprovazione = statoApprovazione;
+    seg.motivazioneRifiuto = motivazioneRifiuto || '';
+    saveLocalDataStore(store);
+  }
+
+  const cfg = getWpConfig();
+  if (cfg.useLiveApi) {
+    try {
+      const apiBase = getEffectiveBaseUrl();
+      await fetch(`${apiBase}/wp-json/vp/v1/segnalazione/moderazione`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-VP-Key': cfg.apiKey,
+          'X-VP-Token': getOrCreateToken(),
+        },
+        body: JSON.stringify({ id, stato: statoApprovazione, motivazione: motivazioneRifiuto || '' }),
+      });
+    } catch (e) {
+      console.warn('Moderazione segnalazione su WP fallita:', e);
+    }
+  }
+
+  return true;
+}
+
+export async function adminUpdatePropostaModerazione(
+  id: number,
+  statoApprovazione: 'approvata' | 'rifiutata' | 'in_attesa',
+  motivazioneRifiuto?: string
+): Promise<boolean> {
+  const store = getLocalDataStore();
+  const prop = store.proposte.find((p) => p.id === id);
+  if (prop) {
+    prop.statoApprovazione = statoApprovazione;
+    prop.motivazioneRifiuto = motivazioneRifiuto || '';
+    saveLocalDataStore(store);
+  }
+
+  const cfg = getWpConfig();
+  if (cfg.useLiveApi) {
+    try {
+      const apiBase = getEffectiveBaseUrl();
+      await fetch(`${apiBase}/wp-json/vp/v1/proposta/moderazione`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-VP-Key': cfg.apiKey,
+          'X-VP-Token': getOrCreateToken(),
+        },
+        body: JSON.stringify({ id, stato: statoApprovazione, motivazione: motivazioneRifiuto || '' }),
+      });
+    } catch (e) {
+      console.warn('Moderazione proposta su WP fallita:', e);
     }
   }
 

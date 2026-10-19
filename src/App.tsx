@@ -25,6 +25,8 @@ import {
   saveWpConfig,
   adminCreateEvento,
   adminUpdateSegnalazioneStato,
+  adminUpdateSegnalazioneModerazione,
+  adminUpdatePropostaModerazione,
   adminCreateRichiesta,
   syncCitizenPointsToWp,
   submitAttivitaCommercio,
@@ -56,6 +58,7 @@ import { NotificationCenterModal } from './components/NotificationCenterModal';
 import { ExportModal } from './components/ExportModal';
 import { PwaInstallBanner } from './components/PwaInstallBanner';
 import { GuidaTourModal } from './components/GuidaTourModal';
+import { RejectionNoticeModal, RejectedItemNotice } from './components/RejectionNoticeModal';
 import { AttivitaCommercio } from './types';
 import {
   NuovoLivelloModal,
@@ -319,6 +322,9 @@ export default function App() {
   // Guida Tour Interattiva Onboarding
   const [tourModalOpen, setTourModalOpen] = useState(false);
 
+  // Pop-up Avviso Rifiuto per l'utente all'avvio dell'app
+  const [userRejectedItemNotice, setUserRejectedItemNotice] = useState<RejectedItemNotice | null>(null);
+
   // Controllo primo avvio per mostrare la guida interattiva
   useEffect(() => {
     try {
@@ -516,6 +522,145 @@ export default function App() {
     }
     setWpPanelOpen(false);
     showToast('Modalità Amministratore disattivata. Vista cittadino attiva.');
+  };
+
+  const handleUpdateSegnalazioneModerazione = async (
+    id: number,
+    statoApprovazione: 'approvata' | 'rifiutata' | 'in_attesa',
+    motivazioneRifiuto?: string
+  ) => {
+    await adminUpdateSegnalazioneModerazione(id, statoApprovazione, motivazioneRifiuto);
+    setSegnalazioni((prev) =>
+      prev.map((s) =>
+        s.id === id
+          ? { ...s, statoApprovazione, motivazioneRifiuto: motivazioneRifiuto || '' }
+          : s
+      )
+    );
+
+    if (statoApprovazione === 'rifiutata') {
+      const seg = segnalazioni.find((s) => s.id === id);
+      const title = seg ? seg.t : 'Segnalazione';
+      triggerNotification({
+        tipo: 'segnalazione_stato',
+        titolo: '❌ Segnalazione non approvata',
+        messaggio: `La tua segnalazione "${title}" è stata rifiutata dall'amministratore. Motivazione: "${motivazioneRifiuto || 'Non conforme alle linee guida.'}"`,
+        targetId: id,
+      });
+      showToast(`Segnalazione #${id} rifiutata. Notifica inviata al mittente.`);
+    } else if (statoApprovazione === 'approvata') {
+      const seg = segnalazioni.find((s) => s.id === id);
+      const title = seg ? seg.t : 'Segnalazione';
+      triggerNotification({
+        tipo: 'segnalazione_stato',
+        titolo: '✅ Segnalazione Approvata!',
+        messaggio: `La tua segnalazione "${title}" è stata approvata e pubblicata nell'app di quartiere.`,
+        targetId: id,
+      });
+      showToast('Segnalazione approvata e pubblicata con successo!');
+    }
+  };
+
+  const handleUpdatePropostaModerazione = async (
+    id: number,
+    statoApprovazione: 'approvata' | 'rifiutata' | 'in_attesa',
+    motivazioneRifiuto?: string
+  ) => {
+    await adminUpdatePropostaModerazione(id, statoApprovazione, motivazioneRifiuto);
+    setProposte((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? { ...p, statoApprovazione, motivazioneRifiuto: motivazioneRifiuto || '' }
+          : p
+      )
+    );
+
+    if (statoApprovazione === 'rifiutata') {
+      const prop = proposte.find((p) => p.id === id);
+      const title = prop ? prop.t : 'Proposta';
+      triggerNotification({
+        tipo: 'proposta_voti',
+        titolo: '❌ Proposta non approvata',
+        messaggio: `La tua proposta "${title}" è stata rifiutata dall'amministratore. Motivazione: "${motivazioneRifiuto || 'Non conforme alle linee guida.'}"`,
+        targetId: id,
+      });
+      showToast(`Proposta #${id} rifiutata. Notifica inviata al mittente.`);
+    } else if (statoApprovazione === 'approvata') {
+      const prop = proposte.find((p) => p.id === id);
+      const title = prop ? prop.t : 'Proposta';
+      triggerNotification({
+        tipo: 'proposta_voti',
+        titolo: '✅ Proposta Approvata!',
+        messaggio: `La tua proposta "${title}" è stata approvata e pubblicata nell'app di quartiere.`,
+        targetId: id,
+      });
+      showToast('Proposta approvata e pubblicata con successo!');
+    }
+  };
+
+  // Controllo avviso di rifiuto per l'utente all'avvio dell'app o dopo la moderazione
+  useEffect(() => {
+    if (loadingData) return;
+    try {
+      const acknowledgedRaw = localStorage.getItem('vp_acknowledged_rejections');
+      const acknowledged: number[] = acknowledgedRaw ? JSON.parse(acknowledgedRaw) : [];
+
+      const mieSegn = interactions.mieSegnalazioni || [];
+      const mieProp = interactions.mieProposte || [];
+
+      // Cerca segnalazioni rifiutate inviate da me non ancora lette
+      const rejectedSeg = segnalazioni.find(
+        (s) =>
+          mieSegn.includes(s.id) &&
+          s.statoApprovazione === 'rifiutata' &&
+          !acknowledged.includes(s.id)
+      );
+
+      if (rejectedSeg) {
+        setUserRejectedItemNotice({
+          id: rejectedSeg.id,
+          type: 'segnalazione',
+          titolo: rejectedSeg.t,
+          motivazione: rejectedSeg.motivazioneRifiuto || 'Non conforme alle linee guida della comunità.',
+          data: rejectedSeg.data,
+        });
+        return;
+      }
+
+      // Cerca proposte rifiutate inviate da me non ancora lette
+      const rejectedProp = proposte.find(
+        (p) =>
+          mieProp.includes(p.id) &&
+          p.statoApprovazione === 'rifiutata' &&
+          !acknowledged.includes(p.id)
+      );
+
+      if (rejectedProp) {
+        setUserRejectedItemNotice({
+          id: rejectedProp.id,
+          type: 'proposta',
+          titolo: rejectedProp.t,
+          motivazione: rejectedProp.motivazioneRifiuto || 'Non conforme alle linee guida della comunità.',
+          data: rejectedProp.data,
+        });
+      }
+    } catch {
+      // ignore
+    }
+  }, [segnalazioni, proposte, interactions.mieSegnalazioni, interactions.mieProposte, loadingData]);
+
+  const handleAcknowledgeRejection = (id: number) => {
+    try {
+      const acknowledgedRaw = localStorage.getItem('vp_acknowledged_rejections');
+      const acknowledged: number[] = acknowledgedRaw ? JSON.parse(acknowledgedRaw) : [];
+      if (!acknowledged.includes(id)) {
+        acknowledged.push(id);
+        localStorage.setItem('vp_acknowledged_rejections', JSON.stringify(acknowledged));
+      }
+    } catch {
+      // ignore
+    }
+    setUserRejectedItemNotice(null);
   };
 
   const loadData = async () => {
@@ -1073,6 +1218,8 @@ export default function App() {
           loadData();
           showToast('Stato segnalazione aggiornato!');
         }}
+        onUpdateSegnalazioneModerazione={handleUpdateSegnalazioneModerazione}
+        onUpdatePropostaModerazione={handleUpdatePropostaModerazione}
         onCreateEvento={async (ev) => {
           await adminCreateEvento(ev);
           loadData();
@@ -1083,6 +1230,7 @@ export default function App() {
           loadData();
           showToast('Nuova attività volontariato pubblicata!');
         }}
+        onApprovaAttivita={handleApprovaAttivita}
         onDeactivateAdmin={handleDeactivateAdmin}
       />
 
@@ -1167,6 +1315,14 @@ export default function App() {
             // ignore
           }
         }}
+        darkMode={darkMode}
+      />
+
+      {/* Pop up informativo di avviso per l'utente in caso di proposta o segnalazione rifiutata */}
+      <RejectionNoticeModal
+        isOpen={!!userRejectedItemNotice}
+        item={userRejectedItemNotice}
+        onAcknowledge={handleAcknowledgeRejection}
         darkMode={darkMode}
       />
     </div>

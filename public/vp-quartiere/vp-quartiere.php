@@ -463,11 +463,13 @@ function vpq_render_commercio_meta($post) {
             <th><label for="vp_categoria">Categoria Merceologica:</label></th>
             <td>
                 <select id="vp_categoria" name="vp_categoria">
-                    <option value="alimentari" <?php selected($categoria, 'alimentari'); ?>>🍞 Alimentari & Gastronomia</option>
-                    <option value="ristorazione" <?php selected($categoria, 'ristorazione'); ?>>🍕 Bar & Ristorazione</option>
-                    <option value="salute" <?php selected($categoria, 'salute'); ?>>💊 Salute & Farmacia</option>
-                    <option value="servizi" <?php selected($categoria, 'servizi'); ?>>🔧 Artigiani & Servizi</option>
-                    <option value="casa" <?php selected($categoria, 'casa'); ?>>🏡 Casa, Giardino & Hobby</option>
+                    <option value="alimentari" <?php selected($categoria, 'alimentari'); ?>>🍞 Alimentari</option>
+                    <option value="ristorazione" <?php selected($categoria, 'ristorazione'); ?>>🍕 Ristorazione</option>
+                    <option value="salute" <?php selected($categoria, 'salute'); ?>>💊 Farmacie & salute</option>
+                    <option value="artigiani" <?php selected($categoria, 'artigiani'); ?>>🔨 Artigiani</option>
+                    <option value="servizi_persona" <?php selected($categoria, 'servizi_persona'); ?>>💇 Servizi alla persona</option>
+                    <option value="servizi_animali" <?php selected($categoria, 'servizi_animali'); ?>>🐾 Servizi per animali</option>
+                    <option value="casa" <?php selected($categoria, 'casa'); ?>>🏡 Casa, fai da te & hobby</option>
                 </select>
             </td>
         </tr>

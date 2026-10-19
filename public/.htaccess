@@ -17,11 +17,13 @@
   RewriteRule . /app/index.html [L]
 </IfModule>
 
-# Caching risorse statiche per massima velocità
+# Caching risorse statiche e tipi MIME per PWA
+AddType application/manifest+json .webmanifest .json
 <IfModule mod_expires.c>
   ExpiresActive On
   ExpiresByType text/css "access plus 1 year"
   ExpiresByType application/javascript "access plus 1 year"
   ExpiresByType image/svg+xml "access plus 1 year"
   ExpiresByType image/png "access plus 1 year"
+  ExpiresByType application/manifest+json "access plus 1 year"
 </IfModule>

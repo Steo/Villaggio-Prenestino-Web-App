@@ -1,3 +1,4 @@
+import { geocodeAndValidateAddress } from '../utils/geocodingUtils';
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   AttivitaCommercio, 
@@ -44,6 +45,7 @@ import {
   KeyRound,
   Info,
   Percent,
+  Loader2,
 } from 'lucide-react';
 import { CommercioSkeletonGrid } from './SkeletonLoaders';
 import { BannerOffertaCommercio } from './BannerOffertaCommercio';
@@ -91,7 +93,7 @@ const CATEGORIA_CONFIG: Record<
     inactiveBadge: 'bg-emerald-200/70 dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-200',
   },
   ristorazione: {
-    label: 'Bar & Cucina',
+    label: 'Ristorazione',
     emoji: '🍕',
     dotBg: 'bg-amber-600',
     activeClass: 'bg-amber-600 text-white shadow-sm border-amber-600 ring-2 ring-amber-500/30',
@@ -100,7 +102,7 @@ const CATEGORIA_CONFIG: Record<
     inactiveBadge: 'bg-amber-200/70 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200',
   },
   salute: {
-    label: 'Farmacia & Salute',
+    label: 'Farmacie & salute',
     emoji: '💊',
     dotBg: 'bg-rose-600',
     activeClass: 'bg-rose-600 text-white shadow-sm border-rose-600 ring-2 ring-rose-500/30',
@@ -108,17 +110,35 @@ const CATEGORIA_CONFIG: Record<
     activeBadge: 'bg-white/20 text-white',
     inactiveBadge: 'bg-rose-200/70 dark:bg-rose-900/60 text-rose-900 dark:text-rose-200',
   },
-  servizi: {
-    label: 'Artigiani & Servizi',
-    emoji: '🔧',
+  artigiani: {
+    label: 'Artigiani',
+    emoji: '🔨',
+    dotBg: 'bg-purple-600',
+    activeClass: 'bg-purple-600 text-white shadow-sm border-purple-600 ring-2 ring-purple-500/30',
+    inactiveClass: 'bg-purple-50/80 dark:bg-purple-950/30 text-purple-800 dark:text-purple-300 border-purple-300/80 dark:border-purple-800 hover:bg-purple-100/80 dark:hover:bg-purple-900/50',
+    activeBadge: 'bg-white/20 text-white',
+    inactiveBadge: 'bg-purple-200/70 dark:bg-purple-900/60 text-purple-900 dark:text-purple-200',
+  },
+  servizi_persona: {
+    label: 'Servizi alla persona',
+    emoji: '💇',
     dotBg: 'bg-indigo-600',
     activeClass: 'bg-indigo-600 text-white shadow-sm border-indigo-600 ring-2 ring-indigo-500/30',
     inactiveClass: 'bg-indigo-50/80 dark:bg-indigo-950/30 text-indigo-800 dark:text-indigo-300 border-indigo-300/80 dark:border-indigo-800 hover:bg-indigo-100/80 dark:hover:bg-indigo-900/50',
     activeBadge: 'bg-white/20 text-white',
     inactiveBadge: 'bg-indigo-200/70 dark:bg-indigo-900/60 text-indigo-900 dark:text-indigo-200',
   },
+  servizi_animali: {
+    label: 'Servizi per animali',
+    emoji: '🐾',
+    dotBg: 'bg-teal-600',
+    activeClass: 'bg-teal-600 text-white shadow-sm border-teal-600 ring-2 ring-teal-500/30',
+    inactiveClass: 'bg-teal-50/80 dark:bg-teal-950/30 text-teal-800 dark:text-teal-300 border-teal-300/80 dark:border-teal-800 hover:bg-teal-100/80 dark:hover:bg-teal-900/50',
+    activeBadge: 'bg-white/20 text-white',
+    inactiveBadge: 'bg-teal-200/70 dark:bg-teal-900/60 text-teal-900 dark:text-teal-200',
+  },
   casa: {
-    label: 'Casa & Brico',
+    label: 'Casa, fai da te & hobby',
     emoji: '🏡',
     dotBg: 'bg-sky-600',
     activeClass: 'bg-sky-600 text-white shadow-sm border-sky-600 ring-2 ring-sky-500/30',
@@ -211,7 +231,7 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
   };
 
   // Form stato nuova attività
-  const [formData, setFormData] = useState<NuovaAttivitaForm>({
+    const [formData, setFormData] = useState<NuovaAttivitaForm>({
     nome: '',
     categoria: 'alimentari',
     indirizzo: '',
@@ -224,6 +244,41 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
     nomeReferente: '',
     emailReferente: '',
   });
+
+  // Geocoding & Indirizzo 3km validation states
+  const [regAddressChecking, setRegAddressChecking] = useState(false);
+  const [regAddressValid, setRegAddressValid] = useState(true);
+  const [regAddressError, setRegAddressError] = useState<string | null>(null);
+  const [regAddressDistance, setRegAddressDistance] = useState<number | null>(null);
+  const [regGeocodedLat, setRegGeocodedLat] = useState<number>(41.8985);
+  const [regGeocodedLng, setRegGeocodedLng] = useState<number>(12.6865);
+
+  useEffect(() => {
+    if (!formData.indirizzo.trim()) {
+      setRegAddressValid(true);
+      setRegAddressError(null);
+      setRegAddressChecking(false);
+      return;
+    }
+
+    setRegAddressChecking(true);
+    const timer = setTimeout(async () => {
+      const result = await geocodeAndValidateAddress(formData.indirizzo);
+      setRegAddressChecking(false);
+      if (result.isValid) {
+        setRegAddressValid(true);
+        setRegAddressError(null);
+        setRegAddressDistance(result.distanceKm);
+        setRegGeocodedLat(result.lat);
+        setRegGeocodedLng(result.lng);
+      } else {
+        setRegAddressValid(false);
+        setRegAddressError(result.errorMsg || "L'indirizzo deve trovarsi entro 3 km da Via Fosso dell'Osa 507, Roma.");
+      }
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [formData.indirizzo]);
 
   // Stati per la selezione standardizzata degli orari di apertura
   const [selectedDays, setSelectedDays] = useState<string[]>(['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab']);
@@ -294,7 +349,9 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
       .filter((shop) => {
         // Filtro categoria
         if (selectedCategory !== 'tutti' && shop.categoria !== selectedCategory) {
-          return false;
+          if (!(selectedCategory === 'servizi_persona' && (shop.categoria as string) === 'servizi')) {
+            return false;
+          }
         }
         // Solo offerte
         if (onlyOffers && !shop.offertaAttiva) {
@@ -352,9 +409,10 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
     e.preventDefault();
     if (!formData.nome.trim() || !formData.indirizzo.trim()) return;
 
-    // Coordinate con lieve offset per evitare sovrapposizioni su Villaggio Prenestino
-    const randomOffsetLat = (Math.random() - 0.5) * 0.008;
-    const randomOffsetLng = (Math.random() - 0.5) * 0.008;
+    if (!regAddressValid) {
+      alert(regAddressError || 'L\'indirizzo specificato dev\'essere entro 3 km da Via Fosso dell\'Osa 507, Roma.');
+      return;
+    }
 
     const newShop: AttivitaCommercio = {
       id: Date.now(),
@@ -363,8 +421,8 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
       indirizzo: formData.indirizzo.includes('Villaggio Prenestino') 
         ? formData.indirizzo.trim() 
         : `${formData.indirizzo.trim()}, Villaggio Prenestino, Roma`,
-      lat: 41.8965 + randomOffsetLat,
-      lng: 12.6710 + randomOffsetLng,
+      lat: regGeocodedLat,
+      lng: regGeocodedLng,
       telefono: formData.telefono.trim() || '06 2244 0000',
       whatsapp: formData.whatsapp.replace(/\D/g, ''),
       orari: formData.orari.trim() || 'Lun-Sab 09:00 - 19:30',
@@ -638,11 +696,11 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                   </span>
                   {selectedCategory !== 'tutti' ? (
                     <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                      Attivo: <span className="font-bold">{CATEGORIA_CONFIG[selectedCategory].label}</span>
+                      Attivo: <span className="font-bold">{CATEGORIA_CONFIG[selectedCategory]?.label || selectedCategory}</span>
                     </span>
                   ) : (
                     <span className="text-[11px] text-slate-400 hidden sm:inline">
-                      (Tutte le 6 categorie visibili)
+                      (Tutte le 7 categorie visibili)
                     </span>
                   )}
                 </div>
@@ -661,12 +719,12 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
 
               {/* Grid responsive a 2 o 3 colonne su mobile/tablet e flex-wrap su desktop: NESSUN TRONCAMENTO */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-wrap gap-2">
-                {(['tutti', 'alimentari', 'ristorazione', 'salute', 'servizi', 'casa'] as CategoriaCommercio[]).map((catId) => {
-                  const conf = CATEGORIA_CONFIG[catId];
+                {(Object.keys(CATEGORIA_CONFIG) as CategoriaCommercio[]).map((catId) => {
+                  const conf = CATEGORIA_CONFIG[catId] || CATEGORIA_CONFIG.tutti;
                   const isActive = selectedCategory === catId;
                   const count = catId === 'tutti' 
                     ? attivita.filter(a => a.statoApprovazione !== 'in_attesa' || a.inviataDaMe).length
-                    : attivita.filter(a => a.categoria === catId && (a.statoApprovazione !== 'in_attesa' || a.inviataDaMe)).length;
+                    : attivita.filter(a => (a.categoria === catId || (catId === 'servizi_persona' && (a.categoria as string) === 'servizi')) && (a.statoApprovazione !== 'in_attesa' || a.inviataDaMe)).length;
 
                   return (
                     <button
@@ -1230,11 +1288,13 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                       onChange={(e) => setFormData({ ...formData, categoria: e.target.value as any })}
                       className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-slate-900 dark:text-white"
                     >
-                      <option value="alimentari">Alimentari & Gastronomia</option>
-                      <option value="ristorazione">Bar & Ristorazione</option>
-                      <option value="salute">Salute & Farmacia</option>
-                      <option value="servizi">Artigiani & Servizi</option>
-                      <option value="casa">Casa, Giardino & Hobby</option>
+                      <option value="alimentari">🍞 Alimentari</option>
+                      <option value="ristorazione">🍕 Ristorazione</option>
+                      <option value="salute">💊 Farmacie & salute</option>
+                      <option value="artigiani">🔨 Artigiani</option>
+                      <option value="servizi_persona">💇 Servizi alla persona</option>
+                      <option value="servizi_animali">🐾 Servizi per animali</option>
+                      <option value="casa">🏡 Casa, fai da te & hobby</option>
                     </select>
                   </div>
 
@@ -1551,11 +1611,35 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                   <input
                     type="text"
                     required
-                    placeholder="es. Via Fosso dell'Osa 120"
+                    placeholder="es. Via Fosso dell'Osa 507, Roma"
                     value={formData.indirizzo}
                     onChange={(e) => setFormData({ ...formData, indirizzo: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-slate-900 dark:text-white"
                   />
+
+                  {/* Feedback geolocalizzazione in tempo reale */}
+                  {regAddressChecking && (
+                    <div className="flex items-center gap-1.5 text-[11px] text-amber-700 dark:text-amber-300 font-semibold pt-1">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                      <span>Verifica indirizzo e geolocalizzazione sulla mappa...</span>
+                    </div>
+                  )}
+
+                  {!regAddressChecking && regAddressValid && formData.indirizzo.trim() && (
+                    <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-300 font-semibold bg-emerald-50 dark:bg-emerald-950/50 p-2 rounded-xl border border-emerald-200 dark:border-emerald-800">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>
+                        Indirizzo verificato a Villaggio Prenestino. Il pin verrà posizionato esattamente a questo indirizzo sulla mappa!
+                      </span>
+                    </div>
+                  )}
+
+                  {!regAddressChecking && !regAddressValid && (
+                    <div className="flex items-start gap-1.5 text-[11px] text-rose-700 dark:text-rose-300 font-semibold bg-rose-50 dark:bg-rose-950/50 p-2 rounded-xl border border-rose-200 dark:border-rose-800">
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
+                      <span>{regAddressError}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1">

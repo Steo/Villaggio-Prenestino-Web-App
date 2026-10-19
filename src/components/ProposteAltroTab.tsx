@@ -40,10 +40,16 @@ export const ProposteAltroTab: React.FC<ProposteAltroTabProps> = ({
 
   const ITEMS_PER_PAGE = 3;
 
-  // Ordina le proposte per numero di "Mi piace" decrescente (più votate per prime)
+  // Ordina e filtra le proposte: approvate per tutti, in_attesa/rifiutate per l'autore
   const sortedProposte = useMemo(() => {
-    return [...proposte].sort((a, b) => b.v - a.v);
-  }, [proposte]);
+    return [...proposte]
+      .filter((p) => {
+        const st = p.statoApprovazione || 'approvata';
+        if (st === 'approvata') return true;
+        return mieProposte.includes(p.id);
+      })
+      .sort((a, b) => b.v - a.v);
+  }, [proposte, mieProposte]);
 
   const totalPages = Math.ceil(sortedProposte.length / ITEMS_PER_PAGE) || 1;
   const safeActiveTab = Math.min(activeTab, Math.max(0, totalPages - 1));
@@ -256,6 +262,18 @@ export const ProposteAltroTab: React.FC<ProposteAltroTabProps> = ({
                       </span>
                     )}
 
+                    {p.statoApprovazione === 'in_attesa' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300">
+                        ⏳ In attesa di approvazione
+                      </span>
+                    )}
+
+                    {p.statoApprovazione === 'rifiutata' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-300">
+                        ❌ Non approvata
+                      </span>
+                    )}
+
                     <span className="text-[11px] text-slate-500 font-semibold inline-block">
                       <strong className="text-slate-900 font-bold">{p.v}</strong> {p.v === 1 ? 'cittadino d\'accordo' : 'cittadini d\'accordo'}
                     </span>
@@ -264,6 +282,12 @@ export const ProposteAltroTab: React.FC<ProposteAltroTabProps> = ({
                   <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
                     {p.t}
                   </h4>
+
+                  {p.statoApprovazione === 'rifiutata' && p.motivazioneRifiuto && (
+                    <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 text-xs mt-1 italic">
+                      <strong className="not-italic text-rose-700">Motivazione dall'amministratore:</strong> "{p.motivazioneRifiuto}"
+                    </div>
+                  )}
 
                   {/* Pulsante rapido di simulazione nuovo voto (per testare la notifica) se è una proposta dell'utente */}
                   {mieProposte.includes(p.id) && onSimulateVoteForProposal && (

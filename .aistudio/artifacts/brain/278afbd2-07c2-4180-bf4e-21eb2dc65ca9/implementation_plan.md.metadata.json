@@ -1,6 +1,6 @@
 {
-  "summary": "Piano di implementazione per sostituire il fumetto nativo InfoWindow con un popup modale dedicato, centrato e ad alta leggibilità per le schede dei negozi al tocco del pin sulla mappa.",
-  "updatedAt": "2026-10-18T08:04:48.400922807Z",
+  "summary": "Piano di implementazione per includere segnalazioni e proposte in attesa di approvazione nella dashboard del plugin WordPress, con modale di rifiuto e notifica pop-up per l'utente.",
+  "updatedAt": "2026-10-19T13:27:43.780180584Z",
   "requestFeedback": true,
   "userFacing": true
 }

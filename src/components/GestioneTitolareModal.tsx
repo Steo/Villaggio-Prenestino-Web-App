@@ -16,8 +16,13 @@ import {
   Store,
   Eye,
   EyeOff,
+  MapPin,
+  CheckCircle2,
+  Loader2,
+  Tag,
 } from 'lucide-react';
-import { AttivitaCommercio, OffertaCommercio } from '../types';
+import { AttivitaCommercio, OffertaCommercio, CategoriaCommercioKey } from '../types';
+import { geocodeAndValidateAddress } from '../utils/geocodingUtils';
 
 interface GestioneTitolareModalProps {
   shop: AttivitaCommercio | null;
@@ -72,6 +77,18 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Form states
+  const [nome, setNome] = useState('');
+  const [categoria, setCategoria] = useState<CategoriaCommercioKey>('alimentari');
+  const [indirizzo, setIndirizzo] = useState('');
+
+  // Geocoding verification states
+  const [addressChecking, setAddressChecking] = useState(false);
+  const [addressValid, setAddressValid] = useState(true);
+  const [addressError, setAddressError] = useState<string | null>(null);
+  const [addressDistance, setAddressDistance] = useState<number | null>(null);
+  const [geocodedLat, setGeocodedLat] = useState<number>(41.8985);
+  const [geocodedLng, setGeocodedLng] = useState<number>(12.6865);
+
   const [hasOffer, setHasOffer] = useState(false);
   const [offerTitle, setOfferTitle] = useState('');
   const [offerDetail, setOfferDetail] = useState('');
@@ -109,6 +126,15 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
     setIsUnlocked(alreadyUnlocked);
 
     // Inizializza i campi del form con i dati attuali
+    setNome(shop.nome || '');
+    setCategoria((shop.categoria as any) || 'alimentari');
+    setIndirizzo(shop.indirizzo || '');
+    setGeocodedLat(shop.lat || 41.8985);
+    setGeocodedLng(shop.lng || 12.6865);
+    setAddressValid(true);
+    setAddressError(null);
+    setAddressChecking(false);
+
     setHasOffer(!!shop.offertaAttiva);
     setOfferTitle(shop.offertaAttiva?.titolo || '');
     setOfferDetail(shop.offertaAttiva?.dettaglio || '');
@@ -134,6 +160,39 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
     setNewPinError('');
   }, [shop, isOpen]);
 
+  // Geocoding reattivo dell'indirizzo con debounce
+  useEffect(() => {
+    if (!isUnlocked || !indirizzo.trim()) return;
+
+    // Se l'indirizzo corrisponde a quello originario, segna come valido direttamente
+    if (shop && indirizzo.trim() === shop.indirizzo) {
+      setAddressValid(true);
+      setAddressError(null);
+      setAddressChecking(false);
+      setGeocodedLat(shop.lat || 41.8985);
+      setGeocodedLng(shop.lng || 12.6865);
+      return;
+    }
+
+    setAddressChecking(true);
+    const timer = setTimeout(async () => {
+      const result = await geocodeAndValidateAddress(indirizzo);
+      setAddressChecking(false);
+      if (result.isValid) {
+        setAddressValid(true);
+        setAddressError(null);
+        setAddressDistance(result.distanceKm);
+        setGeocodedLat(result.lat);
+        setGeocodedLng(result.lng);
+      } else {
+        setAddressValid(false);
+        setAddressError(result.errorMsg || 'Indirizzo fuori dalla zona consentita (max 3km da Via Fosso dell\'Osa 507).');
+      }
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [indirizzo, isUnlocked, shop]);
+
   if (!isOpen || !shop) return null;
 
   const shopPin = shop.pinGestione || '1234';
@@ -155,8 +214,14 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
     setPinInput('');
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validazione indirizzo prima di salvare
+    if (!addressValid) {
+      alert(addressError || 'Inserisci un indirizzo valido a Villaggio Prenestino (entro 3km da Via Fosso dell\'Osa 507).');
+      return;
+    }
 
     // Validazione eventuale cambio PIN
     if (newPin.trim().length > 0) {
@@ -181,6 +246,11 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
     }
 
     const updatedData: Partial<AttivitaCommercio> = {
+      nome: nome.trim() || shop.nome,
+      categoria,
+      indirizzo: indirizzo.trim(),
+      lat: geocodedLat,
+      lng: geocodedLng,
       offertaAttiva,
       orari: orari.trim(),
       apertoOra,
@@ -210,20 +280,20 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
         {/* Header Modal */}
         <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-900/70">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
               {isUnlocked ? <Unlock className="w-5 h-5" /> : <Lock className="w-5 h-5" />}
             </div>
-            <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <span>{isUnlocked ? 'Gestione Scheda Attività' : 'Area Riservata Titolare'}</span>
+            <div className="min-w-0">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2 truncate">
+                <span>{isUnlocked ? 'Modifica Scheda & Indirizzo' : 'Area Riservata Titolare'}</span>
                 {isUnlocked && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
-                    Sbloccata
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 shrink-0">
+                    Sbloccato
                   </span>
                 )}
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[240px] sm:max-w-xs">
+              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                 {shop.nome}
               </p>
             </div>
@@ -231,52 +301,48 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-            aria-label="Chiudi finestra"
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+            aria-label="Chiudi"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Contenuto scrollabile */}
-        <div className="p-4 sm:p-6 overflow-y-auto space-y-5">
+        {/* Body Modal */}
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1">
           {!isUnlocked ? (
-            /* PASSO 1: INSERIMENTO PIN SEGRETO */
-            <form onSubmit={handleVerifyPin} className="space-y-5">
-              <div className="p-4 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/70 dark:border-amber-800/40 text-amber-950 dark:text-amber-200 text-xs leading-relaxed space-y-1.5">
-                <div className="flex items-center gap-1.5 font-bold">
+            /* PASSO 1: INSERIMENTO PIN */
+            <form onSubmit={handleVerifyPin} className="space-y-4">
+              <div className="p-4 rounded-2xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 space-y-2">
+                <div className="flex items-center gap-2 text-xs font-bold text-amber-900 dark:text-amber-200">
                   <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                  <span>Accesso riservato all&apos;esercente</span>
+                  <span>Autenticazione Titolare / Gestore</span>
                 </div>
-                <p>
-                  Inserisci il codice PIN a 4 cifre per aggiornare in autonomia l&apos;offerta in corso, gli orari e i contatti della tua bottega.
+                <p className="text-xs text-amber-800/90 dark:text-amber-300/90 leading-relaxed">
+                  Inserisci il tuo <strong>PIN di sicurezza a 4 cifre</strong> per modificare le informazioni, l&apos;indirizzo, la categoria e la promozione del tuo negozio in tempo reale.
                 </p>
-                <div className="pt-1 text-[11px] text-amber-800/90 dark:text-amber-300/80 font-mono">
-                  PIN predefinito di prova: <strong className="font-bold underline">1234</strong>
+                <div className="pt-1 text-[11px] text-amber-700 dark:text-amber-400 italic">
+                  💡 Nota per i test demo: il PIN predefinito è <strong>1234</strong> (o quello impostato al momento dell&apos;iscrizione).
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label
-                  htmlFor="pin-input"
-                  className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider"
-                >
-                  Codice PIN di Gestione
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Inserisci PIN di Gestione *
                 </label>
                 <div className="relative">
                   <input
-                    id="pin-input"
                     type={showPin ? 'text' : 'password'}
                     inputMode="numeric"
                     maxLength={8}
+                    required
                     value={pinInput}
                     onChange={(e) => {
                       setPinInput(e.target.value);
-                      if (pinError) setPinError(false);
+                      setPinError(false);
                     }}
                     placeholder="••••"
-                    autoFocus
-                    className={`w-full py-3 px-4 pr-12 text-center text-xl font-mono tracking-widest rounded-2xl border bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white transition focus:outline-hidden focus:ring-2 ${
+                    className={`w-full text-center text-lg tracking-widest font-mono font-bold py-2.5 px-4 rounded-xl border bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden transition ${
                       pinError
                         ? 'border-rose-400 ring-2 ring-rose-400/20 bg-rose-50/30'
                         : 'border-slate-300 dark:border-slate-700 focus:ring-amber-500'
@@ -330,7 +396,7 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
             </form>
           ) : (
             /* PASSO 2: MODIFICA DATI ATTIVITÀ & OFFERTA */
-            <form onSubmit={handleSave} className="space-y-6">
+            <form onSubmit={handleSave} className="space-y-5">
               {saveSuccess && (
                 <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs font-bold flex items-center gap-2 animate-in fade-in">
                   <Check className="w-4 h-4 text-emerald-600" />
@@ -338,7 +404,72 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
                 </div>
               )}
 
-              {/* SEZIONE 1: OFFERTA SPECIALE & COUPON % */}
+              {/* SEZIONE 1: MODIFICA CATEGORIA MERCEOLOGICA (MENÙ A TENDINA A 7 CATEGORIE) */}
+              <div className="p-3.5 bg-amber-50/60 dark:bg-amber-950/30 rounded-2xl border border-amber-200 dark:border-amber-800/50 space-y-2">
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <Store className="w-4 h-4 text-amber-600" />
+                  <span>Categoria Merceologica *</span>
+                </label>
+                <select
+                  value={categoria}
+                  onChange={(e) => setCategoria(e.target.value as CategoriaCommercioKey)}
+                  className="w-full text-xs font-bold py-2 px-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-hidden cursor-pointer"
+                >
+                  <option value="alimentari">🍞 Alimentari</option>
+                  <option value="ristorazione">🍕 Ristorazione</option>
+                  <option value="salute">💊 Farmacie & salute</option>
+                  <option value="artigiani">🔨 Artigiani</option>
+                  <option value="servizi_persona">💇 Servizi alla persona</option>
+                  <option value="servizi_animali">🐾 Servizi per animali</option>
+                  <option value="casa">🏡 Casa, fai da te & hobby</option>
+                </select>
+              </div>
+
+              {/* SEZIONE 2: MODIFICA INDIRIZZO & VERIFICA LIMITI (MAX 3KM) */}
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2">
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-amber-600" />
+                  <span>Indirizzo a Villaggio Prenestino (Verificato entro 3 km) *</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={indirizzo}
+                  onChange={(e) => setIndirizzo(e.target.value)}
+                  placeholder="es. Via Fosso dell'Osa 507, Roma"
+                  className={`w-full text-xs font-semibold py-2 px-3 rounded-xl border bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:outline-hidden ${
+                    !addressValid
+                      ? 'border-rose-400 focus:ring-rose-400'
+                      : 'border-slate-300 dark:border-slate-700 focus:ring-amber-500'
+                  }`}
+                />
+
+                {/* Feedback geolocalizzazione in tempo reale */}
+                {addressChecking && (
+                  <div className="flex items-center gap-1.5 text-[11px] text-amber-700 dark:text-amber-300 font-semibold pt-1">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                    <span>Verifica indirizzo e geolocalizzazione sulla mappa...</span>
+                  </div>
+                )}
+
+                {!addressChecking && addressValid && indirizzo.trim() && (
+                  <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-300 font-semibold bg-emerald-50 dark:bg-emerald-950/50 p-2 rounded-xl border border-emerald-200 dark:border-emerald-800">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>
+                      Indirizzo verificato a Villaggio Prenestino. Il pin verrà posizionato esattamente a questo indirizzo sulla mappa!
+                    </span>
+                  </div>
+                )}
+
+                {!addressChecking && !addressValid && (
+                  <div className="flex items-start gap-1.5 text-[11px] text-rose-700 dark:text-rose-300 font-semibold bg-rose-50 dark:bg-rose-950/50 p-2 rounded-xl border border-rose-200 dark:border-rose-800">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
+                    <span>{addressError}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* SEZIONE 3: OFFERTA SPECIALE & COUPON % */}
               <div className="p-4 rounded-2xl bg-teal-50/60 dark:bg-teal-950/30 border border-teal-200/70 dark:border-teal-800/40 space-y-3.5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-xs font-bold text-teal-950 dark:text-teal-200">
@@ -424,7 +555,7 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
                 )}
               </div>
 
-              {/* SEZIONE 2: ORARI & STATO APERTURA */}
+              {/* SEZIONE 4: ORARI & STATO APERTURA */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-slate-200">
@@ -453,7 +584,7 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
                 />
               </div>
 
-              {/* SEZIONE 3: CONTATTI E RECAPITI */}
+              {/* SEZIONE 5: CONTATTI E RECAPITI */}
               <div className="space-y-3">
                 <div className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                   <Phone className="w-4 h-4 text-slate-500" />
@@ -502,7 +633,7 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
                 </div>
               </div>
 
-              {/* SEZIONE 4: DESCRIZIONE ATTIVITÀ */}
+              {/* SEZIONE 6: DESCRIZIONE ATTIVITÀ */}
               <div className="space-y-1.5">
                 <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                   <FileText className="w-4 h-4 text-slate-500" />
@@ -518,7 +649,7 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
                 />
               </div>
 
-              {/* SEZIONE 5: CAMBIO PIN */}
+              {/* SEZIONE 7: CAMBIO PIN */}
               <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-2.5">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300">
                   <KeyRound className="w-3.5 h-3.5 text-amber-500" />
@@ -548,21 +679,21 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
                   <p className="text-[11px] text-rose-500 font-semibold">{newPinError}</p>
                 )}
                 <p className="text-[10px] text-slate-400">
-                  Lascia vuoti i campi se desideri conservare il PIN attuale.
+                  Usa questo PIN per accedere e aggiornare la tua scheda in futuro.
                 </p>
               </div>
 
-              {/* PULSANTI AZIONE */}
-              <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-800">
+              {/* Footer Azioni Salvataggio / Blocco */}
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
                 <button
                   type="button"
                   onClick={handleRelock}
-                  className="w-full sm:w-auto text-[11px] font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition underline underline-offset-2 cursor-pointer text-center sm:text-left"
+                  className="py-2 px-3 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
                 >
-                  Blocca di nuovo (richiedi PIN la prossima volta)
+                  Blocca area
                 </button>
 
-                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={onClose}
@@ -572,7 +703,8 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
                   </button>
                   <button
                     type="submit"
-                    className="py-2.5 px-5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
+                    disabled={!addressValid || addressChecking}
+                    className="py-2.5 px-5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center gap-2 cursor-pointer"
                   >
                     <Check className="w-4 h-4" />
                     <span>Salva Modifiche</span>
