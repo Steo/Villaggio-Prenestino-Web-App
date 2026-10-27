@@ -3,6 +3,8 @@ import { APIProvider, Map, ColorScheme, useMap } from '@vis.gl/react-google-maps
 import { CustomMapPin } from './CustomMapPin';
 import { CustomMapMarker } from './CustomMapMarker';
 import { AttivitaCommercio, EventoQuartiere, CategoriaCommercio } from '../types';
+import { getShopOpeningStatus } from '../utils/openingHoursUtils';
+import { GraficoOrariSettimana } from './GraficoOrariSettimana';
 import { 
   MapPin, 
   Navigation, 
@@ -18,6 +20,7 @@ import {
   Percent, 
   X,
 } from 'lucide-react';
+import { ProgressiveImage } from './common/ProgressiveImage';
 
 interface MappaQuartiereProps {
   attivita: AttivitaCommercio[];
@@ -604,12 +607,13 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
 
             {/* Immagine di copertina */}
             <div className="relative h-44 sm:h-52 w-full overflow-hidden bg-slate-100 dark:bg-slate-800 shrink-0">
-              <img
+              <ProgressiveImage
                 src={selectedItem.negozio.immagine || 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=800&q=80'}
                 alt={selectedItem.negozio.nome}
                 className="w-full h-full object-cover"
+                containerClassName="w-full h-full"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/15 pointer-events-none" />
 
               {/* Badge Categoria ed eventuale Offerta Attiva */}
               <div className="absolute bottom-3 left-3 right-16 flex flex-wrap items-center gap-2">
@@ -663,15 +667,9 @@ export const MappaQuartiere: React.FC<MappaQuartiereProps> = ({
                 </div>
               )}
 
-              {/* Orari di apertura */}
-              <div className={`p-3 rounded-2xl border text-xs sm:text-sm flex items-start gap-2.5 ${
-                isDark ? 'bg-slate-800/40 border-slate-700/80 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-700'
-              }`}>
-                <Clock className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                <div>
-                  <span className="block font-bold text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Orari di Apertura</span>
-                  <span className="font-semibold leading-relaxed">{selectedItem.negozio.orari}</span>
-                </div>
+              {/* Presentazione grafica di orari e giorni della settimana */}
+              <div className="p-3 rounded-2xl border text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700/80">
+                <GraficoOrariSettimana shop={selectedItem.negozio} darkMode={isDark} />
               </div>
 
               {/* Descrizione dell'attività */}

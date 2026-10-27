@@ -12,6 +12,7 @@ import {
   ClipboardList,
   Sparkles,
   ExternalLink,
+  Store,
 } from 'lucide-react';
 import { AppNotification } from '../types';
 import {
@@ -29,6 +30,7 @@ interface NotificationCenterModalProps {
   onTestNotification: () => void;
   onSimulateProposalVote: () => void;
   onSimulateReportStatusChange: () => void;
+  onSimulateShopApproval?: () => void;
   darkMode: boolean;
   onPermissionChange?: () => void;
 }
@@ -42,6 +44,7 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
   onTestNotification,
   onSimulateProposalVote,
   onSimulateReportStatusChange,
+  onSimulateShopApproval,
   darkMode,
   onPermissionChange,
 }) => {
@@ -103,7 +106,7 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
                 )}
               </div>
               <p className="text-[11px] text-white/80">
-                Avvisi su voti alle tue proposte e stati delle tue segnalazioni
+                Avvisi su voti alle proposte, stato segnalazioni e approvazione attività commerciali
               </p>
             </div>
           </div>
@@ -242,6 +245,8 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
                       className={`p-2 rounded-xl shrink-0 mt-0.5 ${
                         n.tipo === 'proposta_voti'
                           ? 'bg-amber-500/20 text-amber-500'
+                          : n.tipo === 'commercio_approvato'
+                          ? 'bg-emerald-500/20 text-emerald-500'
                           : n.tipo === 'segnalazione_stato'
                           ? 'bg-sky-500/20 text-sky-500'
                           : 'bg-slate-500/20 text-slate-400'
@@ -249,6 +254,8 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
                     >
                       {n.tipo === 'proposta_voti' ? (
                         <Vote className="w-4 h-4" />
+                      ) : n.tipo === 'commercio_approvato' ? (
+                        <Store className="w-4 h-4" />
                       ) : (
                         <ClipboardList className="w-4 h-4" />
                       )}

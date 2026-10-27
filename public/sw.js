@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cdq-prenestino-v1.5.0';
+const CACHE_NAME = 'cdq-prenestino-v1.6.1';
 const ASSETS_TO_CACHE = [
   './',
   './manifest.webmanifest',
@@ -12,7 +12,15 @@ const ASSETS_TO_CACHE = [
   './logoo-cdq-2019-BIANCO-ORIZZONTALE.png'
 ];
 
+const isDevHost = self.location.hostname.includes('ais-dev-') || 
+                  self.location.hostname === 'localhost' || 
+                  self.location.hostname === '127.0.0.1';
+
 self.addEventListener('install', (event) => {
+  if (isDevHost) {
+    self.skipWaiting();
+    return;
+  }
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS_TO_CACHE);
@@ -21,6 +29,16 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
+  if (isDevHost) {
+    event.waitUntil(
+      caches.keys()
+        .then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
+        .then(() => self.registration.unregister())
+        .then(() => self.clients.claim())
+    );
+    return;
+  }
+
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
@@ -34,7 +52,17 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
-  if (url.pathname.includes('/wp-json/') || url.pathname.includes('/api/')) {
+
+  // Non intercettare mai in ambiente di sviluppo, né richieste api, sorgenti o dipendenze Vite
+  if (
+    isDevHost ||
+    url.pathname.includes('/wp-json/') || 
+    url.pathname.includes('/api/') ||
+    url.pathname.startsWith('/src/') ||
+    url.pathname.startsWith('/node_modules/') ||
+    url.pathname.startsWith('/@') ||
+    url.searchParams.has('v')
+  ) {
     return;
   }
 

@@ -17,6 +17,7 @@ import {
   BellRing,
   ChevronDown,
   Mail,
+  ThumbsUp,
 } from 'lucide-react';
 import { shareToWhatsApp } from '../utils/shareUtils';
 import { compressMultipleImages } from '../utils/imageCompressor';
@@ -25,6 +26,8 @@ import { SegnalazioniSkeletonList } from './SkeletonLoaders';
 interface SegnalazioniTabProps {
   segnalazioni: SegnalazioneCittadina[];
   mieSegnalazioni?: number[];
+  segnalazioniVotate?: number[];
+  onVoteSegnalazione?: (seg: SegnalazioneCittadina) => void;
   onSubmitSegnalazione: (data: {
     titolo: string;
     luogo: string;
@@ -41,6 +44,8 @@ interface SegnalazioniTabProps {
 export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
   segnalazioni,
   mieSegnalazioni = [],
+  segnalazioniVotate = [],
+  onVoteSegnalazione,
   onSubmitSegnalazione,
   onOpenPhoto,
   onAdvanceSegnalazioneStato,
@@ -821,43 +826,43 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
       )}
 
       {/* FILTRI STATO: Su mobile verticale su 2 righe (Tutte e Ricevute sopra, Inoltrate e Risolte sotto), su tablet/desktop in riga unica */}
-      <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-1.5 text-xs font-bold">
+      <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 text-xs font-bold">
         <button
           onClick={() => setFiltroStato(0)}
-          className={`w-full sm:w-auto px-3 py-1.5 rounded-full transition text-center shrink-0 ${
+          className={`w-full sm:w-auto min-h-[44px] sm:min-h-[38px] px-3.5 py-2 rounded-xl sm:rounded-full transition text-center shrink-0 flex items-center justify-center cursor-pointer ${
             filtroStato === 0
-              ? 'bg-slate-950 text-white'
-              : 'bg-white border border-slate-200 text-slate-600'
+              ? 'bg-slate-950 text-white shadow-xs dark:bg-slate-100 dark:text-slate-950 font-black'
+              : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
           }`}
         >
           Tutte ({segnalazioni.length})
         </button>
         <button
           onClick={() => setFiltroStato(1)}
-          className={`w-full sm:w-auto px-3 py-1.5 rounded-full transition text-center shrink-0 ${
+          className={`w-full sm:w-auto min-h-[44px] sm:min-h-[38px] px-3.5 py-2 rounded-xl sm:rounded-full transition text-center shrink-0 flex items-center justify-center cursor-pointer ${
             filtroStato === 1
-              ? 'bg-amber-500 text-slate-950'
-              : 'bg-white border border-slate-200 text-slate-600'
+              ? 'bg-amber-500 text-slate-950 shadow-xs font-black'
+              : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
           }`}
         >
           Ricevute ({segnalazioni.filter((s) => s.s === 1).length})
         </button>
         <button
           onClick={() => setFiltroStato(2)}
-          className={`w-full sm:w-auto px-3 py-1.5 rounded-full transition text-center shrink-0 ${
+          className={`w-full sm:w-auto min-h-[44px] sm:min-h-[38px] px-3.5 py-2 rounded-xl sm:rounded-full transition text-center shrink-0 flex items-center justify-center cursor-pointer ${
             filtroStato === 2
-              ? 'bg-sky-600 text-white'
-              : 'bg-white border border-slate-200 text-slate-600'
+              ? 'bg-sky-600 text-white shadow-xs font-black'
+              : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
           }`}
         >
           Inoltrate ({segnalazioni.filter((s) => s.s === 2).length})
         </button>
         <button
           onClick={() => setFiltroStato(3)}
-          className={`w-full sm:w-auto px-3 py-1.5 rounded-full transition text-center shrink-0 ${
+          className={`w-full sm:w-auto min-h-[44px] sm:min-h-[38px] px-3.5 py-2 rounded-xl sm:rounded-full transition text-center shrink-0 flex items-center justify-center cursor-pointer ${
             filtroStato === 3
-              ? 'bg-emerald-600 text-white'
-              : 'bg-white border border-slate-200 text-slate-600'
+              ? 'bg-emerald-600 text-white shadow-xs font-black'
+              : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
           }`}
         >
           Risolte ({segnalazioni.filter((s) => s.s === 3).length})
@@ -874,7 +879,9 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
               Nessuna segnalazione in questa sezione.
             </div>
           ) : (
-          segnalazioniFiltrate.map((seg) => (
+          segnalazioniFiltrate.map((seg) => {
+            const hasVoted = (segnalazioniVotate || []).includes(seg.id);
+            return (
             <div
               key={seg.id}
               className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-xs space-y-2.5"
@@ -901,16 +908,6 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] text-slate-400">{seg.data}</span>
-                  {/* Tasto rapido WhatsApp per condividere la segnalazione */}
-                  <button
-                    type="button"
-                    onClick={() => handleShareReportOnWhatsApp(seg.t, seg.w)}
-                    title="Condividi sui gruppi WhatsApp del quartiere"
-                    aria-label="Condividi segnalazione su WhatsApp"
-                    className="p-1 rounded-lg text-emerald-600 hover:bg-emerald-50 transition cursor-pointer"
-                  >
-                    <Share2 className="w-4 h-4" />
-                  </button>
                 </div>
               </div>
 
@@ -974,8 +971,67 @@ export const SegnalazioniTab: React.FC<SegnalazioniTabProps> = ({
                   ))}
                 </div>
               )}
+
+              {/* Azioni Scheda: Tasto Conferma (+1) con micro-interazione e Condivisione */}
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  disabled={hasVoted}
+                  onClick={() => {
+                    try {
+                      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                        navigator.vibrate([35]);
+                      }
+                    } catch {}
+                    onVoteSegnalazione?.(seg);
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 select-none ${
+                    hasVoted
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 cursor-default opacity-95 shadow-2xs animate-heartbeat'
+                      : 'bg-slate-100 hover:bg-slate-200 active:scale-90 text-slate-700 cursor-pointer shadow-2xs hover:shadow-xs'
+                  }`}
+                  title={
+                    hasVoted
+                      ? 'Hai già confermato questa segnalazione (+1 registrato)'
+                      : 'Conferma di aver riscontrato anche tu questo problema (+1 voto)'
+                  }
+                >
+                  {hasVoted ? (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 transition-transform scale-110" />
+                      <span>Confermato ✓</span>
+                    </>
+                  ) : (
+                    <>
+                      <ThumbsUp className="w-3.5 h-3.5 text-slate-600 shrink-0 transition-transform" />
+                      <span>Confermo (+1)</span>
+                    </>
+                  )}
+                  {(seg.voti || 0) > 0 && (
+                    <span className={`ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                      hasVoted
+                        ? 'bg-emerald-200/90 text-emerald-950'
+                        : 'bg-slate-200 text-slate-800'
+                    }`}>
+                      {seg.voti}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleShareReportOnWhatsApp(seg.t, seg.w)}
+                  title="Condividi sui gruppi WhatsApp del quartiere"
+                  aria-label="Condividi segnalazione su WhatsApp"
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition active:scale-95 cursor-pointer"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">WhatsApp</span>
+                </button>
+              </div>
             </div>
-          ))
+          );
+        })
         )}
       </div>
       )}

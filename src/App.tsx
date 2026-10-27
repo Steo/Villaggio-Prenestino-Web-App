@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Suspense, lazy } from 'react';
 import {
   WpArticle,
   EventoQuartiere,
@@ -42,22 +42,22 @@ import {
   getNotificationPermission,
   requestBrowserNotificationPermission,
 } from './services/notificationService';
+import { recordVolunteerAction } from './services/volunteerActionService';
+import {
+  getPendingQueueCount,
+  flushOfflineQueue,
+  enqueueSubmission,
+} from './services/offlineQueueService';
 import { Header } from './components/Header';
 import { HomeTab } from './components/HomeTab';
-import { EventiTab } from './components/EventiTab';
-import { SegnalazioniTab } from './components/SegnalazioniTab';
-import { VolontariatoTab } from './components/VolontariatoTab';
-import { ProposteAltroTab } from './components/ProposteAltroTab';
-import { CommercioTab } from './components/CommercioTab';
+import { TabSkeleton } from './components/skeletons/TabSkeleton';
+import { OmnisearchModal } from './components/OmnisearchModal';
 import { VolunteerContactModal } from './components/VolunteerContactModal';
 import { PhotoLightbox } from './components/PhotoLightbox';
-import { WpPluginPanel } from './components/WpPluginPanel';
 import { AdminAccessModal } from './components/AdminAccessModal';
 import { PuntiCiviciModal } from './components/PuntiCiviciModal';
 import { NotificationCenterModal } from './components/NotificationCenterModal';
-import { ExportModal } from './components/ExportModal';
 import { PwaInstallBanner } from './components/PwaInstallBanner';
-import { GuidaTourModal } from './components/GuidaTourModal';
 import { RejectionNoticeModal, RejectedItemNotice } from './components/RejectionNoticeModal';
 import { AttivitaCommercio } from './types';
 import {
@@ -66,6 +66,19 @@ import {
   getLivelloFromPunti,
   LIVELLO_RANKS,
 } from './components/NuovoLivelloModal';
+
+// Import statico per le schede principali dell'applicazione (elimina errori di dynamic import e garantisce reattività istantanea)
+import { EventiTab } from './components/EventiTab';
+import { SegnalazioniTab } from './components/SegnalazioniTab';
+import { VolontariatoTab } from './components/VolontariatoTab';
+import { ProposteAltroTab } from './components/ProposteAltroTab';
+import { CommercioTab } from './components/CommercioTab';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
+
+// Code-splitting dinamico per i soli pannelli e modali amministrativi secondari
+const WpPluginPanel = lazy(() => import('./components/WpPluginPanel').then((m) => ({ default: m.WpPluginPanel })));
+const ExportModal = lazy(() => import('./components/ExportModal').then((m) => ({ default: m.ExportModal })));
+const GuidaTourModal = lazy(() => import('./components/GuidaTourModal').then((m) => ({ default: m.GuidaTourModal })));
 
 import {
   Home,
@@ -99,7 +112,7 @@ export default function App() {
     const tabLabels: Record<keyof AppTabsConfig, string> = {
       eventi: 'Eventi',
       segnalazioni: 'Segnalazioni',
-      commercio: 'Commercianti',
+      commercio: 'Negozi',
       volontariato: 'Volontari',
       proposte: 'Idee e Proposte',
     };
@@ -162,6 +175,13 @@ export default function App() {
 
   // Voto Mi piace per attività commerciale: UNIVOCE, massimo 1 volta per ogni attività per utente
   const handleVoteAttivita = (attivita: AttivitaCommercio) => {
+    // Riscontro tattile / vibrazione immediata
+    try {
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate([35]);
+      }
+    } catch {}
+
     // Controllo se già consigliata sia nello state che nel localStorage
     const stored = getUserInteractions();
     const currentVoted = Array.from(new Set([
@@ -233,20 +253,23 @@ export default function App() {
 
     const updatedMie = Array.from(new Set([...(interactions.mieAttivita || []), nuova.id]));
     addPunti(5, 'Registrazione nuova attività commerciale', { mieAttivita: updatedMie });
-    showToast('Bottega registrata! Notifica email inviata ad associazione@villaggioprenestino.it');
+    showToast('Attività commerciale registrata! Notifica email inviata ad associazione@villaggioprenestino.it');
   };
 
   const handleApprovaAttivita = (id: number) => {
+    let approvedItemName = 'Attività Commerciale';
     setAttivitaCommercio((prev) => {
-      const updated = prev.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              statoApprovazione: 'approvata' as const,
-              verificato: true,
-            }
-          : item
-      );
+      const updated = prev.map((item) => {
+        if (item.id === id) {
+          approvedItemName = item.nome;
+          return {
+            ...item,
+            statoApprovazione: 'approvata' as const,
+            verificato: true,
+          };
+        }
+        return item;
+      });
       try {
         localStorage.setItem('vp_attivita_commercio', JSON.stringify(updated));
       } catch {
@@ -254,6 +277,18 @@ export default function App() {
       }
       return updated;
     });
+
+    // Se l'attività appartiene all'utente corrente, invia la notifica immediata
+    const isMine = interactions.mieAttivita?.includes(id);
+    if (isMine) {
+      triggerNotification({
+        tipo: 'commercio_approvato',
+        titolo: '🎉 La tua attività commerciale è stata approvata!',
+        messaggio: `La tua attività "${approvedItemName}" è stata verificata e approvata dall'Associazione. Ora è pubblicata e visibile a tutti i residenti su Google Maps e nella vetrina!`,
+        targetId: id,
+      });
+    }
+
     showToast('Attività commerciale approvata con successo! Ora è pubblica per tutti i residenti.');
   };
 
@@ -324,6 +359,76 @@ export default function App() {
   // Guida Tour Interattiva Onboarding
   const [tourModalOpen, setTourModalOpen] = useState(false);
 
+  // Ricerca Globale Universale (Omnisearch)
+  const [isOmnisearchOpen, setIsOmnisearchOpen] = useState(false);
+
+  // Coda di invio offline
+  const [pendingOfflineCount, setPendingOfflineCount] = useState<number>(getPendingQueueCount);
+
+  // Scorciatoia da tastiera globale: Ctrl+K / Cmd+K per aprire la ricerca
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsOmnisearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Tentativo di svuotamento automatico coda offline quando torna la connessione
+  const attemptFlushQueue = useCallback(async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+    try {
+      const res = await flushOfflineQueue(async (item) => {
+        if (item.type === 'segnalazione') {
+          const resSeg = await submitSegnalazione(item.payload);
+          return resSeg.success;
+        } else if (item.type === 'proposta') {
+          const resProp = await submitProposta(item.payload.titolo);
+          return resProp.success;
+        }
+        return true;
+      });
+      if (res.succeeded > 0) {
+        showToast(`${res.succeeded} segnalazione/i offline sincronizzate con successo!`);
+        loadData();
+      }
+      setPendingOfflineCount(getPendingQueueCount());
+    } catch {
+      // Ignora errori di rete temporanei
+    }
+  }, []);
+
+  // Listener evento 'online' per auto-sincronizzazione
+  useEffect(() => {
+    const handleOnline = () => {
+      showToast('Connessione internet ripristinata! Sincronizzazione in corso...');
+      attemptFlushQueue();
+    };
+    window.addEventListener('online', handleOnline);
+    const interval = setInterval(() => {
+      if (getPendingQueueCount() > 0 && navigator.onLine) {
+        attemptFlushQueue();
+      }
+    }, 12000);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      clearInterval(interval);
+    };
+  }, [attemptFlushQueue]);
+
+  const handleSearchNavigate = (tab: TabType, targetId?: number | string) => {
+    setActiveTab(tab);
+    // Riscontro aptico per mobile
+    try {
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate([25]);
+      }
+    } catch {}
+  };
+
   // Pop-up Avviso Rifiuto per l'utente all'avvio dell'app
   const [userRejectedItemNotice, setUserRejectedItemNotice] = useState<RejectedItemNotice | null>(null);
 
@@ -345,8 +450,10 @@ export default function App() {
   // Snapshot precedenti per rilevare variazioni sui dati salvati / sincronizzati
   const prevProposalVotesRef = useRef<Record<number, number>>({});
   const prevReportStatusesRef = useRef<Record<number, StatoSegnalazione>>({});
+  const prevCommercioApprovedRef = useRef<Record<number, boolean>>({});
   const isInitialProposteLoad = useRef(true);
   const isInitialSegnalazioniLoad = useRef(true);
+  const isInitialCommercioLoad = useRef(true);
 
   // Sincronizzazione notifiche all'evento globale
   useEffect(() => {
@@ -425,6 +532,65 @@ export default function App() {
       prevReportStatusesRef.current[s.id] = s.s;
     });
   }, [segnalazioni, interactions.mieSegnalazioni]);
+
+  // Monitoraggio approvazione delle attività commerciali inserite dall'utente
+  useEffect(() => {
+    if (attivitaCommercio.length === 0) return;
+
+    if (isInitialCommercioLoad.current) {
+      attivitaCommercio.forEach((a) => {
+        prevCommercioApprovedRef.current[a.id] =
+          a.statoApprovazione === 'approvata' || a.verificato === true;
+      });
+      isInitialCommercioLoad.current = false;
+      return;
+    }
+
+    const mieAttIds = interactions.mieAttivita || [];
+    attivitaCommercio.forEach((a) => {
+      if (mieAttIds.includes(a.id)) {
+        const isApproved = a.statoApprovazione === 'approvata' || a.verificato === true;
+        const prevApproved = prevCommercioApprovedRef.current[a.id];
+        if (prevApproved === false && isApproved) {
+          triggerNotification({
+            tipo: 'commercio_approvato',
+            titolo: '🎉 La tua attività commerciale è stata approvata!',
+            messaggio: `La tua attività "${a.nome}" è stata verificata e approvata dall'Associazione. Ora è pubblicata e visibile a tutti i residenti su Google Maps e nella vetrina!`,
+            targetId: a.id,
+          });
+          showToast(`🔔 Notifica: "${a.nome}" è stata approvata e pubblicata!`);
+        }
+      }
+      prevCommercioApprovedRef.current[a.id] =
+        a.statoApprovazione === 'approvata' || a.verificato === true;
+    });
+  }, [attivitaCommercio, interactions.mieAttivita]);
+
+  // Simulazione Approvazione Attività Commerciale per test rapido notifiche
+  const handleSimulateShopApproval = (targetShopId?: number) => {
+    const target =
+      attivitaCommercio.find((a) => (targetShopId ? a.id === targetShopId : true)) ||
+      attivitaCommercio[0];
+    if (!target) return;
+
+    const targetId = target.id;
+    if (!interactions.mieAttivita?.includes(targetId)) {
+      const updated = {
+        ...interactions,
+        mieAttivita: [...(interactions.mieAttivita || []), targetId],
+      };
+      setInteractions(updated);
+      saveUserInteractions(updated);
+    }
+
+    triggerNotification({
+      tipo: 'commercio_approvato',
+      titolo: '🎉 La tua attività commerciale è stata approvata!',
+      messaggio: `La tua attività "${target.nome}" è stata verificata e approvata dall'Associazione. Ora è pubblicata e visibile a tutti i residenti su Google Maps e nella vetrina!`,
+      targetId,
+    });
+    showToast(`🔔 Notifica simulata: "${target.nome}" approvata!`);
+  };
 
   // Simulazione Nuovo Voto per una proposta dell'utente (per test rapido notifiche)
   const handleSimulateProposalVote = (targetProposalId?: number) => {
@@ -864,6 +1030,14 @@ export default function App() {
       setRichieste((prev) =>
         prev.map((r) => (r.id === id ? { ...r, have: r.have + 1 } : r))
       );
+      recordVolunteerAction({
+        tipo: 'adesione',
+        titolo: pendingAction.titolo || 'Attività "Serve una mano"',
+        luogo: 'Villaggio Prenestino',
+        volontarioNome: contactData.nome || 'Volontario civico',
+        telefono: contactData.telefono,
+        dettaglio: 'Ha dato disponibilità per l\'intervento sul territorio',
+      });
       addPunti(10, 'Adesione volontariato');
     } else {
       updatedInteractions.eventiPartecipati = [...updatedInteractions.eventiPartecipati, id];
@@ -889,6 +1063,13 @@ export default function App() {
 
   // Votazione Proposta (il contatore si ferma al primo click e non incrementa oltre)
   const handleVoteProposta = (proposta: PropostaCittadina) => {
+    // Micro-interazione aptica per riscontro tattile immediato
+    try {
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate([35]);
+      }
+    } catch {}
+
     const stored = getUserInteractions();
     const currentVoted = Array.from(new Set([
       ...(interactions.proposteVotate || []),
@@ -910,7 +1091,37 @@ export default function App() {
     addPunti(2, 'Voto proposta', { proposteVotate: nextVoted });
   };
 
-  // Nuova Segnalazione
+  // Voto / Conferma Segnalazione
+  const handleVoteSegnalazione = (segnalazione: SegnalazioneCittadina) => {
+    // Micro-interazione aptica per riscontro immediato
+    try {
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate([35]);
+      }
+    } catch {}
+
+    const stored = getUserInteractions();
+    const currentVoted = Array.from(new Set([
+      ...(interactions.segnalazioniVotate || []),
+      ...(stored.segnalazioniVotate || []),
+    ]));
+
+    if (currentVoted.includes(segnalazione.id)) {
+      showToast('Hai già confermato questa segnalazione!');
+      return;
+    }
+
+    const nextVoted = [...currentVoted, segnalazione.id];
+    submitInteraction({ tipo: 'segnalazione_vota', postId: segnalazione.id }).catch(() => {});
+
+    setSegnalazioni((prev) =>
+      prev.map((s) => (s.id === segnalazione.id ? { ...s, voti: (s.voti || 0) + 1 } : s))
+    );
+    addPunti(1, 'Conferma segnalazione', { segnalazioniVotate: nextVoted });
+    showToast('Segnalazione confermata! +1 Punto Civico');
+  };
+
+  // Nuova Segnalazione (con gestione resiliente offline)
   const handleSubmitSegnalazione = async (data: {
     titolo: string;
     luogo: string;
@@ -919,28 +1130,45 @@ export default function App() {
     nome?: string;
     telefono?: string;
   }) => {
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
     const res = await submitSegnalazione(data);
     const updatedMie = Array.from(new Set([...(interactions.mieSegnalazioni || []), res.newId]));
     addPunti(5, 'Segnalazione inviata', { mieSegnalazioni: updatedMie });
 
-    // Richiedi permessi notifiche browser se in stato default per avvisarlo dei futuri cambi di stato
-    if (isNotificationSupported() && getNotificationPermission() === 'default') {
-      requestBrowserNotificationPermission();
+    if (isOffline) {
+      enqueueSubmission('segnalazione', data);
+      setPendingOfflineCount(getPendingQueueCount());
+      showToast('Offline: Segnalazione salvata! Verrà inviata al server appena torna la rete.');
+    } else {
+      // Richiedi permessi notifiche browser se in stato default per avvisarlo dei futuri cambi di stato
+      if (isNotificationSupported() && getNotificationPermission() === 'default') {
+        requestBrowserNotificationPermission();
+      }
+      showToast('Segnalazione inviata! Notifica email recapitata ad associazione@villaggioprenestino.it');
     }
 
-    showToast('Segnalazione inviata! Notifica email recapitata ad associazione@villaggioprenestino.it');
     loadData();
   };
 
-  // Nuova Proposta
+  // Nuova Proposta (con gestione resiliente offline)
   const handleSubmitProposta = async (titolo: string) => {
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
     const res = await submitProposta(titolo);
     const updatedMie = Array.from(new Set([...(interactions.mieProposte || []), res.newId]));
     addPunti(5, 'Proposta inviata', { mieProposte: updatedMie });
 
-    // Richiedi permessi notifiche browser se in stato default per avvisarlo di nuovi voti
-    if (isNotificationSupported() && getNotificationPermission() === 'default') {
-      requestBrowserNotificationPermission();
+    if (isOffline) {
+      enqueueSubmission('proposta', { titolo });
+      setPendingOfflineCount(getPendingQueueCount());
+      showToast('Offline: Proposta salvata! Verrà sincronizzata appena torna la rete.');
+    } else {
+      // Richiedi permessi notifiche browser se in stato default per avvisarlo di nuovi voti
+      if (isNotificationSupported() && getNotificationPermission() === 'default') {
+        requestBrowserNotificationPermission();
+      }
+      showToast('Proposta inviata alla comunità!');
     }
 
     loadData();
@@ -958,6 +1186,14 @@ export default function App() {
     };
     setInteractions(updated);
     saveUserInteractions(updated);
+    recordVolunteerAction({
+      tipo: 'candidatura_albo',
+      titolo: 'Iscrizione Albo Volontari Civici',
+      luogo: 'Villaggio Prenestino',
+      volontarioNome: candidatura.nome || 'Volontario civico',
+      telefono: candidatura.telefono,
+      dettaglio: `Disponibilità per: ${candidatura.attivita.join(', ')}`,
+    });
     addPunti(15, 'Iscrizione volontario');
   };
 
@@ -973,7 +1209,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Header fisso con logo, contatore punti e toggle tema scuro */}
+      {/* Header fisso con logo, contatore punti, ricerca e toggle tema scuro */}
       <Header
         interactions={interactions}
         darkMode={darkMode}
@@ -986,6 +1222,8 @@ export default function App() {
         onOpenNotifications={() => setNotificationModalOpen(true)}
         onOpenExportModal={() => setExportModalOpen(true)}
         onOpenTour={() => setTourModalOpen(true)}
+        onOpenSearch={() => setIsOmnisearchOpen(true)}
+        pendingOfflineCount={pendingOfflineCount}
       />
 
       {/* Banner PWA: Installazione Rapida guidata su smartphone */}
@@ -1011,107 +1249,130 @@ export default function App() {
             onOpenTour={() => setTourModalOpen(true)}
             loading={loadingData}
             tabsConfig={tabsConfig}
-          />
-        )}
-
-        {activeTab === 'eventi' && tabsConfig.eventi !== false && (
-          <EventiTab
-            eventi={eventi}
-            interactions={interactions}
-            onRequestJoinEvento={handleRequestJoinEvento}
-          />
-        )}
-
-        {activeTab === 'segnalazioni' && tabsConfig.segnalazioni !== false && (
-          <SegnalazioniTab
-            segnalazioni={segnalazioni}
-            mieSegnalazioni={interactions.mieSegnalazioni}
-            onSubmitSegnalazione={handleSubmitSegnalazione}
             onOpenPhoto={(url) => setLightboxPhoto(url)}
-            onAdvanceSegnalazioneStato={handleSimulateReportStatusChange}
-            loading={loadingData}
           />
         )}
 
-        {activeTab === 'volontariato' && tabsConfig.volontariato !== false && (
-          <VolontariatoTab
-            richieste={richieste}
-            joinedRichieste={interactions.richiesteAderite}
-            onRequestJoinVolunteer={handleRequestJoinVolunteer}
-            onSubmitCandidatura={handleSubmitCandidatura}
-            defaultName={interactions.contattiSalvati?.nome}
-            defaultPhone={interactions.contattiSalvati?.telefono}
-          />
-        )}
+        {/* Schede secondarie protette da ErrorBoundary per massima resilienza */}
+        <ErrorBoundary key={activeTab} fallbackTitle={`Impossibile caricare la sezione ${activeTab}`}>
+          {activeTab === 'eventi' && tabsConfig.eventi !== false && (
+            <EventiTab
+              eventi={eventi}
+              interactions={interactions}
+              onRequestJoinEvento={handleRequestJoinEvento}
+              onOpenPhoto={(url) => setLightboxPhoto(url)}
+            />
+          )}
 
-        {activeTab === 'commercio' && tabsConfig.commercio !== false && (
-          <CommercioTab
-            attivita={attivitaCommercio}
-            eventi={eventi}
-            votedAttivita={interactions.negoziVotati || []}
-            onVoteAttivita={handleVoteAttivita}
-            onAggiungiAttivita={handleAggiungiAttivita}
-            onUpdateAttivita={handleUpdateAttivita}
-            onApprovaAttivita={handleApprovaAttivita}
-            darkMode={darkMode}
-            loading={loadingData}
-          />
-        )}
+          {activeTab === 'segnalazioni' && tabsConfig.segnalazioni !== false && (
+            <SegnalazioniTab
+              segnalazioni={segnalazioni}
+              mieSegnalazioni={interactions.mieSegnalazioni}
+              segnalazioniVotate={interactions.segnalazioniVotate}
+              onVoteSegnalazione={handleVoteSegnalazione}
+              onSubmitSegnalazione={handleSubmitSegnalazione}
+              onOpenPhoto={(url) => setLightboxPhoto(url)}
+              onAdvanceSegnalazioneStato={handleSimulateReportStatusChange}
+              loading={loadingData}
+            />
+          )}
 
-        {activeTab === 'proposte' && tabsConfig.proposte !== false && (
-          <ProposteAltroTab
-            proposte={proposte}
-            votedProposte={interactions.proposteVotate}
-            mieProposte={interactions.mieProposte}
-            onVoteProposta={handleVoteProposta}
-            onSubmitProposta={handleSubmitProposta}
-            onSimulateVoteForProposal={handleSimulateProposalVote}
-          />
-        )}
+          {activeTab === 'volontariato' && tabsConfig.volontariato !== false && (
+            <VolontariatoTab
+              richieste={richieste}
+              joinedRichieste={interactions.richiesteAderite}
+              onRequestJoinVolunteer={handleRequestJoinVolunteer}
+              onSubmitCandidatura={handleSubmitCandidatura}
+              defaultName={interactions.contattiSalvati?.nome}
+              defaultPhone={interactions.contattiSalvati?.telefono}
+              onOpenPhoto={(url) => setLightboxPhoto(url)}
+              darkMode={darkMode}
+              onAddPunti={(punti, motivo) => addPunti(punti, motivo)}
+            />
+          )}
+
+          {activeTab === 'commercio' && tabsConfig.commercio !== false && (
+            <CommercioTab
+              attivita={attivitaCommercio}
+              eventi={eventi}
+              votedAttivita={interactions.negoziVotati || []}
+              onVoteAttivita={handleVoteAttivita}
+              onAggiungiAttivita={handleAggiungiAttivita}
+              onUpdateAttivita={handleUpdateAttivita}
+              onApprovaAttivita={handleApprovaAttivita}
+              darkMode={darkMode}
+              loading={loadingData}
+            />
+          )}
+
+          {activeTab === 'proposte' && tabsConfig.proposte !== false && (
+            <ProposteAltroTab
+              proposte={proposte}
+              votedProposte={interactions.proposteVotate}
+              mieProposte={interactions.mieProposte}
+              onVoteProposta={handleVoteProposta}
+              onSubmitProposta={handleSubmitProposta}
+              onSimulateVoteForProposal={handleSimulateProposalVote}
+              onOpenPhoto={(url) => setLightboxPhoto(url)}
+            />
+          )}
+        </ErrorBoundary>
       </main>
 
       {/* Bottom Navigation Bar per Smartphone & Desktop (La Home è sempre visibile, le altre schede sono gestite dall'amministratore) */}
-      <nav className={`fixed bottom-0 left-0 right-0 z-40 backdrop-blur-md border-t shadow-md transition-colors duration-200 ${
-        darkMode ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200'
-      }`}>
+      <nav 
+        aria-label="Navigazione principale"
+        className={`fixed bottom-0 left-0 right-0 z-40 backdrop-blur-md border-t shadow-md transition-colors duration-200 ${
+          darkMode ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200'
+        }`}
+      >
         <div className="max-w-xl mx-auto px-1 py-1 flex items-center justify-around">
           <button
             onClick={() => setActiveTab('home')}
-            className={`flex flex-col items-center py-1.5 px-2 rounded-xl transition text-[10px] sm:text-[11px] font-bold ${
+            aria-current={activeTab === 'home' ? 'page' : undefined}
+            className={`min-h-[48px] min-w-[48px] flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition text-[11px] sm:text-xs font-bold ${
               activeTab === 'home'
-                ? 'scale-105'
-                : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900'
+                ? 'scale-105 font-black'
+                : darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-700 hover:text-slate-950'
             }`}
-            style={{ color: activeTab === 'home' ? (darkMode ? '#fca5a5' : '#781816') : undefined }}
+            style={{ color: activeTab === 'home' ? (darkMode ? '#fecdd3' : '#781816') : undefined }}
           >
             <Home className="w-5 h-5 mb-0.5" />
             <span>Home</span>
+            {activeTab === 'home' && (
+              <span className="w-4 h-0.5 rounded-full bg-current mt-0.5" aria-hidden="true" />
+            )}
           </button>
 
           {tabsConfig.eventi !== false && (
             <button
               onClick={() => setActiveTab('eventi')}
-              className={`flex flex-col items-center py-1.5 px-2 rounded-xl transition text-[10px] sm:text-[11px] font-bold ${
+              aria-current={activeTab === 'eventi' ? 'page' : undefined}
+              className={`min-h-[48px] min-w-[48px] flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition text-[11px] sm:text-xs font-bold ${
                 activeTab === 'eventi'
-                  ? 'scale-105'
-                  : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900'
+                  ? 'scale-105 font-black'
+                  : darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-700 hover:text-slate-950'
               }`}
-              style={{ color: activeTab === 'eventi' ? (darkMode ? '#fca5a5' : '#781816') : undefined }}
+              style={{ color: activeTab === 'eventi' ? (darkMode ? '#fecdd3' : '#781816') : undefined }}
             >
               <Calendar className="w-5 h-5 mb-0.5" />
               <span>Eventi</span>
+              {activeTab === 'eventi' && (
+                <span className="w-4 h-0.5 rounded-full bg-current mt-0.5" aria-hidden="true" />
+              )}
             </button>
           )}
 
           {tabsConfig.commercio !== false && (
             <button
               onClick={() => setActiveTab('commercio')}
-              className={`flex flex-col items-center py-1.5 px-2 rounded-xl transition text-[10px] sm:text-[11px] font-bold ${
+              aria-current={activeTab === 'commercio' ? 'page' : undefined}
+              className={`min-h-[48px] min-w-[48px] flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition text-[11px] sm:text-xs font-bold ${
                 activeTab === 'commercio'
-                  ? 'scale-105 text-amber-600'
-                  : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900'
+                  ? 'scale-105 font-black'
+                  : darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-700 hover:text-slate-950'
               }`}
-              style={{ color: activeTab === 'commercio' ? (darkMode ? '#fbbf24' : '#d97706') : undefined }}
+              style={{ color: activeTab === 'commercio' ? (darkMode ? '#fbbf24' : '#92400e') : undefined }}
             >
               <div className="relative">
                 <Store className="w-5 h-5 mb-0.5" />
@@ -1119,54 +1380,70 @@ export default function App() {
                   <span className="absolute -top-0.5 -right-1 w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
                 )}
               </div>
-              <span>Commercianti</span>
+              <span>Negozi</span>
+              {activeTab === 'commercio' && (
+                <span className="w-4 h-0.5 rounded-full bg-current mt-0.5" aria-hidden="true" />
+              )}
             </button>
           )}
 
           {tabsConfig.segnalazioni !== false && (
             <button
               onClick={() => setActiveTab('segnalazioni')}
-              className={`flex flex-col items-center py-1.5 px-2 rounded-xl transition text-[10px] sm:text-[11px] font-bold ${
+              aria-current={activeTab === 'segnalazioni' ? 'page' : undefined}
+              className={`min-h-[48px] min-w-[48px] flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition text-[11px] sm:text-xs font-bold ${
                 activeTab === 'segnalazioni'
-                  ? 'scale-105 text-amber-500'
-                  : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900'
+                  ? 'scale-105 font-black'
+                  : darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-700 hover:text-slate-950'
               }`}
+              style={{ color: activeTab === 'segnalazioni' ? (darkMode ? '#fbbf24' : '#92400e') : undefined }}
             >
               <div className="relative">
                 <Camera className="w-5 h-5 mb-0.5" />
                 <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-500" />
               </div>
               <span>Segnala</span>
+              {activeTab === 'segnalazioni' && (
+                <span className="w-4 h-0.5 rounded-full bg-current mt-0.5" aria-hidden="true" />
+              )}
             </button>
           )}
 
           {tabsConfig.volontariato !== false && (
             <button
               onClick={() => setActiveTab('volontariato')}
-              className={`flex flex-col items-center py-1.5 px-2 rounded-xl transition text-[10px] sm:text-[11px] font-bold ${
+              aria-current={activeTab === 'volontariato' ? 'page' : undefined}
+              className={`min-h-[48px] min-w-[48px] flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition text-[11px] sm:text-xs font-bold ${
                 activeTab === 'volontariato'
-                  ? 'scale-105'
-                  : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900'
+                  ? 'scale-105 font-black'
+                  : darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-700 hover:text-slate-950'
               }`}
-              style={{ color: activeTab === 'volontariato' ? (darkMode ? '#fca5a5' : '#781816') : undefined }}
+              style={{ color: activeTab === 'volontariato' ? (darkMode ? '#fecdd3' : '#781816') : undefined }}
             >
               <HeartHandshake className="w-5 h-5 mb-0.5" />
               <span>Volontari</span>
+              {activeTab === 'volontariato' && (
+                <span className="w-4 h-0.5 rounded-full bg-current mt-0.5" aria-hidden="true" />
+              )}
             </button>
           )}
 
           {tabsConfig.proposte !== false && (
             <button
               onClick={() => setActiveTab('proposte')}
-              className={`flex flex-col items-center py-1.5 px-2 rounded-xl transition text-[10px] sm:text-[11px] font-bold ${
+              aria-current={activeTab === 'proposte' ? 'page' : undefined}
+              className={`min-h-[48px] min-w-[48px] flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition text-[11px] sm:text-xs font-bold ${
                 activeTab === 'proposte'
-                  ? 'scale-105'
-                  : darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900'
+                  ? 'scale-105 font-black'
+                  : darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-700 hover:text-slate-950'
               }`}
-              style={{ color: activeTab === 'proposte' ? (darkMode ? '#fca5a5' : '#781816') : undefined }}
+              style={{ color: activeTab === 'proposte' ? (darkMode ? '#fecdd3' : '#781816') : undefined }}
             >
               <Lightbulb className="w-5 h-5 mb-0.5" />
               <span>Idee</span>
+              {activeTab === 'proposte' && (
+                <span className="w-4 h-0.5 rounded-full bg-current mt-0.5" aria-hidden="true" />
+              )}
             </button>
           )}
         </div>
@@ -1195,46 +1472,50 @@ export default function App() {
         onClose={() => setLightboxPhoto(null)}
       />
 
-      {/* Pannello WordPress Backend & Insight */}
-      <WpPluginPanel
-        isOpen={wpPanelOpen}
-        onClose={() => setWpPanelOpen(false)}
-        config={wpConfig}
-        onSaveConfig={(cfg) => {
-          setWpConfig(cfg);
-          saveWpConfig(cfg);
-          showToast('Configurazione WordPress salvata!');
-        }}
-        isLiveConnected={wpConfig.useLiveApi}
-        onTestConnection={async () => {
-          const res = await fetchAllData();
-          return res.isLive;
-        }}
-        eventi={eventi}
-        segnalazioni={segnalazioni}
-        richieste={richieste}
-        proposte={proposte}
-        onRefreshData={loadData}
-        onUpdateSegnalazioneStato={async (id, stato) => {
-          await adminUpdateSegnalazioneStato(id, stato);
-          loadData();
-          showToast('Stato segnalazione aggiornato!');
-        }}
-        onUpdateSegnalazioneModerazione={handleUpdateSegnalazioneModerazione}
-        onUpdatePropostaModerazione={handleUpdatePropostaModerazione}
-        onCreateEvento={async (ev) => {
-          await adminCreateEvento(ev);
-          loadData();
-          showToast('Nuovo evento pubblicato nell\'app!');
-        }}
-        onCreateRichiesta={async (req) => {
-          await adminCreateRichiesta(req);
-          loadData();
-          showToast('Nuova attività volontariato pubblicata!');
-        }}
-        onApprovaAttivita={handleApprovaAttivita}
-        onDeactivateAdmin={handleDeactivateAdmin}
-      />
+      {/* Pannello WordPress Backend & Insight (Lazy loaded solo all'apertura) */}
+      {wpPanelOpen && (
+        <Suspense fallback={null}>
+          <WpPluginPanel
+            isOpen={wpPanelOpen}
+            onClose={() => setWpPanelOpen(false)}
+            config={wpConfig}
+            onSaveConfig={(cfg) => {
+              setWpConfig(cfg);
+              saveWpConfig(cfg);
+              showToast('Configurazione WordPress salvata!');
+            }}
+            isLiveConnected={wpConfig.useLiveApi}
+            onTestConnection={async () => {
+              const res = await fetchAllData();
+              return res.isLive;
+            }}
+            eventi={eventi}
+            segnalazioni={segnalazioni}
+            richieste={richieste}
+            proposte={proposte}
+            onRefreshData={loadData}
+            onUpdateSegnalazioneStato={async (id, stato) => {
+              await adminUpdateSegnalazioneStato(id, stato);
+              loadData();
+              showToast('Stato segnalazione aggiornato!');
+            }}
+            onUpdateSegnalazioneModerazione={handleUpdateSegnalazioneModerazione}
+            onUpdatePropostaModerazione={handleUpdatePropostaModerazione}
+            onCreateEvento={async (ev) => {
+              await adminCreateEvento(ev);
+              loadData();
+              showToast('Nuovo evento pubblicato nell\'app!');
+            }}
+            onCreateRichiesta={async (req) => {
+              await adminCreateRichiesta(req);
+              loadData();
+              showToast('Nuova attività volontariato pubblicata!');
+            }}
+            onApprovaAttivita={handleApprovaAttivita}
+            onDeactivateAdmin={handleDeactivateAdmin}
+          />
+        </Suspense>
+      )}
 
       {/* Modal Segreta Accesso Amministratore (PIN) */}
       <AdminAccessModal
@@ -1287,37 +1568,59 @@ export default function App() {
         onTestNotification={handleTestNotification}
         onSimulateProposalVote={handleSimulateProposalVote}
         onSimulateReportStatusChange={handleSimulateReportStatusChange}
+        onSimulateShopApproval={handleSimulateShopApproval}
         darkMode={darkMode}
         onPermissionChange={() => {
           showToast('Stato permessi notifiche aggiornato!');
         }}
       />
 
-      {/* Finestra Esportazione Plugin WordPress & Web App ZIP */}
-      <ExportModal
-        isOpen={exportModalOpen}
-        onClose={() => setExportModalOpen(false)}
-        darkMode={darkMode}
-        onOpenWpPanel={() => setWpPanelOpen(true)}
-      />
+      {/* Finestra Esportazione Plugin WordPress & Web App ZIP (Lazy) */}
+      {exportModalOpen && (
+        <Suspense fallback={null}>
+          <ExportModal
+            isOpen={exportModalOpen}
+            onClose={() => setExportModalOpen(false)}
+            darkMode={darkMode}
+            onOpenWpPanel={() => setWpPanelOpen(true)}
+          />
+        </Suspense>
+      )}
 
-      {/* Guida Tour Interattivo Onboarding per Nuovi Utenti */}
-      <GuidaTourModal
-        isOpen={tourModalOpen}
-        onClose={() => setTourModalOpen(false)}
-        onSelectTab={(tab) => setActiveTab(tab)}
-        onAddWelcomePoints={() => {
-          try {
-            const welcomed = localStorage.getItem('vp_welcome_pts');
-            if (!welcomed) {
-              localStorage.setItem('vp_welcome_pts', 'true');
-              addPunti(10, 'Benvenuto nel quartiere!');
-            }
-          } catch {
-            // ignore
-          }
-        }}
-        darkMode={darkMode}
+      {/* Guida Tour Interattivo Onboarding per Nuovi Utenti (Lazy) */}
+      {tourModalOpen && (
+        <Suspense fallback={null}>
+          <GuidaTourModal
+            isOpen={tourModalOpen}
+            onClose={() => setTourModalOpen(false)}
+            onSelectTab={(tab) => setActiveTab(tab)}
+            onAddWelcomePoints={() => {
+              try {
+                const welcomed = localStorage.getItem('vp_welcome_pts');
+                if (!welcomed) {
+                  localStorage.setItem('vp_welcome_pts', 'true');
+                  addPunti(10, 'Benvenuto nel quartiere!');
+                }
+              } catch {
+                // ignore
+              }
+            }}
+            darkMode={darkMode}
+          />
+        </Suspense>
+      )}
+
+      {/* Ricerca Globale Istantanea (Omnisearch) */}
+      <OmnisearchModal
+        isOpen={isOmnisearchOpen}
+        onClose={() => setIsOmnisearchOpen(false)}
+        onNavigate={handleSearchNavigate}
+        articles={news}
+        eventi={eventi}
+        commercio={attivitaCommercio}
+        segnalazioni={segnalazioni}
+        richieste={richieste}
+        proposte={proposte}
       />
 
       {/* Pop up informativo di avviso per l'utente in caso di proposta o segnalazione rifiutata */}

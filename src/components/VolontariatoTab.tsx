@@ -11,8 +11,11 @@ import {
   MapPin,
   Share2,
   Calendar,
+  Image,
+  Users,
 } from 'lucide-react';
 import { shareToWhatsApp } from '../utils/shareUtils';
+import { PannelloImpattoVolontariato } from './PannelloImpattoVolontariato';
 
 interface VolontariatoTabProps {
   richieste: RichiestaVolontariato[];
@@ -21,6 +24,9 @@ interface VolontariatoTabProps {
   onSubmitCandidatura: (candidatura: CandidaturaVolontario) => Promise<void>;
   defaultName?: string;
   defaultPhone?: string;
+  onOpenPhoto?: (url: string) => void;
+  darkMode?: boolean;
+  onAddPunti?: (punti: number, motivo: string) => void;
 }
 
 export const VolontariatoTab: React.FC<VolontariatoTabProps> = ({
@@ -30,6 +36,9 @@ export const VolontariatoTab: React.FC<VolontariatoTabProps> = ({
   onSubmitCandidatura,
   defaultName = '',
   defaultPhone = '',
+  onOpenPhoto,
+  darkMode = false,
+  onAddPunti,
 }) => {
   const [nome, setNome] = useState(defaultName);
   const [telefono, setTelefono] = useState(defaultPhone);
@@ -108,17 +117,25 @@ export const VolontariatoTab: React.FC<VolontariatoTabProps> = ({
         </div>
       </section>
 
+      {/* PANNELLO RIEPILOGATIVO IMPATTO & GRAFICO RECHARTS */}
+      <PannelloImpattoVolontariato
+        richieste={richieste}
+        joinedRichieste={joinedRichieste}
+        darkMode={darkMode}
+        onAddPunti={onAddPunti}
+      />
+
       {/* RICHIESTE IN CORSO */}
       <section className="space-y-2.5">
-        <h3 className="text-sm sm:text-base font-black text-slate-900 px-1">
+        <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white px-1">
           Attività aperte in cerca di persone
         </h3>
 
         {richieste.length === 0 ? (
-          <div className="bg-white rounded-2xl p-6 sm:p-8 text-center border border-slate-200/90 shadow-xs space-y-2">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 text-center border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-2">
             <HeartHandshake className="w-10 h-10 text-amber-500 mx-auto" />
-            <h4 className="text-sm font-bold text-slate-800">Nessuna attività di volontariato attiva al momento</h4>
-            <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+            <h4 className="text-sm font-bold text-slate-800 dark:text-white">Nessuna attività di volontariato attiva al momento</h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
               Non ci sono richieste aperte in questo momento. Compila il modulo in basso per segnalare la tua disponibilità: sarai ricontattato per le prossime iniziative del quartiere!
             </p>
           </div>
@@ -131,14 +148,16 @@ export const VolontariatoTab: React.FC<VolontariatoTabProps> = ({
                 ? (r.data ? `${r.data}${r.ora ? ` • ore ${r.ora}` : ''}` : (r.ora ? `Ore ${r.ora}` : r.data_ora || ''))
                 : null;
 
+              const posterUrl = r.featured_media_url || r.immagine_in_evidenza || r.locandina;
+
               return (
                 <div
                   key={r.id}
-                  className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-xs flex flex-col justify-between"
+                  className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col justify-between"
                 >
                   <div>
                     <div className="flex items-start justify-between gap-1.5">
-                      <h4 className="text-sm font-bold text-slate-900 leading-snug">
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
                         {r.t}
                       </h4>
                       {r.urgente && (
@@ -150,7 +169,7 @@ export const VolontariatoTab: React.FC<VolontariatoTabProps> = ({
 
                     {/* Indirizzo e riferimenti temporali (data e ora) affiancati */}
                     <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-semibold mt-1.5">
-                      <span className="flex items-center gap-1 text-amber-800">
+                      <span className="flex items-center gap-1 text-amber-800 dark:text-amber-400">
                         <MapPin className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                         <span>{r.w}</span>
                       </span>
@@ -167,55 +186,80 @@ export const VolontariatoTab: React.FC<VolontariatoTabProps> = ({
                     </p>
                   </div>
 
-                  <div className="mt-3 pt-2.5 border-t border-slate-100">
-                    <div className="flex items-center justify-between text-xs mb-1 font-semibold text-slate-700">
-                      <span>
-                        Aderiti: <strong>{r.have}</strong> su {r.need}
-                      </span>
-                      <span className="text-amber-800 font-bold">{percentage}%</span>
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2.5">
+                    {/* Prima riga: contatore aderiti e tasti secondari (Vedi locandina, Condividi) */}
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        <Users className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>Aderiti: <strong>{r.have}</strong> su {r.need}</span>
+                        <span className="text-amber-800 dark:text-amber-400 font-bold ml-1">({percentage}%)</span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {posterUrl && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenPhoto?.(posterUrl);
+                            }}
+                            className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 dark:hover:bg-amber-900/60 active:bg-amber-200 border border-amber-200 dark:border-amber-800/80 shadow-2xs transition flex items-center gap-1.5 cursor-pointer shrink-0"
+                            title="Apri e visualizza la locandina a tutto schermo"
+                            aria-label="Apri locandina dell'attività"
+                          >
+                            <Image className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 stroke-[2.3]" />
+                            <span>Apri locandina</span>
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const dateLine = riferimentiTemporali ? `🗓️ Quando: ${riferimentiTemporali}\n` : '';
+                            const msg = `🤝 *Appello Volontari a Villaggio Prenestino*:\n"${r.t}"\n📍 Luogo: ${r.w}\n${dateLine}👥 Mancano ${Math.max(1, r.need - r.have)} volontari!\n\n${r.desc}`;
+                            shareToWhatsApp(msg, 'https://www.villaggioprenestino.it');
+                          }}
+                          className="px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 active:bg-emerald-200 border border-emerald-200 dark:border-emerald-800 shadow-2xs transition flex items-center gap-1.5 cursor-pointer shrink-0"
+                          title="Condividi appello sui gruppi WhatsApp"
+                          aria-label="Condividi richiesta di volontariato"
+                        >
+                          <Share2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 stroke-[2.3]" />
+                          <span>Condividi</span>
+                        </button>
+                      </div>
                     </div>
-                    <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden mb-2.5">
+
+                    {/* Barra di avanzamento percentuale */}
+                    <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all duration-300"
                         style={{ width: `${percentage}%`, backgroundColor: '#781816' }}
                       />
                     </div>
 
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const dateLine = riferimentiTemporali ? `🗓️ Quando: ${riferimentiTemporali}\n` : '';
-                          const msg = `🤝 *Appello Volontari a Villaggio Prenestino*:\n"${r.t}"\n📍 Luogo: ${r.w}\n${dateLine}👥 Mancano ${Math.max(1, r.need - r.have)} volontari!\n\n${r.desc}`;
-                          shareToWhatsApp(msg, 'https://www.villaggioprenestino.it');
-                        }}
-                        title="Condividi appello sui gruppi WhatsApp"
-                        className="p-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition cursor-pointer shrink-0"
-                      >
-                        <Share2 className="w-4 h-4 text-emerald-700" />
-                      </button>
+                    {/* Seconda riga: AZIONE PRINCIPALE - Tasto Iscriviti/Aderisci a tutta larghezza in evidenza */}
                     <button
+                      type="button"
                       onClick={() => onRequestJoinVolunteer(r)}
-                      className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                      className={`w-full py-2.5 px-4 rounded-xl text-xs sm:text-sm font-black transition flex items-center justify-center gap-2 cursor-pointer shadow-xs hover:shadow-sm active:scale-[0.99] ${
                         hasJoined
-                          ? 'bg-amber-100 text-amber-950 border border-amber-300'
-                          : 'bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 shadow-xs'
+                          ? 'bg-amber-100 text-amber-950 border border-amber-300 hover:bg-amber-200 dark:bg-amber-950/80 dark:text-amber-200 dark:border-amber-700'
+                          : 'bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 shadow-md'
                       }`}
                     >
                       {hasJoined ? (
                         <>
-                          <CheckCircle2 className="w-4 h-4 text-emerald-700" />
-                          Hai aderito (Annulla)
+                          <CheckCircle2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
+                          <span>Hai aderito all'attività ✓ (Tocca per annullare)</span>
                         </>
                       ) : (
                         <>
                           <HeartHandshake className="w-4 h-4" />
-                          Ci sono anche io (+10 pts)
+                          <span>Ci sono anche io (+10 pts)</span>
                         </>
                       )}
                     </button>
                   </div>
-                </div>
               </div>
             );
           })}
@@ -224,23 +268,23 @@ export const VolontariatoTab: React.FC<VolontariatoTabProps> = ({
       </section>
 
       {/* FORM: REGISTRAZIONE VOLONTARIO */}
-      <section id="modulo-volontari" className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-3.5">
+      <section id="modulo-volontari" className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-3.5">
         <div>
-          <h3 className="text-base font-black text-slate-900">
+          <h3 className="text-base font-black text-slate-900 dark:text-white">
             Modulo volontari
           </h3>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Lascia i tuoi recapiti: ti contatteremo quando organizziamo le attività.
           </p>
         </div>
 
         {inviatoSuccesso ? (
-          <div className="p-5 rounded-xl bg-amber-50 border border-amber-300 text-center space-y-1.5">
-            <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
-            <h4 className="text-sm font-bold text-slate-900">
+          <div className="p-5 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 text-center space-y-1.5">
+            <CheckCircle2 className="w-8 h-8 text-emerald-600 dark:text-emerald-400 mx-auto" />
+            <h4 className="text-sm font-bold text-slate-900 dark:text-white">
               Grazie per la disponibilità! (+15 pts)
             </h4>
-            <p className="text-xs text-slate-600">
+            <p className="text-xs text-slate-600 dark:text-slate-300">
               I tuoi recapiti sono stati salvati: ti contatteremo per le attività di quartiere.
             </p>
           </div>
@@ -248,7 +292,7 @@ export const VolontariatoTab: React.FC<VolontariatoTabProps> = ({
           <form onSubmit={handleSubmit} className="space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
                   <User className="w-3.5 h-3.5 text-slate-400" />
                   Nome o Soprannome:
                 </label>
@@ -258,13 +302,13 @@ export const VolontariatoTab: React.FC<VolontariatoTabProps> = ({
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
                   placeholder="Il tuo nome"
-                  className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                  <Phone className="w-3.5 h-3.5 text-amber-600" />
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                  <Phone className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
                   Numero di Telefono *:
                 </label>
                 <input
@@ -273,14 +317,14 @@ export const VolontariatoTab: React.FC<VolontariatoTabProps> = ({
                   value={telefono}
                   onChange={(e) => setTelefono(e.target.value)}
                   placeholder="Numero cellulare"
-                  className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
             </div>
 
             {/* Tag attività */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                 Cosa ti piacerebbe fare?
               </label>
               <div className="grid grid-cols-1 sm:flex sm:flex-wrap gap-2 sm:gap-1.5">
@@ -291,10 +335,10 @@ export const VolontariatoTab: React.FC<VolontariatoTabProps> = ({
                       key={tag}
                       type="button"
                       onClick={() => toggleAttivita(tag)}
-                      className={`w-full sm:w-auto text-xs py-2.5 sm:py-1 px-3.5 sm:px-2.5 rounded-xl sm:rounded-lg border transition text-center flex items-center justify-center ${
+                      className={`w-full sm:w-auto text-xs py-2.5 sm:py-1 px-3.5 sm:px-2.5 rounded-xl sm:rounded-lg border transition text-center flex items-center justify-center cursor-pointer ${
                         selected
-                          ? 'bg-amber-500 text-slate-950 border-amber-500 font-bold'
-                          : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200'
+                          ? 'bg-amber-500 text-slate-950 border-amber-500 font-bold shadow-xs'
+                          : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-750 border-slate-200 dark:border-slate-700'
                       }`}
                     >
                       {tag}
@@ -306,7 +350,7 @@ export const VolontariatoTab: React.FC<VolontariatoTabProps> = ({
 
             {/* Note */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                 Disponibilità o orari (facoltativo):
               </label>
               <input
@@ -314,12 +358,12 @@ export const VolontariatoTab: React.FC<VolontariatoTabProps> = ({
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="es. Sabato mattina o pomeriggi"
-                className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
               />
             </div>
 
-            <div className="flex items-start gap-1.5 text-[11px] text-slate-500 pt-1">
-              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+            <div className="flex items-start gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 pt-1">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span>
                 Il tuo numero viene usato solo dall'Associazione per coordinare le attività.
               </span>

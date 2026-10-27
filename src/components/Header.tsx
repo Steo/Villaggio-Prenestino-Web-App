@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Award, Moon, Sun, ShieldCheck, Bell, Download, HelpCircle } from 'lucide-react';
+import { Award, Moon, Sun, ShieldCheck, Bell, Download, HelpCircle, Search, CloudOff } from 'lucide-react';
 import { UserInteractions } from '../types';
 import { LogoCdq } from './LogoCdq';
 import { PuntiCiviciModal } from './PuntiCiviciModal';
@@ -16,6 +16,8 @@ interface HeaderProps {
   onOpenNotifications?: () => void;
   onOpenExportModal?: () => void;
   onOpenTour?: () => void;
+  onOpenSearch?: () => void;
+  pendingOfflineCount?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -30,6 +32,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenNotifications,
   onOpenExportModal,
   onOpenTour,
+  onOpenSearch,
+  pendingOfflineCount = 0,
 }) => {
   const [isPuntiModalOpen, setIsPuntiModalOpen] = useState(false);
   const logoTapCountRef = useRef(0);
@@ -93,12 +97,12 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* Tasto Esporta Plugin & Web App ZIP: VISIBILE SOLO PER L'AMMINISTRATORE */}
-            {isAdmin && onOpenExportModal && (
+            {/* Tasto Esporta Plugin & Web App ZIP: SEMPRE DISPONIBILE NELL'HEADER */}
+            {onOpenExportModal && (
               <button
                 type="button"
                 onClick={onOpenExportModal}
-                title="Esporta il Plugin WordPress (.zip) e la Web App (.zip) da testare sul tuo sito web (Modalità Admin)"
+                title="Esporta il Plugin WordPress (.zip) e la Web App (.zip) da testare sul tuo sito web"
                 aria-label="Esporta Plugin WordPress e Web App per il tuo sito"
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-500/25 hover:bg-emerald-500/40 active:scale-95 border border-emerald-400/50 text-white text-xs font-semibold cursor-pointer transition shadow-xs group focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
               >
@@ -106,6 +110,30 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="hidden sm:inline font-bold text-[11px] text-emerald-100">Esporta ZIP</span>
                 <span className="sm:hidden font-bold text-[10px] text-emerald-200">ZIP</span>
               </button>
+            )}
+
+            {/* Tasto Ricerca Globale Universale (Omnisearch) */}
+            {onOpenSearch && (
+              <button
+                type="button"
+                onClick={onOpenSearch}
+                title="Cerca nel quartiere: eventi, negozi, notizie, segnalazioni (Ctrl+K)"
+                aria-label="Apri ricerca globale universale nel quartiere"
+                className="flex items-center justify-center w-8 h-8 rounded-xl bg-black/20 hover:bg-black/35 active:scale-95 border border-white/20 hover:border-amber-400/50 text-white transition-all shadow-xs cursor-pointer group focus:outline-none focus:ring-2 focus:ring-amber-400/50"
+              >
+                <Search className="w-4 h-4 text-white/90 group-hover:text-amber-300 transition-colors" />
+              </button>
+            )}
+
+            {/* Indicatore Coda Offline se ci sono elementi in attesa di sincronizzazione */}
+            {pendingOfflineCount > 0 && (
+              <div
+                title={`${pendingOfflineCount} invii salvati in memoria offline, verranno sincronizzati al ritorno della connessione.`}
+                className="flex items-center gap-1 px-2 py-1 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-200 text-[11px] font-bold animate-pulse"
+              >
+                <CloudOff className="w-3.5 h-3.5 text-amber-300" />
+                <span>{pendingOfflineCount}</span>
+              </div>
             )}
 
             {/* Tasto Notifiche Browser & Centro Avvisi */}

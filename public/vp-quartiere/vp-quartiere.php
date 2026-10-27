@@ -3,7 +3,7 @@
  * Plugin Name: VP Quartiere - Gestione Web App Villaggio Prenestino
  * Plugin URI:  https://www.villaggioprenestino.it
  * Description: Plugin ufficiale per la gestione della Web App di quartiere: gestisce commercianti e negozi locali con approvazione moderatore, segnalazioni con foto, richieste di volontariato con contatti dei cittadini, eventi, proposte, dashboard Insight e REST API.
- * Version:     1.5.0
+ * Version:     1.6.0
  * Author:      Associazione di Quartiere Villaggio Prenestino
  * Author URI:  https://www.villaggioprenestino.it
  * License:     GPL-2.0+
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('VPQ_VERSION', '1.5.0');
+define('VPQ_VERSION', '1.6.0');
 define('VPQ_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('VPQ_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -84,10 +84,12 @@ function vpq_register_post_types() {
             'edit_item'          => 'Modifica Evento',
             'all_items'          => 'Tutti gli Eventi',
         ],
-        'public'       => false,
+        'public'       => true,
         'show_ui'      => true,
         'show_in_menu' => 'vp-quartiere',
-        'supports'     => ['title', 'editor', 'thumbnail'],
+        'show_in_rest' => true,
+        'rest_base'    => 'vp_evento',
+        'supports'     => ['title', 'editor', 'thumbnail', 'custom-fields'],
     ]);
 
     // 2. Richieste Volontariato ("Serve una mano")
@@ -101,10 +103,12 @@ function vpq_register_post_types() {
             'edit_item'          => 'Modifica Richiesta',
             'all_items'          => 'Tutte le Richieste',
         ],
-        'public'       => false,
+        'public'       => true,
         'show_ui'      => true,
         'show_in_menu' => 'vp-quartiere',
-        'supports'     => ['title', 'editor'],
+        'show_in_rest' => true,
+        'rest_base'    => 'vp_richiesta',
+        'supports'     => ['title', 'editor', 'thumbnail', 'custom-fields'],
     ]);
 
     // 3. Segnalazioni Cittadine
@@ -134,7 +138,7 @@ function vpq_register_post_types() {
         'public'       => false,
         'show_ui'      => true,
         'show_in_menu' => 'vp-quartiere',
-        'supports'     => ['title', 'editor'],
+        'supports'     => ['title', 'editor', 'thumbnail'],
     ]);
 
     // 5. Iscrizioni Registro Volontari ("Partecipa")
@@ -307,6 +311,25 @@ function vpq_render_evento_meta($post) {
                 <p class="description" style="color:#666;">Nota: se la data dell'evento è passata, il plugin lo mostrerà comunque in "Eventi Passati" automaticamente.</p>
             </td>
         </tr>
+        <tr>
+            <th><label for="vp_locandina">Locandina / Manifesto:</label></th>
+            <td>
+                <?php
+                $locandina_field = get_post_meta($post->ID, '_vp_locandina', true);
+                if (!$locandina_field && has_post_thumbnail($post->ID)) {
+                    $locandina_field = get_the_post_thumbnail_url($post->ID, 'full');
+                }
+                ?>
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                    <input type="text" id="vp_locandina" name="vp_locandina" value="<?php echo esc_url($locandina_field); ?>" class="regular-text" placeholder="https://..." style="max-width:380px;" />
+                    <button type="button" class="button vpq-media-select" data-target="#vp_locandina">📂 Scegli da Libreria Media</button>
+                    <button type="button" class="button vpq-media-clear" data-target="#vp_locandina">Rimuovi</button>
+                </div>
+                <p class="description" style="color:#666;margin-top:4px;">
+                    Carica o seleziona la locandina grafica dell'evento dalla <strong>Libreria Media</strong> (oppure usa il box standard <em>"Immagine in evidenza"</em> nella colonna a destra). I residenti nell'app vedranno il tasto <strong>"Vedi Locandina"</strong> per visualizzarla a tutto schermo.
+                </p>
+            </td>
+        </tr>
     </table>
     <script>
     (function(){
@@ -379,6 +402,25 @@ function vpq_render_richiesta_meta($post) {
                     <input type="checkbox" id="vp_urgente" name="vp_urgente" value="1" <?php checked($urgente, true); ?> />
                     <strong>Attività Urgente</strong> (mostrerà il badge rosso di allerta nell'app)
                 </label>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="vp_locandina_r">Locandina / Immagine Attività:</label></th>
+            <td>
+                <?php
+                $locandina_r_field = get_post_meta($post->ID, '_vp_locandina', true);
+                if (!$locandina_r_field && has_post_thumbnail($post->ID)) {
+                    $locandina_r_field = get_the_post_thumbnail_url($post->ID, 'full');
+                }
+                ?>
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                    <input type="text" id="vp_locandina_r" name="vp_locandina" value="<?php echo esc_url($locandina_r_field); ?>" class="regular-text" placeholder="https://..." style="max-width:380px;" />
+                    <button type="button" class="button vpq-media-select" data-target="#vp_locandina_r">📂 Scegli da Libreria Media</button>
+                    <button type="button" class="button vpq-media-clear" data-target="#vp_locandina_r">Rimuovi</button>
+                </div>
+                <p class="description" style="color:#666;margin-top:4px;">
+                    Carica o seleziona la locandina o immagine allegata all'iniziativa dalla <strong>Libreria Media</strong> (oppure usa il box <em>"Immagine in evidenza"</em> a destra). I residenti nell'app vedranno il tasto <strong>"Vedi Locandina"</strong>.
+                </p>
             </td>
         </tr>
     </table>
@@ -582,8 +624,38 @@ function vpq_save_meta($post_id) {
     if (isset($_POST['vp_lat'])) update_post_meta($post_id, '_vp_lat', sanitize_text_field($_POST['vp_lat']));
     if (isset($_POST['vp_lng'])) update_post_meta($post_id, '_vp_lng', sanitize_text_field($_POST['vp_lng']));
     update_post_meta($post_id, '_vp_verificato', isset($_POST['vp_verificato']) ? '1' : '0');
-    if (isset($_POST['vp_mipiace'])) update_post_meta($post_id, '_vp_mipiace', absint($_POST['vp_mipiace']));
+    if (isset($_POST['vp_locandina'])) update_post_meta($post_id, '_vp_locandina', esc_url_raw($_POST['vp_locandina']));
 }
+
+/**
+ * Caricamento script Libreria Media WordPress nel backend per Eventi, Volontariato e Commercianti
+ */
+add_action('admin_enqueue_scripts', function($hook) {
+    global $post_type;
+    if (in_array($post_type, ['vp_evento', 'vp_richiesta', 'vp_commercio', 'vp_segnalazione']) || (isset($_GET['page']) && strpos($_GET['page'], 'vp-quartiere') !== false)) {
+        wp_enqueue_media();
+        wp_add_inline_script('common', "
+            jQuery(document).ready(function($){
+                $(document).on('click', '.vpq-media-select', function(e){
+                    e.preventDefault();
+                    var targetInput = $($(this).data('target'));
+                    var customUploader = wp.media({
+                        title: 'Seleziona Locandina / Immagine dalla Libreria Media',
+                        button: { text: 'Usa questa immagine' },
+                        multiple: false
+                    }).on('select', function() {
+                        var attachment = customUploader.state().get('selection').first().toJSON();
+                        targetInput.val(attachment.url).trigger('change');
+                    }).open();
+                });
+                $(document).on('click', '.vpq-media-clear', function(e){
+                    e.preventDefault();
+                    $($(this).data('target')).val('').trigger('change');
+                });
+            });
+        ");
+    }
+});
 
 /**
  * Colonne Personalizzate nel Back Office
@@ -805,6 +877,52 @@ add_action('rest_api_init', function() {
  * REST API Endpoints personalizzati (/wp-json/vp/v1/...)
  */
 add_action('rest_api_init', function() {
+    // Espone 'featured_media_url', 'immagine_in_evidenza' e 'locandina' nelle REST API WP Core (/wp-json/wp/v2/vp_evento e vp_richiesta)
+    $callback_featured_media = function($post_arr) {
+        $post_id = 0;
+        if (is_array($post_arr) && isset($post_arr['id'])) {
+            $post_id = (int)$post_arr['id'];
+        } elseif (is_object($post_arr) && isset($post_arr->ID)) {
+            $post_id = (int)$post_arr->ID;
+        }
+        if (!$post_id) return '';
+        $url = get_the_post_thumbnail_url($post_id, 'full');
+        if (!$url) {
+            $url = get_post_meta($post_id, '_vp_locandina', true) ?: '';
+        }
+        return $url ?: '';
+    };
+
+    register_rest_field(['vp_evento', 'vp_richiesta', 'vp_proposta'], 'featured_media_url', [
+        'get_callback'    => $callback_featured_media,
+        'update_callback' => null,
+        'schema'          => [
+            'description' => 'URL completo ad alta risoluzione della locandina o immagine in evidenza (featured_media_url)',
+            'type'        => 'string',
+            'context'     => ['view', 'edit', 'embed'],
+        ],
+    ]);
+
+    register_rest_field(['vp_evento', 'vp_richiesta', 'vp_proposta'], 'immagine_in_evidenza', [
+        'get_callback'    => $callback_featured_media,
+        'update_callback' => null,
+        'schema'          => [
+            'description' => 'URL completo della locandina o immagine in evidenza (immagine_in_evidenza)',
+            'type'        => 'string',
+            'context'     => ['view', 'edit', 'embed'],
+        ],
+    ]);
+
+    register_rest_field(['vp_evento', 'vp_richiesta', 'vp_proposta'], 'locandina', [
+        'get_callback'    => $callback_featured_media,
+        'update_callback' => null,
+        'schema'          => [
+            'description' => 'URL completo della locandina (locandina)',
+            'type'        => 'string',
+            'context'     => ['view', 'edit', 'embed'],
+        ],
+    ]);
+
     $ns = 'vp/v1';
 
     // 1. GET /wp-json/vp/v1/dati - Scarica tutti i dati pubblici in una chiamata sola
@@ -918,7 +1036,48 @@ add_action('rest_api_init', function() {
         'callback'            => 'vpq_api_tabs_config',
         'permission_callback' => '__return_true',
     ]);
+
+    // 17. GET /wp-json/vp/v1/assetlinks - Digital Asset Links per Android Trusted Web Activity (Google Play)
+    register_rest_route($ns, '/assetlinks', [
+        'methods'             => 'GET',
+        'callback'            => 'vpq_api_assetlinks',
+        'permission_callback' => '__return_true',
+    ]);
 });
+
+// Interceptor per servire automaticamente /.well-known/assetlinks.json se richiesto direttamente
+add_action('init', function() {
+    if (isset($_SERVER['REQUEST_URI']) && strpos($_SERVER['REQUEST_URI'], '.well-known/assetlinks.json') !== false) {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Access-Control-Allow-Origin: *');
+        echo json_encode(vpq_api_assetlinks(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+});
+
+/**
+ * 17. CALLBACK: GET /assetlinks
+ */
+function vpq_api_assetlinks() {
+    $file = VPQ_PLUGIN_DIR . '.well-known/assetlinks.json';
+    if (file_exists($file)) {
+        $content = file_get_contents($file);
+        $json = json_decode($content, true);
+        if ($json) return $json;
+    }
+    return [
+        [
+            'relation' => ['delegate_permission/common.handle_all_urls'],
+            'target'   => [
+                'namespace'                => 'android_app',
+                'package_name'             => 'it.villaggioprenestino.app',
+                'sha256_cert_fingerprints' => [
+                    'SOSTITUISCI_CON_SHA256_FINGERPRINT_DA_GOOGLE_PLAY_CONSOLE'
+                ]
+            ]
+        ]
+    ];
+}
 
 /**
  * 1. CALLBACK: GET /dati
@@ -947,6 +1106,8 @@ function vpq_api_get_dati() {
         // Normalizza la data ed esegue il controllo automatico passato rispetto ad oggi
         $norm = vpq_normalize_data_evento($giorno_raw, $mese_raw, $anno_raw, $ora, $passato_raw);
 
+        $locandina = get_the_post_thumbnail_url($p->ID, 'full') ?: (get_post_meta($p->ID, '_vp_locandina', true) ?: '');
+
         $eventi[] = [
             'id'           => $p->ID,
             't'            => $p->post_title,
@@ -960,8 +1121,11 @@ function vpq_api_get_dati() {
             'n'            => $count,
             'target'       => (int) get_post_meta($p->ID, '_vp_target', true) ?: 10,
             'tipo'         => get_post_meta($p->ID, '_vp_tipo', true) ?: 'volontariato',
-            'passato'      => $norm['is_passato'],
-            'quota'        => get_post_meta($p->ID, '_vp_quota', true) ?: '',
+            'passato'              => $norm['is_passato'],
+            'quota'                => get_post_meta($p->ID, '_vp_quota', true) ?: '',
+            'locandina'            => $locandina,
+            'featured_media_url'   => $locandina,
+            'immagine_in_evidenza' => $locandina,
         ];
     }
 
@@ -975,22 +1139,26 @@ function vpq_api_get_dati() {
     ]);
     $richieste = [];
     foreach ($richieste_query->posts as $p) {
-        $aderiti  = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE tipo='cisono' AND post_id=%d", $p->ID));
-        $data_r   = get_post_meta($p->ID, '_vp_data', true) ?: '';
-        $ora_r    = get_post_meta($p->ID, '_vp_ora', true) ?: '';
-        $data_ora = trim(($data_r ? $data_r : '') . ($ora_r ? ($data_r ? ' • ore ' : 'Ore ') . $ora_r : ''));
+        $aderiti     = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE tipo='cisono' AND post_id=%d", $p->ID));
+        $data_r      = get_post_meta($p->ID, '_vp_data', true) ?: '';
+        $ora_r       = get_post_meta($p->ID, '_vp_ora', true) ?: '';
+        $data_ora    = trim(($data_r ? $data_r : '') . ($ora_r ? ($data_r ? ' • ore ' : 'Ore ') . $ora_r : ''));
+        $locandina_r = get_the_post_thumbnail_url($p->ID, 'full') ?: (get_post_meta($p->ID, '_vp_locandina', true) ?: '');
 
         $richieste[] = [
-            'id'       => $p->ID,
-            't'        => $p->post_title,
-            'w'        => get_post_meta($p->ID, '_vp_luogo', true) ?: 'Villaggio Prenestino',
-            'desc'     => wp_strip_all_tags($p->post_content),
-            'have'     => $aderiti,
-            'need'     => (int) get_post_meta($p->ID, '_vp_obiettivo', true) ?: 8,
-            'urgente'  => (bool) get_post_meta($p->ID, '_vp_urgente', true),
-            'data'     => $data_r,
-            'ora'      => $ora_r,
-            'data_ora' => $data_ora,
+            'id'                   => $p->ID,
+            't'                    => $p->post_title,
+            'w'                    => get_post_meta($p->ID, '_vp_luogo', true) ?: 'Villaggio Prenestino',
+            'desc'                 => wp_strip_all_tags($p->post_content),
+            'have'                 => $aderiti,
+            'need'                 => (int) get_post_meta($p->ID, '_vp_obiettivo', true) ?: 8,
+            'urgente'              => (bool) get_post_meta($p->ID, '_vp_urgente', true),
+            'data'                 => $data_r,
+            'ora'                  => $ora_r,
+            'data_ora'             => $data_ora,
+            'locandina'            => $locandina_r,
+            'featured_media_url'   => $locandina_r,
+            'immagine_in_evidenza' => $locandina_r,
         ];
     }
 
@@ -1014,6 +1182,7 @@ function vpq_api_get_dati() {
             }
         }
 
+        $voti_seg = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE tipo='segnalazione_vota' AND post_id=%d", $p->ID));
         $segnalazioni[] = [
             'id'    => $p->ID,
             't'     => $p->post_title,
@@ -1022,6 +1191,7 @@ function vpq_api_get_dati() {
             's'     => (int) (get_post_meta($p->ID, '_vp_stato', true) ?: 1),
             'ph'    => $foto_arr,
             'data'  => get_the_date('d/m/Y', $p->ID),
+            'voti'  => $voti_seg,
         ];
     }
 
@@ -1036,10 +1206,17 @@ function vpq_api_get_dati() {
     $proposte = [];
     foreach ($proposte_query->posts as $p) {
         $voti = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE tipo='proposta_vota' AND post_id=%d", $p->ID));
+        $locandina_prop = get_the_post_thumbnail_url($p->ID, 'full') ?: (get_post_meta($p->ID, '_vp_locandina', true) ?: '');
         $proposte[] = [
-            'id' => $p->ID,
-            't'  => $p->post_title,
-            'v'  => $voti,
+            'id'                   => $p->ID,
+            't'                    => $p->post_title,
+            'v'                    => $voti,
+            'desc'                 => wp_strip_all_tags($p->post_content),
+            'data'                 => get_the_date('d/m/Y', $p->ID),
+            'cittadinoNome'        => get_post_meta($p->ID, '_vp_cittadino_nome', true) ?: '',
+            'locandina'            => $locandina_prop,
+            'featured_media_url'   => $locandina_prop,
+            'immagine_in_evidenza' => $locandina_prop,
         ];
     }
 
@@ -1617,27 +1794,6 @@ function vpq_api_post_commercio(WP_REST_Request $request) {
         update_post_meta($post_id, '_vp_logo', $logo);
     }
 
-    // Notifica email automatica all'Associazione di Quartiere per nuova attività commerciale
-    $email_to = 'associazione@villaggioprenestino.it';
-    $email_subject = '🏪 Nuova Bottega/Attività da approvare: ' . $nome . ' (' . strtoupper($categoria) . ')';
-    $email_body = "Gentile Direttivo dell'Associazione di Quartiere Villaggio Prenestino,\n\n"
-        . "È stata registrata una nuova attività commerciale tramite la Web App in attesa di moderazione:\n\n"
-        . "🏪 Attività: " . $nome . "\n"
-        . "🏷️ Categoria: " . strtoupper($categoria) . "\n"
-        . "📍 Indirizzo: " . $indirizzo . "\n"
-        . "📞 Telefono: " . $telefono . "\n"
-        . "💬 WhatsApp: " . ($whatsapp ?: 'Non indicato') . "\n"
-        . "🕒 Orari: " . $orari . "\n"
-        . "👤 Referente: " . ($nome_referente ?: 'Non specificato') . ($email_referente ? " (" . $email_referente . ")" : "") . "\n"
-        . "🎁 Offerta per residenti: " . ($offerta_titolo ? ($offerta_titolo . " - " . $offerta_dettaglio) : 'Nessuna offerta') . "\n"
-        . "📝 Descrizione: " . ($descrizione ?: 'Nessuna descrizione') . "\n"
-        . "🗓️ Data: " . current_time('d/m/Y H:i') . "\n\n"
-        . "Puoi approvare e pubblicare la scheda commerciante dal pannello WordPress:\n"
-        . admin_url('post.php?post=' . $post_id . '&action=edit') . "\n\n"
-        . "--\nAssociazione di Quartiere Villaggio Prenestino\nwww.villaggioprenestino.it";
-    $email_headers = ['Content-Type: text/plain; charset=UTF-8'];
-    @wp_mail($email_to, $email_subject, $email_body, $email_headers);
-
     return rest_ensure_response([
         'success'   => true,
         'post_id'   => $post_id,
@@ -1645,6 +1801,58 @@ function vpq_api_post_commercio(WP_REST_Request $request) {
         'messaggio' => 'Attività commerciale registrata con successo! È ora in attesa di approvazione da parte dell\'amministratore prima della pubblicazione.',
     ]);
 }
+
+/**
+ * Invia notifica email al commerciante / titolare quando la sua attività viene approvata
+ */
+function vpq_invia_notifica_approvazione_commercio($post_id) {
+    if (get_post_type($post_id) !== 'vp_commercio') {
+        return;
+    }
+
+    // Evita invii duplicati della notifica per lo stesso post
+    if (get_post_meta($post_id, '_vp_approvazione_notificata', true)) {
+        return;
+    }
+
+    $email = get_post_meta($post_id, '_vp_email_referente', true);
+    if (empty($email) || !is_email($email)) {
+        return;
+    }
+
+    $nome_attivita  = get_the_title($post_id);
+    $nome_referente = get_post_meta($post_id, '_vp_nome_referente', true) ?: 'Gentile Commerciante';
+    $categoria      = get_post_meta($post_id, '_vp_categoria', true) ?: 'Commercio';
+    $indirizzo      = get_post_meta($post_id, '_vp_indirizzo', true) ?: 'Villaggio Prenestino';
+    $pin            = get_post_meta($post_id, '_vp_pin_gestione', true);
+
+    $subject = '🎉 La tua attività commerciale "' . $nome_attivita . '" è stata approvata!';
+    $message = "Gentile " . $nome_referente . ",\n\n"
+        . "Siamo felici di comunicarti che la tua attività commerciale \"" . $nome_attivita . "\" è stata verificata e approvata con successo dall'Associazione di Quartiere Villaggio Prenestino!\n\n"
+        . "La scheda è ora ufficialmente pubblicata e visibile a tutti i residenti su Google Maps e nella vetrina commercianti dell'App:\n"
+        . "🏪 Attività: " . $nome_attivita . "\n"
+        . "🏷️ Categoria: " . strtoupper($categoria) . "\n"
+        . "📍 Indirizzo: " . $indirizzo . "\n\n"
+        . "I cittadini del quartiere possono ora trovare la tua attività sulla mappa, consultare i tuoi orari, contattarti telefonicamente o su WhatsApp e usufruire delle promozioni dedicate.\n\n"
+        . "Puoi consultare la tua scheda direttamente dalla Web App del quartiere:\n"
+        . "https://villaggioprenestino.it/app/\n"
+        . ($pin ? "\nRicorda che puoi aggiornare orari, recapiti o promozioni in qualsiasi momento con il tuo PIN di gestione riservato: " . $pin . "\n" : "") . "\n"
+        . "Grazie per aver scelto di valorizzare il commercio di vicinato a Villaggio Prenestino!\n\n"
+        . "--\nAssociazione di Quartiere Villaggio Prenestino\nwww.villaggioprenestino.it";
+
+    $headers = ['Content-Type: text/plain; charset=UTF-8'];
+    $sent = @wp_mail($email, $subject, $message, $headers);
+    if ($sent) {
+        update_post_meta($post_id, '_vp_approvazione_notificata', '1');
+    }
+}
+
+// Hook su passaggio di stato a 'publish' (approvazione attività commerciale)
+add_action('transition_post_status', function($new_status, $old_status, $post) {
+    if ($post && $post->post_type === 'vp_commercio' && $new_status === 'publish' && $old_status !== 'publish') {
+        vpq_invia_notifica_approvazione_commercio($post->ID);
+    }
+}, 10, 3);
 
 /**
  * 15. CALLBACK: POST /notify-email (Invio notifica email generica da Web App)
@@ -1938,6 +2146,789 @@ function vpq_api_get_classifica_data() {
     return $classifica;
 }
 
+/* =========================================================================
+ * 18. SHORTCODE: [vp_negozi_mappa], [vp_commercianti] e [vp_negozi]
+ * Mappa interattiva dei negozi con schede responsive, ricerca istantanea e filtri
+ * ========================================================================= */
+add_shortcode('vp_negozi_mappa', 'vpq_shortcode_negozi_mappa');
+add_shortcode('vp_commercianti', 'vpq_shortcode_negozi_mappa');
+add_shortcode('vp_negozi', 'vpq_shortcode_negozi_mappa');
+
+function vpq_shortcode_negozi_mappa($atts) {
+    global $wpdb;
+    $table = $wpdb->prefix . 'vp_interazioni';
+
+    $atts = shortcode_atts([
+        'provider'         => 'osm',       // 'osm' (OpenStreetMap/Leaflet) o 'google'
+        'categoria'        => 'tutti',     // 'tutti', 'alimentari', 'ristorazione', 'servizi', 'salute', 'casa_brico', 'abbigliamento', 'tempo_libero'
+        'schede'           => 'si',        // 'si' | 'no' (mostra o nasconde le schede sotto la mappa)
+        'ricerca'          => 'si',        // 'si' | 'no' (barra di ricerca in tempo reale)
+        'filtro_categoria' => 'si',        // 'si' | 'no' (pulsanti di filtro per categoria)
+        'colonne'          => '3',         // 2, 3, 4 colonne su desktop
+        'altezza'          => '450px',     // Altezza CSS della mappa
+        'offerte_solo'     => 'no',        // 'si' | 'no' (solo negozi con offerte)
+        'limite'           => '0',         // 0 = illimitato
+        'ordine'           => 'mipiace',   // 'mipiace', 'titolo', 'data'
+        'zoom'             => '14',        // Livello zoom mappa
+        'centro_lat'       => '41.8965',   // Centro latitudine
+        'centro_lng'       => '12.6710',   // Centro longitudine
+        'google_api_key'   => '',          // Override opzionale chiave Google Maps
+    ], $atts, 'vp_negozi_mappa');
+
+    $provider         = in_array(strtolower($atts['provider']), ['google', 'gmaps']) ? 'google' : 'osm';
+    $categoria_filter = sanitize_key($atts['categoria'] ?: 'tutti');
+    $mostra_schede    = strtolower($atts['schede']) !== 'no';
+    $mostra_ricerca   = strtolower($atts['ricerca']) !== 'no';
+    $mostra_filtri    = strtolower($atts['filtro_categoria']) !== 'no';
+    $colonne          = max(1, min(4, intval($atts['colonne']) ?: 3));
+    $altezza          = esc_attr($atts['altezza'] ?: '450px');
+    $offerte_solo     = strtolower($atts['offerte_solo']) === 'si';
+    $limite           = max(0, intval($atts['limite']));
+    $ordine           = in_array($atts['ordine'], ['titolo', 'data']) ? $atts['ordine'] : 'mipiace';
+    $zoom             = max(10, min(19, intval($atts['zoom']) ?: 14));
+    $centro_lat       = floatval($atts['centro_lat'] ?: 41.8965);
+    $centro_lng       = floatval($atts['centro_lng'] ?: 12.6710);
+    $google_api_key   = sanitize_text_field($atts['google_api_key'] ?: get_option('vpq_google_maps_api_key', ''));
+
+    // Configurazione metadati categorie (colori, etichette, emoji)
+    $categorie_meta = [
+        'tutti'          => ['label' => 'Tutti i Negozi', 'emoji' => '🏪', 'color' => '#781816', 'bg' => '#fef2f2', 'border' => '#fecdd3'],
+        'alimentari'     => ['label' => 'Alimentari & Botteghe', 'emoji' => '🛒', 'color' => '#15803d', 'bg' => '#f0fdf4', 'border' => '#bbf7d0'],
+        'ristorazione'   => ['label' => 'Ristoranti & Bar', 'emoji' => '🍕', 'color' => '#c2410c', 'bg' => '#fff7ed', 'border' => '#fed7aa'],
+        'servizi'        => ['label' => 'Servizi & Artigiani', 'emoji' => '✂️', 'color' => '#4338ca', 'bg' => '#eef2ff', 'border' => '#c7d2fe'],
+        'salute'         => ['label' => 'Salute & Benessere', 'emoji' => '💊', 'color' => '#0f766e', 'bg' => '#f0fdfa', 'border' => '#99f6e4'],
+        'casa_brico'     => ['label' => 'Casa & Brico', 'emoji' => '🔨', 'color' => '#a16207', 'bg' => '#fefce8', 'border' => '#fef08a'],
+        'abbigliamento'  => ['label' => 'Abbigliamento & Moda', 'emoji' => '👗', 'color' => '#be185d', 'bg' => '#fdf2f8', 'border' => '#fbcfe8'],
+        'tempo_libero'   => ['label' => 'Tempo Libero & Altro', 'emoji' => '⚽', 'color' => '#0284c7', 'bg' => '#f0f9ff', 'border' => '#bae6fd'],
+    ];
+
+    // Query per estrarre le attività pubblicate
+    $query_args = [
+        'post_type'      => 'vp_commercio',
+        'post_status'    => 'publish',
+        'posts_per_page' => $limite > 0 ? $limite : 150,
+    ];
+    if ($ordine === 'titolo') {
+        $query_args['orderby'] = 'title';
+        $query_args['order']   = 'ASC';
+    } elseif ($ordine === 'data') {
+        $query_args['orderby'] = 'date';
+        $query_args['order']   = 'DESC';
+    }
+
+    $meta_queries = [];
+    if ($categoria_filter !== 'tutti' && isset($categorie_meta[$categoria_filter])) {
+        $meta_queries[] = [
+            'key'     => '_vp_categoria',
+            'value'   => $categoria_filter,
+            'compare' => '=',
+        ];
+    }
+    if ($offerte_solo) {
+        $meta_queries[] = [
+            'key'     => '_vp_offerta_titolo',
+            'value'   => '',
+            'compare' => '!=',
+        ];
+    }
+    if (!empty($meta_queries)) {
+        $query_args['meta_query'] = $meta_queries;
+    }
+
+    $shops_query = new WP_Query($query_args);
+    $shops = [];
+
+    $fallback_images = [
+        'alimentari'    => 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=800&q=80',
+        'ristorazione'  => 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80',
+        'servizi'       => 'https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?auto=format&fit=crop&w=800&q=80',
+        'salute'        => 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=800&q=80',
+        'casa_brico'    => 'https://images.unsplash.com/photo-1581783342308-f792dbdd27c5?auto=format&fit=crop&w=800&q=80',
+        'abbigliamento' => 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=800&q=80',
+        'tempo_libero'  => 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=800&q=80',
+    ];
+
+    foreach ($shops_query->posts as $p) {
+        $cat = get_post_meta($p->ID, '_vp_categoria', true) ?: 'alimentari';
+        $thumb = get_post_meta($p->ID, '_vp_immagine', true) ?: get_the_post_thumbnail_url($p->ID, 'large');
+        if (!$thumb) {
+            $thumb = $fallback_images[$cat] ?? $fallback_images['alimentari'];
+        }
+
+        $voti_mp = (int) ($wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE tipo='commercio_vota' AND post_id=%d", $p->ID)) ?: 0);
+        $meta_mp = (int) get_post_meta($p->ID, '_vp_mipiace', true) ?: 1;
+        $tot_mp  = max($meta_mp, $voti_mp);
+
+        $off_titolo = get_post_meta($p->ID, '_vp_offerta_titolo', true);
+        $off_det    = get_post_meta($p->ID, '_vp_offerta_dettaglio', true);
+
+        $shops[] = [
+            'id'          => $p->ID,
+            'nome'        => $p->post_title,
+            'categoria'   => $cat,
+            'cat_label'   => $categorie_meta[$cat]['label'] ?? 'Commercio',
+            'cat_emoji'   => $categorie_meta[$cat]['emoji'] ?? '🏪',
+            'cat_color'   => $categorie_meta[$cat]['color'] ?? '#781816',
+            'descrizione' => wp_strip_all_tags($p->post_content),
+            'indirizzo'   => get_post_meta($p->ID, '_vp_indirizzo', true) ?: 'Villaggio Prenestino',
+            'lat'         => floatval(get_post_meta($p->ID, '_vp_lat', true) ?: 41.8965),
+            'lng'         => floatval(get_post_meta($p->ID, '_vp_lng', true) ?: 12.6710),
+            'telefono'    => get_post_meta($p->ID, '_vp_telefono', true) ?: '',
+            'whatsapp'    => get_post_meta($p->ID, '_vp_whatsapp', true) ?: '',
+            'orari'       => get_post_meta($p->ID, '_vp_orari', true) ?: 'Lun-Sab 09:00 - 19:30',
+            'immagine'    => $thumb,
+            'miPiace'     => $tot_mp,
+            'offerta'     => $off_titolo ? [
+                'titolo'    => $off_titolo,
+                'dettaglio' => $off_det ?: 'Offerta per residenti',
+            ] : null,
+        ];
+    }
+
+    if ($ordine === 'mipiace') {
+        usort($shops, function($a, $b) {
+            return $b['miPiace'] - $a['miPiace'];
+        });
+    }
+
+    $inst_id = 'vpq_' . wp_rand(10000, 99999);
+    $shops_json = wp_json_encode($shops);
+
+    ob_start();
+    ?>
+    <div class="vp-negozi-shortcode-container" id="<?php echo esc_attr($inst_id); ?>" style="--vp-cols:<?php echo esc_attr($colonne); ?>;">
+        <!-- STILI SCOPED -->
+        <style>
+            #<?php echo esc_attr($inst_id); ?> {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                margin: 24px 0;
+                color: #0f172a;
+            }
+            #<?php echo esc_attr($inst_id); ?> * {
+                box-sizing: border-box;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-header-box {
+                background: #ffffff;
+                border: 1px solid #e2e8f0;
+                border-radius: 18px;
+                padding: 16px;
+                margin-bottom: 16px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-search-input-wrap {
+                position: relative;
+                margin-bottom: 12px;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-search-input {
+                width: 100%;
+                padding: 10px 14px 10px 38px;
+                font-size: 14px;
+                border: 1px solid #cbd5e1;
+                border-radius: 12px;
+                background: #f8fafc;
+                color: #0f172a;
+                outline: none;
+                transition: border-color 0.15s, box-shadow 0.15s;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-search-input:focus {
+                border-color: #781816;
+                box-shadow: 0 0 0 3px rgba(120, 24, 22, 0.12);
+                background: #ffffff;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-search-icon {
+                position: absolute;
+                left: 12px;
+                top: 50%;
+                transform: translateY(-50%);
+                font-size: 15px;
+                color: #94a3b8;
+                pointer-events: none;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-filter-buttons {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-cat-btn {
+                background: #f1f5f9;
+                border: 1px solid #e2e8f0;
+                color: #334155;
+                padding: 7px 12px;
+                border-radius: 10px;
+                font-size: 12px;
+                font-weight: 700;
+                cursor: pointer;
+                transition: all 0.15s;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-cat-btn:hover {
+                background: #e2e8f0;
+                color: #0f172a;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-cat-btn.active {
+                background: #781816;
+                border-color: #781816;
+                color: #ffffff;
+                box-shadow: 0 2px 4px rgba(120, 24, 22, 0.2);
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-cat-btn .vp-badge-count {
+                background: rgba(0,0,0,0.08);
+                padding: 1px 6px;
+                border-radius: 8px;
+                font-size: 10px;
+                font-weight: 800;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-cat-btn.active .vp-badge-count {
+                background: rgba(255,255,255,0.25);
+                color: #ffffff;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-map-wrap {
+                width: 100%;
+                height: <?php echo $altezza; ?>;
+                border-radius: 18px;
+                overflow: hidden;
+                border: 1px solid #e2e8f0;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+                margin-bottom: 20px;
+                position: relative;
+                background: #f1f5f9;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-shops-grid {
+                display: grid;
+                grid-template-columns: repeat(var(--vp-cols, 3), minmax(0, 1fr));
+                gap: 18px;
+            }
+            @media (max-width: 960px) {
+                #<?php echo esc_attr($inst_id); ?> .vp-shops-grid {
+                    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                }
+            }
+            @media (max-width: 600px) {
+                #<?php echo esc_attr($inst_id); ?> .vp-shops-grid {
+                    grid-template-columns: 1fr !important;
+                }
+                #<?php echo esc_attr($inst_id); ?> .vp-cat-btn {
+                    padding: 6px 10px;
+                    font-size: 11px;
+                }
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-shop-card {
+                background: #ffffff;
+                border: 1px solid #e2e8f0;
+                border-radius: 16px;
+                overflow: hidden;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+                transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+                display: flex;
+                flex-direction: column;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-shop-card:hover {
+                transform: translateY(-3px);
+                box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+                border-color: #cbd5e1;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-card-image-wrap {
+                position: relative;
+                width: 100%;
+                height: 160px;
+                background: #e2e8f0;
+                overflow: hidden;
+                cursor: pointer;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-card-img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                transition: transform 0.3s ease;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-shop-card:hover .vp-card-img {
+                transform: scale(1.04);
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-card-cat-badge {
+                position: absolute;
+                top: 10px;
+                left: 10px;
+                background: rgba(15, 23, 42, 0.85);
+                color: #ffffff;
+                backdrop-filter: blur(4px);
+                padding: 4px 10px;
+                border-radius: 8px;
+                font-size: 11px;
+                font-weight: 700;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-card-body {
+                padding: 16px;
+                display: flex;
+                flex-direction: column;
+                flex-grow: 1;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-card-title {
+                margin: 0 0 6px 0;
+                font-size: 16px;
+                font-weight: 800;
+                color: #0f172a;
+                line-height: 1.3;
+                cursor: pointer;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-card-title:hover {
+                color: #781816;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-card-address {
+                font-size: 12px;
+                color: #64748b;
+                margin-bottom: 8px;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-card-hours {
+                font-size: 11px;
+                color: #475569;
+                margin-bottom: 10px;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-card-offer {
+                background: #fefce8;
+                border: 1px solid #fef08a;
+                color: #854d0e;
+                padding: 8px 10px;
+                border-radius: 10px;
+                font-size: 12px;
+                font-weight: 700;
+                margin-bottom: 12px;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-card-actions {
+                margin-top: auto;
+                padding-top: 12px;
+                border-top: 1px solid #f1f5f9;
+                display: flex;
+                gap: 8px;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-btn-action {
+                flex: 1;
+                padding: 8px 10px;
+                border-radius: 10px;
+                font-size: 12px;
+                font-weight: 700;
+                text-align: center;
+                text-decoration: none;
+                cursor: pointer;
+                transition: all 0.15s;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 5px;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-btn-map {
+                background: #f8fafc;
+                border: 1px solid #cbd5e1;
+                color: #334155;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-btn-map:hover {
+                background: #e2e8f0;
+                color: #0f172a;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-btn-wa {
+                background: #25D366;
+                border: 1px solid #20ba59;
+                color: #ffffff;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-btn-wa:hover {
+                background: #1ebc51;
+                color: #ffffff;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-btn-tel {
+                background: #0f172a;
+                border: 1px solid #0f172a;
+                color: #ffffff;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-btn-tel:hover {
+                background: #334155;
+                color: #ffffff;
+            }
+            #<?php echo esc_attr($inst_id); ?> .vp-empty-msg {
+                grid-column: 1 / -1;
+                background: #ffffff;
+                border: 1px dashed #cbd5e1;
+                border-radius: 16px;
+                padding: 30px;
+                text-align: center;
+                color: #64748b;
+                font-size: 14px;
+            }
+        </style>
+
+        <!-- BARRA RICERCA & FILTRI CATEGORIA -->
+        <?php if ($mostra_ricerca || $mostra_filtri): ?>
+        <div class="vp-header-box">
+            <?php if ($mostra_ricerca): ?>
+            <div class="vp-search-input-wrap">
+                <span class="vp-search-icon">🔍</span>
+                <input type="text" class="vp-search-input" id="<?php echo esc_attr($inst_id); ?>_search" placeholder="Cerca attività per nome, indirizzo o categoria..." />
+            </div>
+            <?php endif; ?>
+
+            <?php if ($mostra_filtri): ?>
+            <div class="vp-filter-buttons" id="<?php echo esc_attr($inst_id); ?>_filters">
+                <button type="button" class="vp-cat-btn <?php echo $categoria_filter === 'tutti' ? 'active' : ''; ?>" data-cat="tutti">
+                    <span>🏪 Tutti</span>
+                    <span class="vp-badge-count" id="<?php echo esc_attr($inst_id); ?>_count_tutti"><?php echo count($shops); ?></span>
+                </button>
+                <?php
+                foreach ($categorie_meta as $cat_key => $cat_info) {
+                    if ($cat_key === 'tutti') continue;
+                    $count_cat = count(array_filter($shops, function($s) use ($cat_key) {
+                        return $s['categoria'] === $cat_key;
+                    }));
+                    if ($count_cat === 0 && $categoria_filter !== $cat_key) continue;
+                    $is_active = $categoria_filter === $cat_key;
+                    ?>
+                    <button type="button" class="vp-cat-btn <?php echo $is_active ? 'active' : ''; ?>" data-cat="<?php echo esc_attr($cat_key); ?>">
+                        <span><?php echo esc_html($cat_info['emoji'] . ' ' . $cat_info['label']); ?></span>
+                        <span class="vp-badge-count"><?php echo $count_cat; ?></span>
+                    </button>
+                    <?php
+                }
+                ?>
+            </div>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
+        <!-- MAPPA INTERATTIVA -->
+        <div class="vp-map-wrap" id="<?php echo esc_attr($inst_id); ?>_map"></div>
+
+        <!-- GRIGLIA SCHEDE COMMERCIANTI -->
+        <?php if ($mostra_schede): ?>
+        <div class="vp-shops-grid" id="<?php echo esc_attr($inst_id); ?>_grid">
+            <?php foreach ($shops as $shop): ?>
+            <div class="vp-shop-card" data-id="<?php echo esc_attr($shop['id']); ?>" data-cat="<?php echo esc_attr($shop['categoria']); ?>" data-name="<?php echo esc_attr(strtolower($shop['nome'])); ?>" data-addr="<?php echo esc_attr(strtolower($shop['indirizzo'])); ?>" data-desc="<?php echo esc_attr(strtolower($shop['descrizione'])); ?>">
+                <div class="vp-card-image-wrap" onclick="window.vpqFocusShop_<?php echo esc_attr($inst_id); ?>(<?php echo esc_attr($shop['id']); ?>)">
+                    <img src="<?php echo esc_url($shop['immagine']); ?>" alt="<?php echo esc_attr($shop['nome']); ?>" class="vp-card-img" loading="lazy" />
+                    <span class="vp-card-cat-badge" style="border-left: 3px solid <?php echo esc_attr($shop['cat_color']); ?>;">
+                        <span><?php echo esc_html($shop['cat_emoji']); ?></span>
+                        <span><?php echo esc_html($shop['cat_label']); ?></span>
+                    </span>
+                </div>
+                <div class="vp-card-body">
+                    <h4 class="vp-card-title" onclick="window.vpqFocusShop_<?php echo esc_attr($inst_id); ?>(<?php echo esc_attr($shop['id']); ?>)"><?php echo esc_html($shop['nome']); ?></h4>
+                    <div class="vp-card-address">
+                        <span>📍</span>
+                        <span><?php echo esc_html($shop['indirizzo']); ?></span>
+                    </div>
+                    <?php if (!empty($shop['orari'])): ?>
+                    <div class="vp-card-hours">
+                        <span>🕒</span>
+                        <span><?php echo esc_html($shop['orari']); ?></span>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if (!empty($shop['offerta'])): ?>
+                    <div class="vp-card-offer">
+                        <span>🏷️</span>
+                        <div>
+                            <div><?php echo esc_html($shop['offerta']['titolo']); ?></div>
+                            <?php if (!empty($shop['offerta']['dettaglio']) && $shop['offerta']['dettaglio'] !== $shop['offerta']['titolo']): ?>
+                            <div style="font-size:11px; font-weight:400; opacity:0.9; margin-top:1px;"><?php echo esc_html($shop['offerta']['dettaglio']); ?></div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+
+                    <div class="vp-card-actions">
+                        <button type="button" class="vp-btn-action vp-btn-map" onclick="window.vpqFocusShop_<?php echo esc_attr($inst_id); ?>(<?php echo esc_attr($shop['id']); ?>)" title="Mostra e centra sulla mappa">
+                            <span>🗺️ Mappa</span>
+                        </button>
+                        <?php if (!empty($shop['telefono'])): ?>
+                        <a href="tel:<?php echo esc_attr($shop['telefono']); ?>" class="vp-btn-action vp-btn-tel" title="Chiama direttamente">
+                            <span>📞 Chiama</span>
+                        </a>
+                        <?php endif; ?>
+                        <?php if (!empty($shop['whatsapp'])): 
+                            $clean_wa = preg_replace('/[^0-9]/', '', $shop['whatsapp']);
+                            if (strlen($clean_wa) === 10) $clean_wa = '39' . $clean_wa;
+                        ?>
+                        <a href="https://wa.me/<?php echo esc_attr($clean_wa); ?>" target="_blank" rel="noopener noreferrer" class="vp-btn-action vp-btn-wa" title="Scrivi su WhatsApp">
+                            <span>💬 WhatsApp</span>
+                        </a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+            <?php endforeach; ?>
+            <div class="vp-empty-msg" id="<?php echo esc_attr($inst_id); ?>_empty" style="display:none;">
+                Nessun negozio trovato con i filtri selezionati. Prova a cambiare categoria o testo di ricerca.
+            </div>
+        </div>
+        <?php endif; ?>
+    </div>
+
+    <!-- SCRIPT CARTOGRAFICO ED INTERAZIONI -->
+    <script>
+    (function() {
+        var instId = <?php echo wp_json_encode($inst_id); ?>;
+        var provider = <?php echo wp_json_encode($provider); ?>;
+        var zoom = <?php echo intval($zoom); ?>;
+        var centerLat = <?php echo floatval($centro_lat); ?>;
+        var centerLng = <?php echo floatval($centro_lng); ?>;
+        var shops = <?php echo $shops_json; ?>;
+        var googleApiKey = <?php echo wp_json_encode($google_api_key); ?>;
+
+        var mapInstance = null;
+        var markersMap = {};
+        var currentCategory = <?php echo wp_json_encode($categoria_filter); ?>;
+
+        function loadScript(src, cb) {
+            var s = document.createElement('script');
+            s.src = src;
+            s.async = true;
+            s.onload = cb;
+            document.head.appendChild(s);
+        }
+
+        function loadCSS(href) {
+            if (!document.querySelector('link[href="' + href + '"]')) {
+                var l = document.createElement('link');
+                l.rel = 'stylesheet';
+                l.href = href;
+                document.head.appendChild(l);
+            }
+        }
+
+        function createPopupContent(s) {
+            var html = '<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif; width:220px; line-height:1.4;">';
+            if (s.immagine) {
+                html += '<img src="' + s.immagine + '" alt="' + s.nome + '" style="width:100%; height:105px; object-fit:cover; border-radius:8px 8px 0 0; margin-bottom:8px; display:block;" />';
+            }
+            html += '<div style="font-size:11px; font-weight:700; color:' + s.cat_color + '; text-transform:uppercase;">' + s.cat_emoji + ' ' + s.cat_label + '</div>';
+            html += '<div style="font-size:14px; font-weight:800; color:#0f172a; margin:3px 0 4px;">' + s.nome + '</div>';
+            html += '<div style="font-size:12px; color:#64748b; margin-bottom:6px;">📍 ' + s.indirizzo + '</div>';
+            if (s.orari) {
+                html += '<div style="font-size:11px; color:#475569; margin-bottom:6px;">🕒 ' + s.orari + '</div>';
+            }
+            if (s.offerta) {
+                html += '<div style="background:#fefce8; border:1px solid #fef08a; color:#854d0e; padding:5px 8px; border-radius:6px; font-size:11px; font-weight:700; margin:6px 0;">🏷️ ' + s.offerta.titolo + '</div>';
+            }
+            html += '<div style="display:flex; gap:6px; margin-top:8px;">';
+            if (s.telefono) {
+                html += '<a href="tel:' + s.telefono + '" style="flex:1; background:#0f172a; color:#fff; text-decoration:none; padding:6px 0; border-radius:6px; font-size:11px; font-weight:700; text-align:center;">📞 Chiama</a>';
+            }
+            if (s.whatsapp) {
+                var wa = s.whatsapp.replace(/[^0-9]/g, '');
+                if (wa.length === 10) wa = '39' + wa;
+                html += '<a href="https://wa.me/' + wa + '" target="_blank" rel="noopener noreferrer" style="flex:1; background:#25D366; color:#fff; text-decoration:none; padding:6px 0; border-radius:6px; font-size:11px; font-weight:700; text-align:center;">💬 WhatsApp</a>';
+            }
+            html += '</div></div>';
+            return html;
+        }
+
+        // Inizializzazione Leaflet (OpenStreetMap)
+        function initLeafletMap() {
+            var mapEl = document.getElementById(instId + '_map');
+            if (!mapEl || mapInstance) return;
+
+            mapInstance = L.map(mapEl, {
+                scrollWheelZoom: false
+            }).setView([centerLat, centerLng], zoom);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(mapInstance);
+
+            shops.forEach(function(s) {
+                if (!s.lat || !s.lng) return;
+
+                var pinHtml = '<div style="background-color:' + s.cat_color + '; width:30px; height:30px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); display:flex; align-items:center; justify-content:center; box-shadow:0 3px 6px rgba(0,0,0,0.3); border:2px solid #ffffff;">' +
+                    '<span style="transform:rotate(45deg); font-size:13px;">' + s.cat_emoji + '</span>' +
+                    '</div>';
+
+                var icon = L.divIcon({
+                    className: 'vpq-leaflet-pin',
+                    html: pinHtml,
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 30],
+                    popupAnchor: [0, -28]
+                });
+
+                var marker = L.marker([s.lat, s.lng], { icon: icon }).addTo(mapInstance);
+                marker.bindPopup(createPopupContent(s));
+                markersMap[s.id] = marker;
+            });
+        }
+
+        // Inizializzazione Google Maps
+        function initGoogleMap() {
+            var mapEl = document.getElementById(instId + '_map');
+            if (!mapEl || mapInstance) return;
+
+            mapInstance = new google.maps.Map(mapEl, {
+                center: { lat: centerLat, lng: centerLng },
+                zoom: zoom,
+                scrollwheel: false,
+                mapTypeControl: false,
+                streetViewControl: false
+            });
+
+            var infoWindow = new google.maps.InfoWindow();
+
+            shops.forEach(function(s) {
+                if (!s.lat || !s.lng) return;
+
+                var marker = new google.maps.Marker({
+                    position: { lat: s.lat, lng: s.lng },
+                    map: mapInstance,
+                    title: s.nome
+                });
+
+                marker.addListener('click', function() {
+                    infoWindow.setContent(createPopupContent(s));
+                    infoWindow.open(mapInstance, marker);
+                });
+
+                markersMap[s.id] = {
+                    marker: marker,
+                    openPopup: function() {
+                        infoWindow.setContent(createPopupContent(s));
+                        infoWindow.open(mapInstance, marker);
+                    }
+                };
+            });
+        }
+
+        // Focus & scroll dal click della scheda
+        window['vpqFocusShop_' + instId] = function(shopId) {
+            var s = shops.find(function(item) { return item.id === shopId; });
+            if (!s) return;
+
+            var mapEl = document.getElementById(instId + '_map');
+            if (mapEl) {
+                mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            if (provider === 'osm' && mapInstance && markersMap[shopId]) {
+                mapInstance.setView([s.lat, s.lng], Math.max(mapInstance.getZoom(), 16));
+                setTimeout(function() {
+                    markersMap[shopId].openPopup();
+                }, 300);
+            } else if (provider === 'google' && mapInstance && markersMap[shopId]) {
+                mapInstance.setCenter({ lat: s.lat, lng: s.lng });
+                mapInstance.setZoom(Math.max(mapInstance.getZoom(), 16));
+                markersMap[shopId].openPopup();
+            }
+        };
+
+        // Filtro dinamico (ricerca e categoria)
+        function applyFilters() {
+            var searchEl = document.getElementById(instId + '_search');
+            var term = searchEl ? searchEl.value.toLowerCase().trim() : '';
+            var visibleCount = 0;
+
+            shops.forEach(function(s) {
+                var matchCat = (currentCategory === 'tutti' || s.categoria === currentCategory);
+                var matchSearch = (!term || 
+                    s.nome.toLowerCase().indexOf(term) !== -1 || 
+                    s.indirizzo.toLowerCase().indexOf(term) !== -1 || 
+                    s.descrizione.toLowerCase().indexOf(term) !== -1
+                );
+                var visible = matchCat && matchSearch;
+
+                // Gestione marker su mappa
+                if (provider === 'osm') {
+                    if (markersMap[s.id]) {
+                        if (visible) {
+                            if (!mapInstance.hasLayer(markersMap[s.id])) {
+                                mapInstance.addLayer(markersMap[s.id]);
+                            }
+                        } else {
+                            if (mapInstance.hasLayer(markersMap[s.id])) {
+                                mapInstance.removeLayer(markersMap[s.id]);
+                            }
+                        }
+                    }
+                } else if (provider === 'google') {
+                    if (markersMap[s.id] && markersMap[s.id].marker) {
+                        markersMap[s.id].marker.setVisible(visible);
+                    }
+                }
+
+                // Gestione scheda nel DOM
+                var cardEl = document.querySelector('#' + instId + '_grid .vp-shop-card[data-id="' + s.id + '"]');
+                if (cardEl) {
+                    cardEl.style.display = visible ? 'flex' : 'none';
+                }
+
+                if (visible) visibleCount++;
+            });
+
+            var emptyEl = document.getElementById(instId + '_empty');
+            if (emptyEl) {
+                emptyEl.style.display = visibleCount === 0 ? 'block' : 'none';
+            }
+        }
+
+        // Event listeners
+        function setupListeners() {
+            var searchEl = document.getElementById(instId + '_search');
+            if (searchEl) {
+                searchEl.addEventListener('input', applyFilters);
+            }
+
+            var filtersWrap = document.getElementById(instId + '_filters');
+            if (filtersWrap) {
+                var btns = filtersWrap.querySelectorAll('.vp-cat-btn');
+                btns.forEach(function(btn) {
+                    btn.addEventListener('click', function() {
+                        btns.forEach(function(b) { b.classList.remove('active'); });
+                        btn.classList.add('active');
+                        currentCategory = btn.getAttribute('data-cat');
+                        applyFilters();
+                    });
+                });
+            }
+        }
+
+        // Avvio cartografia
+        if (provider === 'google') {
+            if (window.google && window.google.maps) {
+                initGoogleMap();
+                setupListeners();
+            } else {
+                var gSrc = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(googleApiKey) + '&callback=vpqGmapsInit_' + instId;
+                window['vpqGmapsInit_' + instId] = function() {
+                    initGoogleMap();
+                    setupListeners();
+                };
+                loadScript(gSrc);
+            }
+        } else {
+            // Default: OpenStreetMap / Leaflet
+            loadCSS('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
+            if (window.L) {
+                initLeafletMap();
+                setupListeners();
+            } else {
+                loadScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js', function() {
+                    initLeafletMap();
+                    setupListeners();
+                });
+            }
+        }
+    })();
+    </script>
+    <?php
+    return ob_get_clean();
+}
+
 /**
  * Menu Amministrazione WordPress Unificato con Hub & Schede (Tab)
  * Raggruppa tutte le funzionalità dell'app sotto un'unica voce nel menu verticale di WordPress!
@@ -1979,6 +2970,15 @@ add_action('admin_menu', function() {
         'manage_options',
         'vp-quartiere-settings',
         'vpq_render_admin_page'
+    );
+
+    // 4. Guida Shortcode Mappa & Negozi
+    add_submenu_page(
+        'vp-quartiere',
+        'Shortcode Mappa & Negozi',
+        '🧩 Shortcode Mappa',
+        'manage_options',
+        'admin.php?page=vp-quartiere&tab=shortcodes'
     );
 }, 8);
 
@@ -2052,28 +3052,32 @@ function vpq_render_admin_hub($preset_tab = '') {
     // Gestione salvataggio impostazioni
     if (isset($_POST['vpq_save_settings']) && check_admin_referer('vpq_settings_nonce')) {
         update_option('vpq_allow_origins', sanitize_text_field($_POST['vpq_allow_origins']));
+        if (isset($_POST['vpq_google_maps_api_key'])) {
+            update_option('vpq_google_maps_api_key', sanitize_text_field($_POST['vpq_google_maps_api_key']));
+        }
         if (!empty($_POST['vpq_regenerate_key'])) {
             update_option('vpq_api_key', wp_generate_password(32, false));
         }
-        echo '<div class="notice notice-success is-dismissible" style="margin:15px 0;"><p><strong>Impostazioni API salvate con successo!</strong></p></div>';
+        echo '<div class="notice notice-success is-dismissible" style="margin:15px 0;"><p><strong>Impostazioni salvate con successo!</strong></p></div>';
     }
 
     // Configurazione schede attive
     $tabs_cfg = vpq_get_tabs_config();
 
     // Tab attiva (di default sempre la Dashboard / Panoramica)
-    $allowed_tabs = ['panoramica', 'eventi', 'volontari', 'segnalazioni', 'proposte', 'commercianti', 'impostazioni', 'webapp'];
+    $allowed_tabs = ['panoramica', 'eventi', 'volontari', 'segnalazioni', 'proposte', 'commercianti', 'impostazioni', 'webapp', 'shortcodes'];
     $active_tab   = !empty($preset_tab) ? $preset_tab : (isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'panoramica');
     if (!in_array($active_tab, $allowed_tabs)) {
         $active_tab = 'panoramica';
     }
 
     // Statistiche REALI dal database di WordPress (azzerate alla prima installazione)
-    $tot_segnalazioni = (int) wp_count_posts('vp_segnalazione')->publish;
-    $risolte_count    = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE meta_key='_vp_stato' AND meta_value='3'");
-    $inoltrate_count  = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE meta_key='_vp_stato' AND meta_value='2'");
-    $ricevute_count   = max(0, $tot_segnalazioni - $risolte_count - $inoltrate_count);
-    $tasso_risolte    = $tot_segnalazioni > 0 ? round(($risolte_count / $tot_segnalazioni) * 100) : 0;
+    $tot_segnalazioni      = (int) wp_count_posts('vp_segnalazione')->publish;
+    $pending_segnalazioni  = (int) wp_count_posts('vp_segnalazione')->pending;
+    $risolte_count         = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE meta_key='_vp_stato' AND meta_value='3'");
+    $inoltrate_count       = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE meta_key='_vp_stato' AND meta_value='2'");
+    $ricevute_count        = max(0, $tot_segnalazioni - $risolte_count - $inoltrate_count);
+    $tasso_risolte         = $tot_segnalazioni > 0 ? round(($risolte_count / $tot_segnalazioni) * 100) : 0;
 
     $tot_volontari    = (int) ($wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type='vp_volontario' AND post_status IN ('publish','private','draft')") ?: 0);
     $tot_richieste    = (int) wp_count_posts('vp_richiesta')->publish;
@@ -2082,9 +3086,77 @@ function vpq_render_admin_hub($preset_tab = '') {
     $tot_eventi       = (int) wp_count_posts('vp_evento')->publish;
     $tot_partecipanti = (int) ($wpdb->get_var("SELECT COUNT(*) FROM $table WHERE tipo='evento_vengo'") ?: 0);
 
-    // Statistiche Commercianti
-    $tot_commercio     = (int) wp_count_posts('vp_commercio')->publish;
-    $pending_commercio = (int) wp_count_posts('vp_commercio')->pending;
+    // Statistiche Commercianti e Mappa
+    $tot_commercio        = (int) wp_count_posts('vp_commercio')->publish;
+    $pending_commercio    = (int) wp_count_posts('vp_commercio')->pending;
+    $tot_commercio_all    = $tot_commercio + $pending_commercio;
+    $geolocalizzati_count = (int) $wpdb->get_var("SELECT COUNT(DISTINCT post_id) FROM {$wpdb->postmeta} WHERE meta_key='_vp_lat' AND meta_value != '' AND meta_value != '0'");
+
+    // Ultime 5 azioni di volontariato avvenute nell'app
+    $ultime_azioni_volontariato = [];
+    $interazioni_vol = $wpdb->get_results(
+        "SELECT i.id, i.tipo, i.post_id, i.nome, i.telefono, i.creato, p.post_title 
+         FROM $table i 
+         LEFT JOIN {$wpdb->posts} p ON i.post_id = p.ID 
+         WHERE i.tipo IN ('cisono', 'volontario_iscrizione') 
+         ORDER BY i.creato DESC 
+         LIMIT 5", 
+        ARRAY_A
+    );
+    if (!empty($interazioni_vol)) {
+        foreach ($interazioni_vol as $row) {
+            $is_cisono = ($row['tipo'] === 'cisono');
+            $ultime_azioni_volontariato[] = [
+                'tipo'      => $is_cisono ? 'Adesione "Serve una mano"' : 'Iscrizione Albo Volontari',
+                'icona'     => $is_cisono ? '🤝' : '📋',
+                'volontario'=> !empty($row['nome']) ? $row['nome'] : 'Volontario civico',
+                'telefono'  => !empty($row['telefono']) ? $row['telefono'] : '',
+                'titolo'    => !empty($row['post_title']) ? $row['post_title'] : 'Iniziativa quartiere',
+                'data_ora'  => !empty($row['creato']) ? date_i18n('d/m/Y H:i', strtotime($row['creato'])) : 'Di recente',
+            ];
+        }
+    }
+    if (count($ultime_azioni_volontariato) < 5) {
+        $candidature = get_posts([
+            'post_type'   => 'vp_volontario',
+            'post_status' => ['private', 'publish', 'draft'],
+            'numberposts' => 5 - count($ultime_azioni_volontariato),
+            'orderby'     => 'date',
+            'order'       => 'DESC',
+        ]);
+        foreach ($candidature as $cand) {
+            $tel = get_post_meta($cand->ID, '_vp_telefono', true);
+            $parts = explode(' - ', $cand->post_title);
+            $ultime_azioni_volontariato[] = [
+                'tipo'      => 'Iscrizione Albo Volontari',
+                'icona'     => '📋',
+                'volontario'=> !empty($parts[0]) ? $parts[0] : 'Volontario iscritto',
+                'telefono'  => $tel ?: '',
+                'titolo'    => 'Albo Volontari Civici',
+                'data_ora'  => get_the_date('d/m/Y H:i', $cand->ID),
+            ];
+        }
+    }
+    if (count($ultime_azioni_volontariato) < 5) {
+        $richieste_recenti = get_posts([
+            'post_type'   => 'vp_richiesta',
+            'post_status' => 'publish',
+            'numberposts' => 5 - count($ultime_azioni_volontariato),
+            'orderby'     => 'date',
+            'order'       => 'DESC',
+        ]);
+        foreach ($richieste_recenti as $rq) {
+            $dove = get_post_meta($rq->ID, '_vp_dove', true);
+            $ultime_azioni_volontariato[] = [
+                'tipo'      => 'Attività di Volontariato',
+                'icona'     => '✨',
+                'volontario'=> 'Comunità Villaggio Prenestino',
+                'telefono'  => '',
+                'titolo'    => $rq->post_title . ($dove ? ' (' . $dove . ')' : ''),
+                'data_ora'  => get_the_date('d/m/Y H:i', $rq->ID),
+            ];
+        }
+    }
 
     // Configurazione API
     $api_key       = get_option('vpq_api_key');
@@ -2107,7 +3179,7 @@ function vpq_render_admin_hub($preset_tab = '') {
             </div>
             <div style="display:flex;align-items:center;gap:10px;">
                 <span style="background:#dcfce7;color:#166534;font-weight:bold;padding:6px 12px;border-radius:20px;font-size:12px;border:1px solid #bbf7d0;">
-                    ● Sincronizzazione Live Attiva (v1.4.0)
+                    ● Sincronizzazione Live Attiva (v1.6.0)
                 </span>
                 <a href="<?php echo esc_url($app_url); ?>" target="_blank" class="button button-secondary" style="font-size:12px;">
                     📱 Apri Web App &rarr;
@@ -2142,6 +3214,9 @@ function vpq_render_admin_hub($preset_tab = '') {
             <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=webapp'); ?>" class="nav-tab <?php echo $active_tab === 'webapp' ? 'nav-tab-active' : ''; ?>" style="font-weight:600;font-size:13px;">
                 📱 Web App & Download
             </a>
+            <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=shortcodes'); ?>" class="nav-tab <?php echo $active_tab === 'shortcodes' ? 'nav-tab-active' : ''; ?>" style="font-weight:600;font-size:13px;background:<?php echo $active_tab === 'shortcodes' ? '#ffffff' : '#f8fafc'; ?>;">
+                🧩 Shortcode Mappa
+            </a>
         </h2>
 
         <!-- ========================================== -->
@@ -2175,6 +3250,142 @@ function vpq_render_admin_hub($preset_tab = '') {
                     </a>
                 </div>
             <?php endif; ?>
+
+            <!-- ============================================================== -->
+            <!-- COMPONENTE DI RIEPILOGO IN TEMPO REALE                         -->
+            <!-- (Attività Mappate, Segnalazioni in Attesa, Ultime 5 Azioni)   -->
+            <!-- ============================================================== -->
+            <div style="background:#fff;border:1px solid #cbd5e1;border-radius:16px;padding:22px;box-shadow:0 1px 3px rgba(0,0,0,0.06);margin-bottom:25px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:18px;border-bottom:1px solid #f1f5f9;padding-bottom:14px;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span style="display:inline-block;width:10px;height:10px;background:#10b981;border-radius:50%;box-shadow:0 0 0 3px rgba(16,185,129,0.2);"></span>
+                        <div>
+                            <h3 style="margin:0;font-size:16px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:8px;">
+                                Riepilogo Operativo in Tempo Reale
+                                <span style="font-size:11px;font-weight:700;background:#dcfce7;color:#166534;padding:3px 9px;border-radius:12px;border:1px solid #bbf7d0;">
+                                    Live WP & App
+                                </span>
+                            </h3>
+                            <p style="margin:2px 0 0 0;font-size:12px;color:#64748b;">
+                                Stato immediato di attività mappate, segnalazioni in attesa di moderazione e ultime 5 azioni di volontariato.
+                            </p>
+                        </div>
+                    </div>
+                    <span style="font-size:11px;color:#94a3b8;">
+                        Aggiornato al: <?php echo current_time('d/m/Y H:i'); ?>
+                    </span>
+                </div>
+
+                <!-- 2 Card Metriche Principali -->
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px;margin-bottom:18px;">
+                    <!-- CARD 1: Attività Mappate -->
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                            <div>
+                                <span style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">
+                                    🏪 Attività Mappate
+                                </span>
+                                <div style="font-size:32px;font-weight:900;color:#0f172a;line-height:1.1;margin:6px 0 4px 0;">
+                                    <?php echo $tot_commercio_all; ?>
+                                </div>
+                            </div>
+                            <span class="dashicons dashicons-location-alt" style="font-size:24px;width:24px;height:24px;color:#d97706;"></span>
+                        </div>
+                        <div style="border-top:1px solid #e2e8f0;padding-top:10px;margin-top:10px;font-size:12px;color:#475569;">
+                            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                                <span style="color:#64748b;">Geolocalizzate su mappa:</span>
+                                <strong><?php echo $geolocalizzati_count; ?> su <?php echo $tot_commercio_all; ?></strong>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
+                                <span style="color:#64748b;">Stato approvazione:</span>
+                                <strong><?php echo $tot_commercio; ?> approvate <?php if ($pending_commercio > 0): ?><span style="color:#d97706;">· <?php echo $pending_commercio; ?> in attesa</span><?php endif; ?></strong>
+                            </div>
+                            <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=commercianti'); ?>" class="button button-secondary" style="width:100%;text-align:center;font-size:12px;font-weight:700;">
+                                Gestisci Commercianti e Mappa &rarr;
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- CARD 2: Segnalazioni in Attesa di Moderazione -->
+                    <div style="background:<?php echo $pending_segnalazioni > 0 ? '#fffbeb' : '#f8fafc'; ?>;border:1px solid <?php echo $pending_segnalazioni > 0 ? '#fde68a' : '#e2e8f0'; ?>;border-radius:14px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                            <div>
+                                <span style="font-size:11px;font-weight:700;color:<?php echo $pending_segnalazioni > 0 ? '#92400e' : '#64748b'; ?>;text-transform:uppercase;letter-spacing:0.5px;">
+                                    ⚠️ Segnalazioni in Attesa
+                                </span>
+                                <div style="font-size:32px;font-weight:900;color:<?php echo $pending_segnalazioni > 0 ? '#b45309' : '#0f172a'; ?>;line-height:1.1;margin:6px 0 4px 0;">
+                                    <?php echo $pending_segnalazioni; ?>
+                                </div>
+                            </div>
+                            <span class="dashicons dashicons-warning" style="font-size:24px;width:24px;height:24px;color:<?php echo $pending_segnalazioni > 0 ? '#d97706' : '#94a3b8'; ?>;"></span>
+                        </div>
+                        <div style="border-top:1px solid <?php echo $pending_segnalazioni > 0 ? '#fde68a' : '#e2e8f0'; ?>;padding-top:10px;margin-top:10px;font-size:12px;color:#475569;">
+                            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                                <span style="color:#64748b;">Stato coda moderazione:</span>
+                                <strong><?php echo $pending_segnalazioni > 0 ? '<span style="color:#d97706;">Richiede verifica</span>' : '<span style="color:#16a34a;">Coda pulita</span>'; ?></strong>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
+                                <span style="color:#64748b;">Storico segnalazioni:</span>
+                                <strong><?php echo $tot_segnalazioni; ?> totali · <?php echo $risolte_count; ?> risolte</strong>
+                            </div>
+                            <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=segnalazioni'); ?>" class="button <?php echo $pending_segnalazioni > 0 ? 'button-primary' : 'button-secondary'; ?>" style="width:100%;text-align:center;font-size:12px;font-weight:700;<?php echo $pending_segnalazioni > 0 ? 'background:#d97706;border-color:#b45309;' : ''; ?>">
+                                <?php echo $pending_segnalazioni > 0 ? 'Revisiona Segnalazioni in Attesa (' . $pending_segnalazioni . ') &rarr;' : 'Vedi Tutte le Segnalazioni &rarr;'; ?>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CARD 3: Ultime 5 Azioni di Volontariato Avvenute nell'App -->
+                <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:16px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;border-bottom:1px solid #f1f5f9;padding-bottom:10px;">
+                        <strong style="font-size:13px;color:#0f172a;display:flex;align-items:center;gap:6px;">
+                            <span class="dashicons dashicons-groups" style="color:#16a34a;font-size:18px;width:18px;height:18px;"></span>
+                            Ultime 5 Azioni di Volontariato Avvenute nell'App
+                        </strong>
+                        <span style="font-size:11px;color:#64748b;">
+                            Adesioni "Serve una Mano" & Iscrizioni Albo
+                        </span>
+                    </div>
+
+                    <?php if (empty($ultime_azioni_volontariato)): ?>
+                        <div style="padding:15px;text-align:center;color:#94a3b8;font-size:12px;">
+                            Nessuna azione di volontariato registrata al momento. Le adesioni dei cittadini compariranno qui in tempo reale.
+                        </div>
+                    <?php else: ?>
+                        <div style="display:flex;flex-direction:column;gap:8px;">
+                            <?php foreach ($ultime_azioni_volontariato as $az): ?>
+                                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;background:#f8fafc;border-radius:10px;font-size:12px;">
+                                    <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+                                        <span style="font-size:14px;width:24px;text-align:center;"><?php echo $az['icona']; ?></span>
+                                        <div style="min-width:0;">
+                                            <div style="font-weight:700;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                                                <?php echo esc_html($az['volontario']); ?>
+                                                <span style="font-weight:400;color:#64748b;">· <?php echo esc_html($az['tipo']); ?></span>
+                                                <?php if (!empty($az['telefono'])): ?>
+                                                    <span style="font-size:11px;color:#475569;margin-left:6px;font-family:monospace;">📞 <?php echo esc_html($az['telefono']); ?></span>
+                                                <?php endif; ?>
+                                            </div>
+                                            <div style="font-size:11px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                                                <strong><?php echo esc_html($az['titolo']); ?></strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <span style="font-size:11px;color:#94a3b8;white-space:nowrap;margin-left:auto;">
+                                        <?php echo esc_html($az['data_ora']); ?>
+                                    </span>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <div style="margin-top:12px;padding-top:10px;border-top:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;">
+                        <span style="font-size:11px;color:#64748b;">Dati sincronizzati in tempo reale con la Web App.</span>
+                        <a href="<?php echo admin_url('admin.php?page=vp-quartiere&tab=volontari'); ?>" style="font-size:12px;font-weight:700;color:#16a34a;text-decoration:none;">
+                            Apri Gestione Volontari &rarr;
+                        </a>
+                    </div>
+                </div>
+            </div>
 
             <!-- Controllo Attivazione Funzionalità nell'App (ad eccezione della Home) -->
             <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.05);margin-bottom:25px;">
@@ -2853,7 +4064,8 @@ function vpq_render_admin_hub($preset_tab = '') {
                     'post_status' => 'publish',
                 ]);
                 update_post_meta($pid, '_vp_verificato', '1');
-                echo '<div class="notice notice-success is-dismissible" style="margin:15px 0;"><p><strong>Attività commerciale approvata con successo! È ora pubblicata e visibile a tutti i residenti su Google Maps e nella vetrina.</strong></p></div>';
+                vpq_invia_notifica_approvazione_commercio($pid);
+                echo '<div class="notice notice-success is-dismissible" style="margin:15px 0;"><p><strong>Attività commerciale approvata con successo! È ora pubblicata e visibile a tutti i residenti su Google Maps e nella vetrina. Notifica email inviata al commerciante.</strong></p></div>';
             }
 
             $filtro_stato = isset($_GET['stato_filtro']) ? sanitize_key($_GET['stato_filtro']) : 'tutti';
@@ -3104,6 +4316,15 @@ function vpq_render_admin_hub($preset_tab = '') {
                             </td>
                         </tr>
                         <tr>
+                            <th scope="row" style="font-weight:700;">Google Maps API Key (opzionale):</th>
+                            <td>
+                                <input type="text" name="vpq_google_maps_api_key" value="<?php echo esc_attr(get_option('vpq_google_maps_api_key', '')); ?>" class="regular-text" style="width:100%;max-width:500px;" placeholder="AIzaSy..." />
+                                <p class="description" style="margin-top:4px;">
+                                    Necessaria solo se utilizzi lo shortcode con <code>provider="google"</code>. Se lasciata vuota o se usi <code>provider="osm"</code> (default), la mappa visualizza OpenStreetMap gratuitamente senza API key.
+                                </p>
+                            </td>
+                        </tr>
+                        <tr>
                             <th scope="row" style="font-weight:700;">Sicurezza Chiave:</th>
                             <td>
                                 <label style="display:flex;align-items:center;gap:8px;">
@@ -3158,7 +4379,7 @@ function vpq_render_admin_hub($preset_tab = '') {
                     </p>
                     <div style="display:flex;flex-direction:column;gap:10px;margin-top:16px;">
                         <a href="<?php echo esc_url(home_url('/vp-quartiere.zip')); ?>" class="button button-secondary" style="display:flex;align-items:center;justify-content:center;gap:6px;padding:6px 0;height:auto;">
-                            <span class="dashicons dashicons-admin-plugins" style="margin-top:-2px;"></span> Scarica Plugin Aggiornato (vp-quartiere.zip v1.3.1)
+                            <span class="dashicons dashicons-admin-plugins" style="margin-top:-2px;"></span> Scarica Plugin Aggiornato (vp-quartiere.zip v1.6.0)
                         </a>
                         <a href="<?php echo esc_url(home_url('/villaggioprenestino-app.zip')); ?>" class="button button-secondary" style="display:flex;align-items:center;justify-content:center;gap:6px;padding:6px 0;height:auto;">
                             <span class="dashicons dashicons-media-archive" style="margin-top:-2px;"></span> Scarica Pacchetto Web App (villaggioprenestino-app.zip)
@@ -3166,6 +4387,258 @@ function vpq_render_admin_hub($preset_tab = '') {
                     </div>
                 </div>
             </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 7: SHORTCODE MAPPA & SCHEDE NEGOZI    -->
+        <!-- ========================================== -->
+        <?php elseif ($active_tab === 'shortcodes'): ?>
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:26px;box-shadow:0 1px 3px rgba(0,0,0,0.05);margin-bottom:24px;">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+                    <span class="dashicons dashicons-location-alt" style="font-size:28px;width:28px;height:28px;color:#781816;"></span>
+                    <h2 style="margin:0;font-size:20px;font-weight:800;color:#0f172a;">Shortcode Mappa & Schede Negozi</h2>
+                </div>
+                <p style="font-size:14px;color:#64748b;line-height:1.6;margin:0 0 20px 0;max-width:850px;">
+                    Puoi incorporare la mappa interattiva dei negozi e le relative schede all'interno di <strong>pagine, articoli o widget</strong> del tuo sito WordPress. I dati si aggiornano automaticamente attingendo in tempo reale alle attività commerciali approvate e pubblicate.
+                </p>
+
+                <!-- Box Esempi Rapidi -->
+                <h3 style="font-size:16px;font-weight:800;color:#0f172a;margin:24px 0 12px 0;">📋 Esempi Pronti da Copiare</h3>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));gap:16px;">
+                    <!-- Esempio 1: Default Completo -->
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <strong style="font-size:13px;color:#0f172a;">1. Mappa Completa (Consigliata)</strong>
+                            <span style="font-size:11px;background:#e2e8f0;color:#334155;padding:2px 6px;border-radius:4px;font-weight:600;">OpenStreetMap</span>
+                        </div>
+                        <p style="font-size:12px;color:#64748b;margin:0 0 10px 0;">Mappa con ricerca, filtri per categoria e schede a 3 colonne.</p>
+                        <div style="display:flex;gap:8px;">
+                            <input type="text" readonly value="[vp_negozi_mappa]" style="flex:1;font-family:monospace;font-size:12px;background:#fff;border:1px solid #cbd5e1;padding:6px 10px;border-radius:6px;" id="sc_ex1" />
+                            <button type="button" class="button button-secondary" onclick="vpqCopyCode('sc_ex1', this)">Copia</button>
+                        </div>
+                    </div>
+
+                    <!-- Esempio 2: Solo Mappa -->
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <strong style="font-size:13px;color:#0f172a;">2. Solo Mappa (senza schede sotto)</strong>
+                            <span style="font-size:11px;background:#e0f2fe;color:#0369a1;padding:2px 6px;border-radius:4px;font-weight:600;">Compatta</span>
+                        </div>
+                        <p style="font-size:12px;color:#64748b;margin:0 0 10px 0;">Ideale per banner di testata o pagine compatte. Altezza 500px.</p>
+                        <div style="display:flex;gap:8px;">
+                            <input type="text" readonly value='[vp_negozi_mappa schede="no" altezza="500px"]' style="flex:1;font-family:monospace;font-size:12px;background:#fff;border:1px solid #cbd5e1;padding:6px 10px;border-radius:6px;" id="sc_ex2" />
+                            <button type="button" class="button button-secondary" onclick="vpqCopyCode('sc_ex2', this)">Copia</button>
+                        </div>
+                    </div>
+
+                    <!-- Esempio 3: Ristoranti & Pizzerie -->
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <strong style="font-size:13px;color:#0f172a;">3. Solo Ristoranti & Bar</strong>
+                            <span style="font-size:11px;background:#ffedd5;color:#c2410c;padding:2px 6px;border-radius:4px;font-weight:600;">🍕 Categoria</span>
+                        </div>
+                        <p style="font-size:12px;color:#64748b;margin:0 0 10px 0;">Filtra solo la ristorazione con schede a 2 colonne.</p>
+                        <div style="display:flex;gap:8px;">
+                            <input type="text" readonly value='[vp_negozi_mappa categoria="ristorazione" colonne="2"]' style="flex:1;font-family:monospace;font-size:12px;background:#fff;border:1px solid #cbd5e1;padding:6px 10px;border-radius:6px;" id="sc_ex3" />
+                            <button type="button" class="button button-secondary" onclick="vpqCopyCode('sc_ex3', this)">Copia</button>
+                        </div>
+                    </div>
+
+                    <!-- Esempio 4: Offerte Speciali -->
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <strong style="font-size:13px;color:#0f172a;">4. Solo Negozi con Offerte</strong>
+                            <span style="font-size:11px;background:#fef08a;color:#854d0e;padding:2px 6px;border-radius:4px;font-weight:600;">🏷️ Promozioni</span>
+                        </div>
+                        <p style="font-size:12px;color:#64748b;margin:0 0 10px 0;">Mostra le prime 6 attività con sconti attivi per residenti.</p>
+                        <div style="display:flex;gap:8px;">
+                            <input type="text" readonly value='[vp_negozi_mappa offerte_solo="si" limite="6"]' style="flex:1;font-family:monospace;font-size:12px;background:#fff;border:1px solid #cbd5e1;padding:6px 10px;border-radius:6px;" id="sc_ex4" />
+                            <button type="button" class="button button-secondary" onclick="vpqCopyCode('sc_ex4', this)">Copia</button>
+                        </div>
+                    </div>
+
+                    <!-- Esempio 5: Google Maps -->
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <strong style="font-size:13px;color:#0f172a;">5. Motore Google Maps</strong>
+                            <span style="font-size:11px;background:#dbeafe;color:#1e40af;padding:2px 6px;border-radius:4px;font-weight:600;">Google Maps</span>
+                        </div>
+                        <p style="font-size:12px;color:#64748b;margin:0 0 10px 0;">Utilizza l'API Google Maps (richiede chiave API configurata).</p>
+                        <div style="display:flex;gap:8px;">
+                            <input type="text" readonly value='[vp_negozi_mappa provider="google"]' style="flex:1;font-family:monospace;font-size:12px;background:#fff;border:1px solid #cbd5e1;padding:6px 10px;border-radius:6px;" id="sc_ex5" />
+                            <button type="button" class="button button-secondary" onclick="vpqCopyCode('sc_ex5', this)">Copia</button>
+                        </div>
+                    </div>
+
+                    <!-- Esempio 6: Alias Breve -->
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <strong style="font-size:13px;color:#0f172a;">6. Alias Breve Alternativo</strong>
+                            <span style="font-size:11px;background:#f3e8ff;color:#7e22ce;padding:2px 6px;border-radius:4px;font-weight:600;">Sintassi Breve</span>
+                        </div>
+                        <p style="font-size:12px;color:#64748b;margin:0 0 10px 0;">Puoi usare indifferentemente <code>[vp_commercianti]</code> o <code>[vp_negozi]</code>.</p>
+                        <div style="display:flex;gap:8px;">
+                            <input type="text" readonly value="[vp_commercianti]" style="flex:1;font-family:monospace;font-size:12px;background:#fff;border:1px solid #cbd5e1;padding:6px 10px;border-radius:6px;" id="sc_ex6" />
+                            <button type="button" class="button button-secondary" onclick="vpqCopyCode('sc_ex6', this)">Copia</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabella Tutti i Parametri -->
+                <h3 style="font-size:16px;font-weight:800;color:#0f172a;margin:32px 0 12px 0;">⚙️ Tutti i Parametri Supportati</h3>
+                <div style="overflow-x:auto;">
+                    <table class="wp-list-table widefat fixed striped" style="border-radius:8px;overflow:hidden;">
+                        <thead>
+                            <tr style="background:#0f172a;color:#ffffff;">
+                                <th style="color:#ffffff;font-weight:700;width:150px;">Parametro</th>
+                                <th style="color:#ffffff;font-weight:700;width:120px;">Default</th>
+                                <th style="color:#ffffff;font-weight:700;width:240px;">Valori Ammessi</th>
+                                <th style="color:#ffffff;font-weight:700;">Descrizione</th>
+                            </tr>
+                        </thead>
+                        <tbody style="font-size:13px;">
+                            <tr>
+                                <td><code>provider</code></td>
+                                <td><code>osm</code></td>
+                                <td><code>osm</code>, <code>google</code></td>
+                                <td>Motore cartografico. <code>osm</code> usa OpenStreetMap (gratuito, zero configurazione). <code>google</code> usa Google Maps JS.</td>
+                            </tr>
+                            <tr>
+                                <td><code>categoria</code></td>
+                                <td><code>tutti</code></td>
+                                <td><code>tutti</code>, <code>alimentari</code>, <code>ristorazione</code>, <code>servizi</code>, <code>salute</code>, <code>casa_brico</code>, <code>abbigliamento</code>, <code>tempo_libero</code></td>
+                                <td>Filtra la mappa e le schede per una specifica categoria merceologica.</td>
+                            </tr>
+                            <tr>
+                                <td><code>schede</code></td>
+                                <td><code>si</code></td>
+                                <td><code>si</code>, <code>no</code></td>
+                                <td>Mostra o nasconde la griglia delle schede informative dei negozi sotto la mappa.</td>
+                            </tr>
+                            <tr>
+                                <td><code>ricerca</code></td>
+                                <td><code>si</code></td>
+                                <td><code>si</code>, <code>no</code></td>
+                                <td>Abilita o nasconde la barra di ricerca in tempo reale (nome, indirizzo, categoria).</td>
+                            </tr>
+                            <tr>
+                                <td><code>filtro_categoria</code></td>
+                                <td><code>si</code></td>
+                                <td><code>si</code>, <code>no</code></td>
+                                <td>Mostra o nasconde i pulsanti di selezione rapida delle categorie.</td>
+                            </tr>
+                            <tr>
+                                <td><code>colonne</code></td>
+                                <td><code>3</code></td>
+                                <td><code>2</code>, <code>3</code>, <code>4</code></td>
+                                <td>Numero di colonne per la griglia delle schede su schermi desktop (su mobile passa automaticamente a 1 colonna).</td>
+                            </tr>
+                            <tr>
+                                <td><code>altezza</code></td>
+                                <td><code>450px</code></td>
+                                <td>Valore CSS (es. <code>400px</code>, <code>500px</code>, <code>60vh</code>)</td>
+                                <td>Altezza del riquadro della mappa.</td>
+                            </tr>
+                            <tr>
+                                <td><code>offerte_solo</code></td>
+                                <td><code>no</code></td>
+                                <td><code>si</code>, <code>no</code></td>
+                                <td>Se impostato su <code>si</code>, mostra solo le attività commerciali che hanno un'offerta speciale attiva per i residenti.</td>
+                            </tr>
+                            <tr>
+                                <td><code>limite</code></td>
+                                <td><code>0</code></td>
+                                <td>Numero intero (es. <code>6</code>, <code>12</code>)</td>
+                                <td>Numero massimo di negozi da visualizzare (<code>0</code> = tutti i negozi pubblicati).</td>
+                            </tr>
+                            <tr>
+                                <td><code>ordine</code></td>
+                                <td><code>mipiace</code></td>
+                                <td><code>mipiace</code>, <code>titolo</code>, <code>data</code></td>
+                                <td>Ordinamento predefinito: per gradimento residenti (<code>mipiace</code>), alfabetico (<code>titolo</code>) o recente (<code>data</code>).</td>
+                            </tr>
+                            <tr>
+                                <td><code>zoom</code></td>
+                                <td><code>14</code></td>
+                                <td>Intero da <code>10</code> a <code>18</code></td>
+                                <td>Livello di ingrandimento iniziale della mappa.</td>
+                            </tr>
+                            <tr>
+                                <td><code>centro_lat</code></td>
+                                <td><code>41.8965</code></td>
+                                <td>Coordinate decimali</td>
+                                <td>Latitudine del centro iniziale della mappa.</td>
+                            </tr>
+                            <tr>
+                                <td><code>centro_lng</code></td>
+                                <td><code>12.6710</code></td>
+                                <td>Coordinate decimali</td>
+                                <td>Longitudine del centro iniziale della mappa.</td>
+                            </tr>
+                            <tr>
+                                <td><code>google_api_key</code></td>
+                                <td>(vuota)</td>
+                                <td>Stringa chiave API</td>
+                                <td>Permette di specificare direttamente una chiave Google Maps se diversa da quella salvata nelle impostazioni.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Come Usare nei Page Builder -->
+                <h3 style="font-size:16px;font-weight:800;color:#0f172a;margin:32px 0 12px 0;">🧱 Come Inserire lo Shortcode nel Tuo Tema</h3>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:16px;">
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+                        <strong style="display:block;font-size:14px;color:#0f172a;margin-bottom:6px;">Gutenberg (Editor a Blocchi)</strong>
+                        <p style="font-size:12px;color:#64748b;margin:0;line-height:1.5;">
+                            Aggiungi un nuovo blocco premendo <strong>+</strong>, cerca <strong>"Shortcode"</strong> e incolla <code>[vp_negozi_mappa]</code>.
+                        </p>
+                    </div>
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+                        <strong style="display:block;font-size:14px;color:#0f172a;margin-bottom:6px;">Elementor</strong>
+                        <p style="font-size:12px;color:#64748b;margin:0;line-height:1.5;">
+                            Trascina il widget <strong>"Shortcode"</strong> nella colonna desiderata e incolla lo shortcode nel pannello sinistro.
+                        </p>
+                    </div>
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+                        <strong style="display:block;font-size:14px;color:#0f172a;margin-bottom:6px;">Divi Builder</strong>
+                        <p style="font-size:12px;color:#64748b;margin:0;line-height:1.5;">
+                            Inserisci un modulo <strong>"Codice"</strong> o <strong>"Testo"</strong> e incolla lo shortcode direttamente nel contenuto.
+                        </p>
+                    </div>
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+                        <strong style="display:block;font-size:14px;color:#0f172a;margin-bottom:6px;">Classic Editor o Widget</strong>
+                        <p style="font-size:12px;color:#64748b;margin:0;line-height:1.5;">
+                            Incolla semplicemente lo shortcode <code>[vp_negozi_mappa]</code> ovunque nel testo dell'articolo o nella barra laterale.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+            function vpqCopyCode(elemId, btn) {
+                var copyText = document.getElementById(elemId);
+                if (!copyText) return;
+                copyText.select();
+                copyText.setSelectionRange(0, 99999);
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(copyText.value).then(function() {
+                        var orig = btn.innerText;
+                        btn.innerText = 'Copiato! ✓';
+                        btn.style.background = '#10b981';
+                        btn.style.color = '#fff';
+                        setTimeout(function() {
+                            btn.innerText = orig;
+                            btn.style.background = '';
+                            btn.style.color = '';
+                        }, 2000);
+                    });
+                } else {
+                    document.execCommand('copy');
+                    btn.innerText = 'Copiato! ✓';
+                    setTimeout(function() { btn.innerText = 'Copia'; }, 2000);
+                }
+            }
+            </script>
         <?php endif; ?>
 
     </div>

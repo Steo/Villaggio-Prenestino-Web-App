@@ -70,7 +70,7 @@ export function saveStoredNotifications(notifiche: AppNotification[]): void {
 export function triggerNotification(params: {
   titolo: string;
   messaggio: string;
-  tipo: 'proposta_voti' | 'segnalazione_stato' | 'sistema';
+  tipo: 'proposta_voti' | 'segnalazione_stato' | 'commercio_approvato' | 'sistema';
   targetId?: number;
 }): AppNotification {
   const now = new Date();

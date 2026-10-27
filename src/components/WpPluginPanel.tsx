@@ -46,7 +46,13 @@ import {
   Tag,
   Percent,
   Mail,
+  Code2,
+  Map,
+  Layers,
+  Search,
 } from 'lucide-react';
+import { WpAdminLiveSummary } from './WpAdminLiveSummary';
+import { recordVolunteerAction } from '../services/volunteerActionService';
 
 interface WpPluginPanelProps {
   isOpen: boolean;
@@ -164,11 +170,43 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
   onToggleTab,
 }) => {
   const [activeTab, setActiveTab] = useState<
-    'insights' | 'commercianti' | 'eventi' | 'segnalazioni' | 'volontari' | 'proposte' | 'config'
+    'insights' | 'commercianti' | 'shortcodes' | 'eventi' | 'segnalazioni' | 'volontari' | 'proposte' | 'config'
   >('insights');
   const [commercioStatoFiltro, setCommercioStatoFiltro] = useState<'tutti' | 'pending' | 'publish'>('tutti');
   const [segnalazioniStatoFiltro, setSegnalazioniStatoFiltro] = useState<'tutti' | 'in_attesa' | 'approvata' | 'rifiutata'>('tutti');
   const [proposteStatoFiltro, setProposteStatoFiltro] = useState<'tutti' | 'in_attesa' | 'approvata' | 'rifiutata'>('tutti');
+
+  // Shortcode Generator State
+  const [copiedSnippet, setCopiedSnippet] = useState<string | null>(null);
+  const [scProvider, setScProvider] = useState<'osm' | 'google'>('osm');
+  const [scCategoria, setScCategoria] = useState<string>('tutte');
+  const [scSchede, setScSchede] = useState<'si' | 'no'>('si');
+  const [scRicerca, setScRicerca] = useState<'si' | 'no'>('si');
+  const [scFiltroCat, setScFiltroCat] = useState<'si' | 'no'>('si');
+  const [scColonne, setScColonne] = useState<'1' | '2' | '3' | '4'>('3');
+  const [scAltezza, setScAltezza] = useState<string>('420px');
+  const [scOfferteSolo, setScOfferteSolo] = useState<'si' | 'no'>('no');
+  const [scLimite, setScLimite] = useState<string>('-1');
+
+  const copyShortcodeText = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedSnippet(text);
+    setTimeout(() => setCopiedSnippet(null), 2500);
+  };
+
+  const generateCurrentShortcode = (): string => {
+    const parts = ['vp_negozi_mappa'];
+    if (scProvider !== 'osm') parts.push(`provider="${scProvider}"`);
+    if (scCategoria !== 'tutte') parts.push(`categoria="${scCategoria}"`);
+    if (scSchede !== 'si') parts.push(`schede="${scSchede}"`);
+    if (scRicerca !== 'si') parts.push(`ricerca="${scRicerca}"`);
+    if (scFiltroCat !== 'si') parts.push(`filtro_categoria="${scFiltroCat}"`);
+    if (scColonne !== '3') parts.push(`colonne="${scColonne}"`);
+    if (scAltezza !== '420px') parts.push(`altezza="${scAltezza}"`);
+    if (scOfferteSolo !== 'no') parts.push(`offerte_solo="${scOfferteSolo}"`);
+    if (scLimite !== '-1') parts.push(`limite="${scLimite}"`);
+    return `[${parts.join(' ')}]`;
+  };
 
   // Modale per inserire la motivazione del rifiuto
   const [rejectionModalItem, setRejectionModalItem] = useState<{
@@ -229,6 +267,8 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
     target: 20,
     tipo: 'volontariato' as TipoEvento,
     quota: '',
+    locandina: '',
+    featured_media_url: '',
   });
 
   // Volunteer request form state
@@ -239,6 +279,8 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
     desc: '',
     need: 6,
     urgente: false,
+    locandina: '',
+    featured_media_url: '',
   });
 
   // Caricamento Insights
@@ -354,6 +396,7 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
     const isPassato = Boolean(newEvent.dataCompleta && newEvent.dataCompleta < today);
 
     if (onCreateEvento) {
+      const poster = newEvent.featured_media_url || newEvent.locandina || '';
       onCreateEvento({
         t: newEvent.t.trim(),
         p: newEvent.p.trim() || 'Evento organizzato dall\'Associazione di Quartiere Villaggio Prenestino.',
@@ -368,6 +411,9 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
         quota: newEvent.tipo === 'pagamento' ? newEvent.quota : undefined,
         passato: isPassato,
         n: 0,
+        locandina: poster,
+        featured_media_url: poster,
+        immagine_in_evidenza: poster,
       });
       setShowNewEventModal(false);
       setNewEvent({
@@ -382,6 +428,8 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
         target: 20,
         tipo: 'volontariato',
         quota: '',
+        locandina: '',
+        featured_media_url: '',
       });
       loadInsights();
     }
@@ -391,12 +439,23 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
     e.preventDefault();
     if (!newRichiesta.t.trim()) return;
     if (onCreateRichiesta) {
+      const poster = newRichiesta.featured_media_url || newRichiesta.locandina || '';
       onCreateRichiesta({
         t: newRichiesta.t.trim(),
         w: newRichiesta.w.trim(),
         desc: newRichiesta.desc.trim() || 'Attività di volontariato sul territorio.',
         need: Number(newRichiesta.need) || 6,
         urgente: newRichiesta.urgente,
+        locandina: poster,
+        featured_media_url: poster,
+        immagine_in_evidenza: poster,
+      });
+      recordVolunteerAction({
+        tipo: 'nuova_iniziativa',
+        titolo: newRichiesta.t.trim(),
+        luogo: newRichiesta.w.trim(),
+        volontarioNome: 'Amministratore WP',
+        dettaglio: `Aperta ricerca per ${newRichiesta.need} volontari`,
       });
       setShowNewRichiestaModal(false);
       setNewRichiesta({
@@ -405,6 +464,8 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
         desc: '',
         need: 6,
         urgente: false,
+        locandina: '',
+        featured_media_url: '',
       });
       loadInsights();
     }
@@ -429,7 +490,7 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                villaggioprenestino.it • Plugin VP Quartiere v1.5.0 (Moderazione Commercianti & Negozi)
+                villaggioprenestino.it • Plugin VP Quartiere v1.6.0 (Moderazione Commercianti & Negozi)
               </p>
             </div>
           </div>
@@ -492,6 +553,21 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
                 {attivitaCommercio.filter(a => a.statoApprovazione === 'in_attesa').length} in attesa
               </span>
             )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('shortcodes')}
+            className={`py-3 px-3 text-xs font-bold border-b-2 flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap ${
+              activeTab === 'shortcodes'
+                ? 'border-[#0073aa] text-[#0073aa] bg-white -mb-px rounded-t-lg'
+                : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+            }`}
+          >
+            <Code2 className="w-4 h-4 text-indigo-600" />
+            <span>Shortcode Mappa</span>
+            <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-indigo-100 text-indigo-800 font-bold uppercase">
+              Nuovo
+            </span>
           </button>
 
           <button
@@ -635,6 +711,23 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
                   </button>
                 </div>
               </div>
+
+              {/* Componente di Riepilogo in Tempo Reale (Attività Mappate, Segnalazioni in Attesa, Ultime 5 Azioni Volontariato) */}
+              <WpAdminLiveSummary
+                attivitaCommercio={attivitaCommercio}
+                segnalazioni={segnalazioni}
+                richieste={richieste}
+                onNavigateTab={(tab) => {
+                  setActiveTab(tab);
+                  if (tab === 'segnalazioni') {
+                    setSegnalazioniStatoFiltro('in_attesa');
+                  }
+                }}
+                onRefreshData={() => {
+                  loadInsights();
+                  if (onRefreshData) onRefreshData();
+                }}
+              />
 
               {/* Riquadro Attivazione Schede Web App */}
               <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs">
@@ -1018,6 +1111,47 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
                 description="Mostra la vetrina e la mappa dei commercianti di quartiere agli utenti dell'app."
               />
 
+              {/* Banner Shortcode Mappa per Pagine/Articoli WordPress */}
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 border border-indigo-200/80 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-2.5 rounded-xl bg-indigo-600 text-white shrink-0 shadow-xs">
+                    <Code2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-black text-indigo-950 uppercase tracking-wider">
+                        Novità v1.6.0: Shortcode WordPress
+                      </span>
+                      <code className="text-xs font-mono font-bold text-indigo-700 bg-white px-2 py-0.5 rounded-md border border-indigo-200">
+                        [vp_negozi_mappa]
+                      </code>
+                    </div>
+                    <p className="text-xs text-slate-700 mt-1 leading-relaxed">
+                      Puoi incorporare questa mappa e l'elenco delle schede commercianti in <strong>qualsiasi pagina o articolo del tuo sito WordPress</strong> con OpenStreetMap (gratuito) o Google Maps, filtri di categoria e ricerca!
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => copyShortcodeText('[vp_negozi_mappa]')}
+                    className="flex-1 sm:flex-none px-3 py-2 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold rounded-xl border border-slate-300 transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    {copiedSnippet === '[vp_negozi_mappa]' ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-500" />}
+                    <span>{copiedSnippet === '[vp_negozi_mappa]' ? 'Copiato!' : 'Copia Base'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('shortcodes')}
+                    className="flex-1 sm:flex-none px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <span>Configura & Guida</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -1321,6 +1455,498 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
             </div>
           )}
 
+          {/* TAB: SHORTCODE WORDPRESS MAPPA & NEGOZI */}
+          {activeTab === 'shortcodes' && (
+            <div className="space-y-6 animate-fadeIn">
+              {/* Header Box */}
+              <div className="p-5 rounded-2xl bg-gradient-to-br from-indigo-900 via-indigo-800 to-slate-900 text-white shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
+                      Modulo WordPress v1.6.0
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                      Zero API Key Obbligatoria (OpenStreetMap)
+                    </span>
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
+                    <Code2 className="w-5 h-5 text-indigo-400" />
+                    Shortcode WordPress: Mappa & Schede Negozi
+                  </h3>
+                  <p className="text-xs text-indigo-200 max-w-2xl leading-relaxed">
+                    Incorpora la mappa interattiva dei commercianti e la vetrina con schede dettagliate in qualsiasi articolo, pagina o widget del sito WordPress. Supporta ricerca dal vivo, filtri categoria, Leaflet OpenStreetMap e Google Maps.
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2 shrink-0 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => downloadBlobFile('/vp-quartiere.zip', 'vp-quartiere.zip')}
+                    className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Scarica Plugin v1.6.0</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Box 1: Esempi Rapidi Pronti da Copiare */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-amber-500" />
+                      Esempi Rapidi Pronti all'Uso (1-Click Copy)
+                    </h4>
+                    <p className="text-xs text-slate-500">
+                      Clicca su un pulsante per copiare immediatamente il codice shortcode da incollare nelle tue pagine.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {[
+                    {
+                      titolo: 'Mappa Completa Standard',
+                      desc: 'Mappa OpenStreetMap + ricerca + filtri + schede su 3 colonne',
+                      code: '[vp_negozi_mappa]',
+                      tag: 'Consigliato',
+                      tagColor: 'bg-emerald-100 text-emerald-800',
+                    },
+                    {
+                      titolo: 'Solo Mappa (No Schede)',
+                      desc: 'Ideale per una sezione panoramica a piena larghezza con popup',
+                      code: '[vp_negozi_mappa schede="no" altezza="500px"]',
+                      tag: 'Panoramica',
+                      tagColor: 'bg-blue-100 text-blue-800',
+                    },
+                    {
+                      titolo: 'Con Google Maps',
+                      desc: 'Usa le mappe Google ufficiali (con o senza API Key in admin)',
+                      code: '[vp_negozi_mappa provider="google"]',
+                      tag: 'Google Maps',
+                      tagColor: 'bg-purple-100 text-purple-800',
+                    },
+                    {
+                      titolo: 'Solo Pizzerie & Ristoranti',
+                      desc: 'Filtra solo le attività di ristorazione su 2 colonne',
+                      code: '[vp_negozi_mappa categoria="ristorazione" colonne="2"]',
+                      tag: 'Tematico',
+                      tagColor: 'bg-amber-100 text-amber-800',
+                    },
+                    {
+                      titolo: 'Negozi con Offerte Residenti',
+                      desc: 'Mostra solo le attività che offrono promozioni speciali',
+                      code: '[vp_negozi_mappa offerte_solo="si" limite="6"]',
+                      tag: 'Promozioni',
+                      tagColor: 'bg-teal-100 text-teal-800',
+                    },
+                    {
+                      titolo: 'Widget Compatto / Sidebar',
+                      desc: 'Mappa compatta a 300px per colonne laterali del tema',
+                      code: '[vp_negozi_mappa schede="no" ricerca="no" filtro_categoria="no" altezza="300px"]',
+                      tag: 'Compatto',
+                      tagColor: 'bg-slate-100 text-slate-800',
+                    },
+                  ].map((preset, idx) => {
+                    const isCopied = copiedSnippet === preset.code;
+                    return (
+                      <div
+                        key={idx}
+                        className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 hover:border-indigo-300 transition flex flex-col justify-between gap-2.5"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-xs font-bold text-slate-900">{preset.titolo}</span>
+                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${preset.tagColor}`}>
+                              {preset.tag}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 leading-snug">{preset.desc}</p>
+                        </div>
+
+                        <div className="space-y-2 pt-1 border-t border-slate-200/60">
+                          <div className="bg-slate-900 text-emerald-400 font-mono text-[11px] px-2.5 py-1.5 rounded-lg overflow-x-auto select-all">
+                            {preset.code}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => copyShortcodeText(preset.code)}
+                            className={`w-full py-1.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                              isCopied
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 shadow-2xs'
+                            }`}
+                          >
+                            {isCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
+                            <span>{isCopied ? 'Copiato negli appunti!' : 'Copia Shortcode'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Box 2: Configuratore Interattivo Personalizzato */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <Sliders className="w-4 h-4 text-indigo-600" />
+                      Configuratore Interattivo Shortcode
+                    </h4>
+                    <p className="text-xs text-slate-500">
+                      Seleziona i parametri desiderati: lo shortcode viene generato in tempo reale pronto da copiare.
+                    </p>
+                  </div>
+
+                  <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-xl border border-indigo-200 self-start sm:self-auto">
+                    Generatore Visuale
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                  {/* Provider */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      1. Motore Cartografico (provider):
+                    </label>
+                    <select
+                      value={scProvider}
+                      onChange={(e) => setScProvider(e.target.value as 'osm' | 'google')}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white font-medium"
+                    >
+                      <option value="osm">OpenStreetMap / Leaflet (Gratuito, Zero API Key)</option>
+                      <option value="google">Google Maps (Usa la chiave del plugin o del parametro)</option>
+                    </select>
+                  </div>
+
+                  {/* Categoria */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      2. Filtro Categoria (categoria):
+                    </label>
+                    <select
+                      value={scCategoria}
+                      onChange={(e) => setScCategoria(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white font-medium"
+                    >
+                      <option value="tutte">Tutte le Categorie (Nessun filtro iniziale)</option>
+                      <option value="alimentari">Alimentari (Supermercati, Forni, Macellerie)</option>
+                      <option value="ristorazione">Ristorazione (Pizzerie, Bar, Ristoranti)</option>
+                      <option value="salute">Farmacie & Salute</option>
+                      <option value="artigiani">Artigiani & Riparazioni</option>
+                      <option value="servizi_persona">Servizi alla Persona (Parrucchieri, Estetica)</option>
+                      <option value="servizi_animali">Servizi per Animali (Toelettatura, Veterinari)</option>
+                      <option value="casa">Casa, Fai da te & Hobby</option>
+                    </select>
+                  </div>
+
+                  {/* Mostra Schede */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      3. Mostra Schede Negozi (schede):
+                    </label>
+                    <select
+                      value={scSchede}
+                      onChange={(e) => setScSchede(e.target.value as 'si' | 'no')}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white font-medium"
+                    >
+                      <option value="si">Sì (Mappa in alto + Griglia schede sotto)</option>
+                      <option value="no">No (Mostra unicamente la mappa con popup)</option>
+                    </select>
+                  </div>
+
+                  {/* Ricerca dal Vivo */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      4. Ricerca Istantanea (ricerca):
+                    </label>
+                    <select
+                      value={scRicerca}
+                      onChange={(e) => setScRicerca(e.target.value as 'si' | 'no')}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white font-medium"
+                    >
+                      <option value="si">Sì (Input di ricerca testuale dal vivo)</option>
+                      <option value="no">No (Disattiva barra di ricerca)</option>
+                    </select>
+                  </div>
+
+                  {/* Filtro Categoria Dinamico */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      5. Pulsanti Filtro Categoria (filtro_categoria):
+                    </label>
+                    <select
+                      value={scFiltroCat}
+                      onChange={(e) => setScFiltroCat(e.target.value as 'si' | 'no')}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white font-medium"
+                    >
+                      <option value="si">Sì (Mostra i bottoni per filtrare categorie)</option>
+                      <option value="no">No (Nascondi barra dei pulsanti)</option>
+                    </select>
+                  </div>
+
+                  {/* Colonne Schede */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      6. Colonne Griglia (colonne):
+                    </label>
+                    <select
+                      value={scColonne}
+                      onChange={(e) => setScColonne(e.target.value as '1' | '2' | '3' | '4')}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white font-medium"
+                    >
+                      <option value="1">1 Colonna (Verticale)</option>
+                      <option value="2">2 Colonne</option>
+                      <option value="3">3 Colonne (Consigliato per desktop)</option>
+                      <option value="4">4 Colonne (Compatto)</option>
+                    </select>
+                  </div>
+
+                  {/* Altezza Mappa */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      7. Altezza Riquadro Mappa (altezza):
+                    </label>
+                    <select
+                      value={scAltezza}
+                      onChange={(e) => setScAltezza(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white font-medium"
+                    >
+                      <option value="320px">320px (Compatta)</option>
+                      <option value="420px">420px (Standard consigliata)</option>
+                      <option value="520px">520px (Media)</option>
+                      <option value="650px">650px (Grande a pieno schermo)</option>
+                      <option value="0">0 (Nessuna mappa, solo schede)</option>
+                    </select>
+                  </div>
+
+                  {/* Offerte Solo */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      8. Solo con Offerte Attive (offerte_solo):
+                    </label>
+                    <select
+                      value={scOfferteSolo}
+                      onChange={(e) => setScOfferteSolo(e.target.value as 'si' | 'no')}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white font-medium"
+                    >
+                      <option value="no">No (Mostra tutti i negozi)</option>
+                      <option value="si">Sì (Filtra solo attività con sconti residenti)</option>
+                    </select>
+                  </div>
+
+                  {/* Limite Negozi */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      9. Limite Negozi Visibili (limite):
+                    </label>
+                    <select
+                      value={scLimite}
+                      onChange={(e) => setScLimite(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white font-medium"
+                    >
+                      <option value="-1">Tutti (-1)</option>
+                      <option value="3">Massimo 3</option>
+                      <option value="6">Massimo 6</option>
+                      <option value="9">Massimo 9</option>
+                      <option value="12">Massimo 12</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Box Risultato del Configuratore */}
+                <div className="mt-4 p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                      <Code2 className="w-4 h-4 text-emerald-400" />
+                      Shortcode Generato Pronto da Incollare:
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      Alias supportati: [vp_negozi_mappa], [vp_commercianti], [vp_negozi]
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-black/60 border border-slate-700/80 text-emerald-400 font-mono text-xs sm:text-sm font-bold break-all select-all">
+                    {generateCurrentShortcode()}
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-1">
+                    <p className="text-[11px] text-slate-400">
+                      Incolla questa stringa in qualsiasi blocco Shortcode o campo testo di WordPress.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => copyShortcodeText(generateCurrentShortcode())}
+                      className={`py-2 px-5 rounded-xl text-xs font-extrabold transition flex items-center gap-2 cursor-pointer shadow-md ${
+                        copiedSnippet === generateCurrentShortcode()
+                          ? 'bg-emerald-600 text-white shadow-emerald-600/30'
+                          : 'bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white shadow-indigo-600/30'
+                      }`}
+                    >
+                      {copiedSnippet === generateCurrentShortcode() ? (
+                        <>
+                          <Check className="w-4 h-4" />
+                          <span>Copiato negli Appunti!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-4 h-4" />
+                          <span>Copia Shortcode Configurato</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Box 3: Come usarlo con i Page Builder più diffusi */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                  <BookOpen className="w-4 h-4 text-[#0073aa]" />
+                  Come Inserirlo nei Principali Editor di WordPress:
+                </h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-slate-600">
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                    <span className="font-bold text-slate-900 block flex items-center gap-1.5">
+                      <span>🧱</span> WordPress Block Editor (Gutenberg)
+                    </span>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      Clicca sul <strong>+</strong> per aggiungere un blocco, cerca <strong>"Shortcode"</strong> (oppure "HTML personalizzato") e incolla il codice <code>[vp_negozi_mappa]</code>. Salva o pubblica la pagina.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                    <span className="font-bold text-slate-900 block flex items-center gap-1.5">
+                      <span>🎨</span> Elementor Page Builder
+                    </span>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      Nella colonna sinistra di Elementor, trascina il widget <strong>"Shortcode"</strong> all'interno della sezione desiderata, incolla il codice nell'apposito campo e clicca su "Aggiorna".
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                    <span className="font-bold text-slate-900 block flex items-center gap-1.5">
+                      <span>✨</span> Divi Theme & Builder
+                    </span>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      Aggiungi un modulo <strong>"Codice"</strong> o <strong>"Testo"</strong>, inserisci <code>[vp_negozi_mappa]</code> e conferma con la spunta verde.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                    <span className="font-bold text-slate-900 block flex items-center gap-1.5">
+                      <span>📝</span> Editor Classico / Widget Barra Laterale
+                    </span>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      Incolla direttamente lo shortcode all'interno del testo della pagina o in un widget di tipo <strong>"Testo"</strong> in <em>Aspetto &gt; Widget</em>.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Box 4: Tabella Completa dei Parametri Disponibili */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                      <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                      Tabella di Riferimento di Tutti i Parametri Supportati
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Tutti i parametri sono opzionali. Se omessi, il plugin applica i valori predefiniti indicati qui sotto.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                      <tr>
+                        <th className="py-2.5 px-3">Parametro</th>
+                        <th className="py-2.5 px-3">Valore Default</th>
+                        <th className="py-2.5 px-3">Valori Supportati</th>
+                        <th className="py-2.5 px-3">Descrizione</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-600">
+                      <tr>
+                        <td className="py-2.5 px-3 font-mono font-bold text-indigo-700">provider</td>
+                        <td className="py-2.5 px-3 font-mono text-slate-700">"osm"</td>
+                        <td className="py-2.5 px-3 font-mono text-[11px]">"osm", "google"</td>
+                        <td className="py-2.5 px-3">Sceglie OpenStreetMap (nessuna API key richiesta) o Google Maps.</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2.5 px-3 font-mono font-bold text-indigo-700">categoria</td>
+                        <td className="py-2.5 px-3 font-mono text-slate-700">"tutte"</td>
+                        <td className="py-2.5 px-3 font-mono text-[11px]">"alimentari", "ristorazione", "salute", "artigiani", "servizi_persona", "servizi_animali", "casa"</td>
+                        <td className="py-2.5 px-3">Filtra per mostrare solo i negozi della categoria selezionata.</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2.5 px-3 font-mono font-bold text-indigo-700">schede</td>
+                        <td className="py-2.5 px-3 font-mono text-slate-700">"si"</td>
+                        <td className="py-2.5 px-3 font-mono text-[11px]">"si", "no"</td>
+                        <td className="py-2.5 px-3">Mostra o nasconde la griglia con le schede dei negozi sotto alla mappa.</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2.5 px-3 font-mono font-bold text-indigo-700">ricerca</td>
+                        <td className="py-2.5 px-3 font-mono text-slate-700">"si"</td>
+                        <td className="py-2.5 px-3 font-mono text-[11px]">"si", "no"</td>
+                        <td className="py-2.5 px-3">Abilita o disabilita il campo di ricerca testuale dal vivo.</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2.5 px-3 font-mono font-bold text-indigo-700">filtro_categoria</td>
+                        <td className="py-2.5 px-3 font-mono text-slate-700">"si"</td>
+                        <td className="py-2.5 px-3 font-mono text-[11px]">"si", "no"</td>
+                        <td className="py-2.5 px-3">Mostra o nasconde i pulsanti di filtraggio rapido per categoria.</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2.5 px-3 font-mono font-bold text-indigo-700">colonne</td>
+                        <td className="py-2.5 px-3 font-mono text-slate-700">"3"</td>
+                        <td className="py-2.5 px-3 font-mono text-[11px]">"1", "2", "3", "4"</td>
+                        <td className="py-2.5 px-3">Numero di colonne per la griglia delle schede su schermi desktop.</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2.5 px-3 font-mono font-bold text-indigo-700">altezza</td>
+                        <td className="py-2.5 px-3 font-mono text-slate-700">"420px"</td>
+                        <td className="py-2.5 px-3 font-mono text-[11px]">Es. "350px", "500px", "0"</td>
+                        <td className="py-2.5 px-3">Altezza CSS della mappa. Con "0" nasconde la mappa mostrando solo le schede.</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2.5 px-3 font-mono font-bold text-indigo-700">offerte_solo</td>
+                        <td className="py-2.5 px-3 font-mono text-slate-700">"no"</td>
+                        <td className="py-2.5 px-3 font-mono text-[11px]">"si", "no"</td>
+                        <td className="py-2.5 px-3">Se "si", mostra unicamente i negozi che hanno un'offerta attiva per i residenti.</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2.5 px-3 font-mono font-bold text-indigo-700">limite</td>
+                        <td className="py-2.5 px-3 font-mono text-slate-700">"-1"</td>
+                        <td className="py-2.5 px-3 font-mono text-[11px]">"-1" (tutti) o numero positivo</td>
+                        <td className="py-2.5 px-3">Numero massimo di negozi caricati dalla query.</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2.5 px-3 font-mono font-bold text-indigo-700">zoom</td>
+                        <td className="py-2.5 px-3 font-mono text-slate-700">"14"</td>
+                        <td className="py-2.5 px-3 font-mono text-[11px]">Da 10 a 19</td>
+                        <td className="py-2.5 px-3">Livello iniziale di zoom della mappa (14 inquadra l'intero quartiere).</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2.5 px-3 font-mono font-bold text-indigo-700">google_api_key</td>
+                        <td className="py-2.5 px-3 font-mono text-slate-700">""</td>
+                        <td className="py-2.5 px-3 font-mono text-[11px]">Stringa chiave Google Maps</td>
+                        <td className="py-2.5 px-3">Chiave specifica per pagina; sovrascrive quella salvata nelle impostazioni plugin.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* TAB 2: GESTIONE EVENTI */}
           {activeTab === 'eventi' && (
             <div className="space-y-4 animate-fadeIn">
@@ -1502,6 +2128,28 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
                         />
                       </div>
                     )}
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        URL Locandina / Immagine in evidenza (Opzionale):
+                      </label>
+                      <input
+                        type="url"
+                        value={newEvent.locandina || ''}
+                        onChange={(e) =>
+                          setNewEvent({
+                            ...newEvent,
+                            locandina: e.target.value,
+                            featured_media_url: e.target.value,
+                          })
+                        }
+                        placeholder="https://.../locandina.jpg (caricata nella Libreria Media WordPress)"
+                        className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white"
+                      />
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Nell'App verrà mostrato il pulsante <strong>"Vedi locandina"</strong> con visualizzazione a schermo intero (Lightbox).
+                      </p>
+                    </div>
 
                     <div className="sm:col-span-2">
                       <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -1917,6 +2565,28 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
                       />
                     </div>
 
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        URL Locandina / Immagine Attività (Opzionale):
+                      </label>
+                      <input
+                        type="url"
+                        value={newRichiesta.locandina || ''}
+                        onChange={(e) =>
+                          setNewRichiesta({
+                            ...newRichiesta,
+                            locandina: e.target.value,
+                            featured_media_url: e.target.value,
+                          })
+                        }
+                        placeholder="https://.../volontariato.jpg (caricata nella Libreria Media WordPress)"
+                        className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white"
+                      />
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Nell'App verrà mostrato il pulsante <strong>"Vedi locandina"</strong> con apertura della foto ingrandita a schermo intero (Lightbox).
+                      </p>
+                    </div>
+
                     <div className="sm:col-span-2 flex items-center gap-2">
                       <input
                         type="checkbox"
@@ -2218,14 +2888,14 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
               {/* Box Download ZIP */}
               <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-50 via-teal-50 to-amber-50/50 border-2 border-emerald-300 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                  <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-600 text-white uppercase tracking-wider mb-1.5">
-                    Versione 1.5.0: Notifiche Email Associazione & Commercianti
+                  <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-600 text-white uppercase tracking-wider mb-1.5">
+                    Versione 1.6.0: Shortcode Mappa [vp_negozi_mappa] & Notifiche
                   </span>
                   <h3 className="text-base font-bold text-slate-900 leading-snug">
                     Scarica il Plugin WordPress: <code className="text-emerald-800">vp-quartiere.zip</code>
                   </h3>
                   <p className="text-xs text-slate-600 mt-1 max-w-md">
-                    Include il modulo <strong>"Commercianti & Negozi"</strong> con flusso di moderazione/approvazione delle attività inserite dall'app, contatori in attesa, bottoni di approvazione rapida e integrazione Google Maps.
+                    Include il nuovo shortcode <code>[vp_negozi_mappa]</code> con supporto OpenStreetMap e Google Maps, schede responsive, ricerca live, filtri di categoria, più il modulo di moderazione e le notifiche email.
                   </p>
                 </div>
 
@@ -2236,7 +2906,7 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
                     className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-emerald-700/20 transition flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <Download className="w-4 h-4" />
-                    <span>Scarica ZIP (v1.5.0)</span>
+                    <span>Scarica ZIP (v1.6.0)</span>
                   </button>
                   <button
                     onClick={handleCopiaCodice}
@@ -2541,7 +3211,7 @@ export const WpPluginPanel: React.FC<WpPluginPanelProps> = ({
         {/* Footer */}
         <div className="bg-slate-100 px-6 py-3 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 shrink-0">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-700">Plugin WordPress VP Quartiere v1.5.0</span>
+            <span className="font-semibold text-slate-700">Plugin WordPress VP Quartiere v1.6.0</span>
             <span className="text-slate-300">•</span>
             <span>Associazione di Quartiere Villaggio Prenestino</span>
           </div>

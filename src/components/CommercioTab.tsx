@@ -1,5 +1,6 @@
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { geocodeAndValidateAddress } from '../utils/geocodingUtils';
-import React, { useState, useMemo, useEffect } from 'react';
+import { getShopOpeningStatus } from '../utils/openingHoursUtils';
 import { 
   AttivitaCommercio, 
   CategoriaCommercio, 
@@ -8,6 +9,8 @@ import {
 } from '../types';
 import { MappaQuartiere } from './MappaQuartiere';
 import { GestioneTitolareModal } from './GestioneTitolareModal';
+import { GraficoOrariSettimana } from './GraficoOrariSettimana';
+import { OrariEditorAvanzato } from './OrariEditorAvanzato';
 import { compressImage } from '../utils/imageCompressor';
 import { 
   Store, 
@@ -49,6 +52,7 @@ import {
 } from 'lucide-react';
 import { CommercioSkeletonGrid } from './SkeletonLoaders';
 import { BannerOffertaCommercio } from './BannerOffertaCommercio';
+import { ProgressiveImage } from './common/ProgressiveImage';
 
 interface CommercioTabProps {
   attivita: AttivitaCommercio[];
@@ -280,62 +284,20 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
     return () => clearTimeout(timer);
   }, [formData.indirizzo]);
 
-  // Stati per la selezione standardizzata degli orari di apertura
-  const [selectedDays, setSelectedDays] = useState<string[]>(['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab']);
-  const [orarioTipo, setOrarioTipo] = useState<'spezzato' | 'continuato' | 'h24'>('spezzato');
-  const [oraAperturaMattina, setOraAperturaMattina] = useState('08:30');
-  const [oraChiusuraMattina, setOraChiusuraMattina] = useState('13:00');
-  const [oraAperturaPomeriggio, setOraAperturaPomeriggio] = useState('16:00');
-  const [oraChiusuraPomeriggio, setOraChiusuraPomeriggio] = useState('20:00');
-  const [oraAperturaContinuato, setOraAperturaContinuato] = useState('08:30');
-  const [oraChiusuraContinuato, setOraChiusuraContinuato] = useState('19:30');
+  // Stato per gli orari strutturati e dettagliati giorno per giorno
+  const [regOrarioDettagliato, setRegOrarioDettagliato] = useState<{ [giornoKey: string]: string }>({});
 
-  // Sincronizzazione automatica degli orari standardizzati nel formData
-  useEffect(() => {
-    let giorniLabel = '';
-    if (selectedDays.length === 7) {
-      giorniLabel = 'Tutti i giorni';
-    } else if (
-      selectedDays.length === 6 &&
-      selectedDays.includes('Lun') &&
-      selectedDays.includes('Sab') &&
-      !selectedDays.includes('Dom')
-    ) {
-      giorniLabel = 'Lun-Sab';
-    } else if (
-      selectedDays.length === 5 &&
-      selectedDays.includes('Lun') &&
-      selectedDays.includes('Ven') &&
-      !selectedDays.includes('Sab') &&
-      !selectedDays.includes('Dom')
-    ) {
-      giorniLabel = 'Lun-Ven';
-    } else if (selectedDays.length === 0) {
-      giorniLabel = 'Chiuso';
-    } else {
-      giorniLabel = selectedDays.join(', ');
-    }
-
-    let orarioFormattato = '';
-    if (orarioTipo === 'h24') {
-      orarioFormattato = `${giorniLabel}: 24h/24`;
-    } else if (orarioTipo === 'continuato') {
-      orarioFormattato = `${giorniLabel}: ${oraAperturaContinuato}-${oraChiusuraContinuato}`;
-    } else {
-      orarioFormattato = `${giorniLabel}: ${oraAperturaMattina}-${oraChiusuraMattina} / ${oraAperturaPomeriggio}-${oraChiusuraPomeriggio}`;
-    }
-
-    setFormData((prev) => ({ ...prev, orari: orarioFormattato }));
-  }, [
-    selectedDays,
-    orarioTipo,
-    oraAperturaMattina,
-    oraChiusuraMattina,
-    oraAperturaPomeriggio,
-    oraChiusuraPomeriggio,
-    oraAperturaContinuato,
-    oraChiusuraContinuato,
-  ]);
+  const handleRegOrariChange = useCallback((result: { orariText: string; orarioDettagliato: { [key: string]: string } }) => {
+    setFormData((prev) => (prev.orari === result.orariText ? prev : { ...prev, orari: result.orariText }));
+    setRegOrarioDettagliato((prev) => {
+      const prevKeys = Object.keys(prev || {});
+      const nextKeys = Object.keys(result.orarioDettagliato || {});
+      if (prevKeys.length === nextKeys.length && prevKeys.every((k) => prev[k] === result.orarioDettagliato[k])) {
+        return prev;
+      }
+      return result.orarioDettagliato;
+    });
+  }, []);
 
   // Reset pagina al variare dei filtri di ricerca
   useEffect(() => {
@@ -357,8 +319,8 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
         if (onlyOffers && !shop.offertaAttiva) {
           return false;
         }
-        // Solo aperte ora
-        if (onlyOpen && !shop.apertoOra) {
+        // Solo aperte ora (calcolato dinamicamente sugli orari e giorni reali)
+        if (onlyOpen && !getShopOpeningStatus(shop).isOpen) {
           return false;
         }
         // Ricerca testuale
@@ -426,6 +388,7 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
       telefono: formData.telefono.trim() || '06 2244 0000',
       whatsapp: formData.whatsapp.replace(/\D/g, ''),
       orari: formData.orari.trim() || 'Lun-Sab 09:00 - 19:30',
+      orarioDettagliato: regOrarioDettagliato,
       apertoOra: true,
       verificato: false,
       recensioneVoto: 5.0,
@@ -478,14 +441,7 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
       nomeReferente: '',
       emailReferente: '',
     });
-    setSelectedDays(['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab']);
-    setOrarioTipo('spezzato');
-    setOraAperturaMattina('08:30');
-    setOraChiusuraMattina('13:00');
-    setOraAperturaPomeriggio('16:00');
-    setOraChiusuraPomeriggio('20:00');
-    setOraAperturaContinuato('08:30');
-    setOraChiusuraContinuato('19:30');
+    setRegOrarioDettagliato({});
   };
 
   const scrollToVetrina = () => {
@@ -659,29 +615,33 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                 )}
               </div>
 
-              {/* Toggles rapidi: Offerte attive & Aperto ora */}
-              <div className="flex items-center gap-2">
+              {/* Toggles rapidi: Offerte attive & Aperto ora (su mobile verticale: griglia a 2 colonne full-width allineata alle categorie) */}
+              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
                 <button
+                  type="button"
                   onClick={() => setOnlyOffers(!onlyOffers)}
-                  className={`px-3 py-2 rounded-2xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
+                  aria-pressed={onlyOffers}
+                  className={`w-full px-2.5 sm:px-3 py-2 sm:py-2.5 rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 min-h-[42px] border transition-all duration-150 cursor-pointer select-none ${
                     onlyOffers
-                      ? 'bg-teal-600 text-white dark:bg-teal-500 dark:text-slate-950 shadow-xs'
-                      : 'bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                      ? 'bg-teal-600 text-white dark:bg-teal-500 dark:text-slate-950 border-teal-600 dark:border-teal-400 shadow-xs'
+                      : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-750'
                   }`}
                 >
-                  <Percent className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>Con Offerte</span>
+                  <Percent className="w-3.5 h-3.5 stroke-[2.5] shrink-0" />
+                  <span className="truncate">Con Offerte</span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => setOnlyOpen(!onlyOpen)}
-                  className={`px-3 py-2 rounded-2xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
+                  aria-pressed={onlyOpen}
+                  className={`w-full px-2.5 sm:px-3 py-2 sm:py-2.5 rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 min-h-[42px] border transition-all duration-150 cursor-pointer select-none ${
                     onlyOpen
-                      ? 'bg-emerald-500 text-white shadow-xs'
-                      : 'bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                      ? 'bg-emerald-600 text-white dark:bg-emerald-500 dark:text-slate-950 border-emerald-600 dark:border-emerald-400 shadow-xs'
+                      : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-750'
                   }`}
                 >
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>Aperti Ora</span>
+                  <Clock className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">Aperti Ora</span>
                 </button>
               </div>
             </div>
@@ -842,6 +802,7 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                 const isTop3 = globalIndex < 3;
                 const hasVoted = votedAttivita.includes(shop.id);
                 const isExpanded = expandedShopIds.includes(shop.id);
+                const openStatus = getShopOpeningStatus(shop);
 
                 return (
                   <div
@@ -873,54 +834,76 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                         className="relative h-44 overflow-hidden bg-slate-100 dark:bg-slate-800 cursor-pointer group"
                         title="Clicca per aprire la scheda dettagliata sulla mappa"
                       >
-                        <img
+                        <ProgressiveImage
                           src={shop.immagine}
                           alt={shop.nome}
                           className="w-full h-full object-cover transition duration-300 group-hover:scale-105"
-                          loading="lazy"
+                          containerClassName="w-full h-full"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                        {/* Sfumatura leggera non invasiva che mantiene logo e foto nitidi e luminosi */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-black/15 pointer-events-none" />
 
                         {/* Badge Posizione Classifica "Mi piace" */}
-                        <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 pointer-events-none">
                           <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black shadow-md ${
                             isTop1
                               ? 'bg-amber-400 text-slate-950 border border-amber-300'
                               : isTop3
                               ? 'bg-amber-100 text-amber-950 border border-amber-300'
-                              : 'bg-black/60 backdrop-blur-xs text-white border border-white/20'
+                              : 'bg-black/75 backdrop-blur-xs text-white border border-white/20'
                           }`}>
                             <Award className="w-3.5 h-3.5" />
                             <span>#{globalIndex + 1} Più Consigliata</span>
                           </span>
                         </div>
 
-                        {/* Categoria chip */}
-                        <div className="absolute top-3 right-3">
-                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-white/90 text-slate-900 backdrop-blur-xs shadow-xs capitalize">
-                            {shop.categoria}
+                        {/* Stato apertura in tempo reale ad alta leggibilità */}
+                        <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 pointer-events-none">
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black shadow-md border backdrop-blur-md transition-all select-none ${
+                              openStatus.isOpen
+                                ? 'bg-emerald-600/95 text-white border-emerald-400/50 ring-1 ring-emerald-500/30'
+                                : openStatus.isPaused
+                                ? 'bg-amber-500 text-slate-950 border-amber-300 ring-1 ring-amber-400/40'
+                                : openStatus.isFerie
+                                ? 'bg-amber-600 text-white border-amber-400/50 ring-1 ring-amber-500/30'
+                                : 'bg-rose-600 text-white border-rose-400/60 ring-2 ring-rose-500/40 shadow-rose-950/40'
+                            }`}
+                          >
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                openStatus.isOpen
+                                  ? 'bg-emerald-200 animate-pulse'
+                                  : openStatus.isPaused
+                                  ? 'bg-slate-950'
+                                  : openStatus.isFerie
+                                  ? 'bg-amber-200'
+                                  : 'bg-white'
+                              }`}
+                            />
+                            <span className="tracking-tight">{openStatus.statusText}</span>
                           </span>
                         </div>
 
-                        {/* Titolo e indirizzo sovrapposti all'immagine */}
-                        <div className="absolute bottom-3 left-3 right-3 text-white">
-                          <div className="flex items-center gap-1.5 mb-0.5">
-                            <h4 className="font-black text-base leading-tight drop-shadow-md text-white line-clamp-1 group-hover:underline">
+                        {/* Targhetta Titolo e Indirizzo in vetro satinato ad alto contrasto protetto */}
+                        <div className="absolute bottom-2 left-2 right-2 p-2 sm:p-2.5 rounded-2xl bg-black/60 dark:bg-black/75 backdrop-blur-md border border-white/20 text-white pointer-events-none shadow-lg transition-colors group-hover:bg-black/70">
+                          <div className="flex items-center justify-between gap-1.5 mb-0.5">
+                            <h4 className="font-black text-sm sm:text-base leading-tight text-white drop-shadow-sm line-clamp-1 group-hover:underline">
                               {shop.nome}
                             </h4>
                             {shop.verificato ? (
-                              <span title="Verificato dall'Associazione">
+                              <span title="Verificato dall'Associazione" className="shrink-0">
                                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                               </span>
                             ) : shop.statoApprovazione === 'in_attesa' ? (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-slate-950 flex items-center gap-1 shrink-0" title="In attesa di approvazione moderatore WordPress">
-                                <Clock className="w-3 h-3 text-slate-950" />
+                              <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-amber-400 text-slate-950 flex items-center gap-0.5 shrink-0" title="In attesa di approvazione">
+                                <Clock className="w-2.5 h-2.5 text-slate-950" />
                                 <span>In attesa</span>
                               </span>
                             ) : null}
                           </div>
-                          <p className="text-[11px] text-slate-200 flex items-center gap-1 drop-shadow-xs truncate">
-                            <MapPin className="w-3 h-3 text-amber-400 shrink-0" />
+                          <p className="text-[11px] sm:text-xs font-semibold text-slate-200 flex items-center gap-1 drop-shadow-xs truncate">
+                            <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                             <span>{shop.indirizzo}</span>
                           </p>
                         </div>
@@ -934,13 +917,18 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                             type="button"
                             onClick={() => {
                               if (hasVoted) return;
+                              try {
+                                if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                                  navigator.vibrate([35]);
+                                }
+                              } catch {}
                               onVoteAttivita(shop);
                             }}
                             disabled={hasVoted}
-                            className={`w-full py-2.5 px-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer ${
+                            className={`w-full py-2.5 px-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition-all duration-150 select-none shadow-xs cursor-pointer ${
                               hasVoted
                                 ? 'bg-amber-100/90 text-amber-900 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-300/80 dark:border-amber-700/60 cursor-default animate-heartbeat'
-                                : 'bg-[#781816] hover:bg-[#5a1210] active:scale-[0.98] text-white hover:shadow-md'
+                                : 'bg-[#781816] hover:bg-[#5a1210] active:scale-90 text-white hover:shadow-md'
                             }`}
                             title={hasVoted ? 'Hai già consigliato questa attività (+2 Punti Civici registrati)' : 'Esprimi Mi piace per consigliare questa attività ai vicini (+2 Punti Civici)'}
                           >
@@ -998,23 +986,16 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                                 </div>
                               )}
 
-                              {/* Dettagli orari e telefono */}
-                              <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-300 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/60">
-                                <div className="flex items-center justify-between">
-                                  <span className="flex items-center gap-1.5 text-slate-500">
-                                    <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                    <span>{shop.orari}</span>
-                                  </span>
-                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                    Aperto
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                  <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                  <a href={`tel:${shop.telefono}`} className="hover:text-slate-900 dark:hover:text-white underline font-semibold">
-                                    {shop.telefono}
-                                  </a>
+                              {/* Presentazione grafica intuitiva di orari e giorni della settimana */}
+                              <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/60 space-y-2">
+                                <GraficoOrariSettimana shop={shop} darkMode={darkMode} />
+                                <div className="pt-1.5 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between text-xs">
+                                  <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
+                                    <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                    <a href={`tel:${shop.telefono}`} className="hover:text-slate-900 dark:hover:text-white underline font-semibold">
+                                      {shop.telefono}
+                                    </a>
+                                  </div>
                                 </div>
                               </div>
 
@@ -1396,228 +1377,16 @@ export const CommercioTab: React.FC<CommercioTabProps> = ({
                   />
                 </div>
 
-                {/* SELETTORE STANDARDIZZATO ORARI DI APERTURA (NESSUN TESTO DA SCRIVERE) */}
-                <div className="space-y-3 p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700">
-                  <div className="flex items-center justify-between">
-                    <label className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 text-xs">
-                      <Clock className="w-4 h-4 text-amber-600" />
-                      <span>Orari di Apertura (Seleziona Giorni e Orari) *</span>
-                    </label>
-                    <span className="text-[10px] text-amber-700 dark:text-amber-300 font-bold bg-amber-100 dark:bg-amber-950/70 px-2 py-0.5 rounded-full border border-amber-300 dark:border-amber-800">
-                      Standardizzato
-                    </span>
-                  </div>
-
-                  {/* 1. Selezione Giorni con Preset e Bottoni */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-semibold text-slate-700 dark:text-slate-300">1. Giorni di Apertura:</span>
-                      {/* Preset rapidi */}
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedDays(['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'])}
-                          className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition cursor-pointer ${
-                            selectedDays.length === 6 && !selectedDays.includes('Dom')
-                              ? 'bg-[#781816] text-white border-[#781816]'
-                              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'
-                          }`}
-                        >
-                          Lun-Sab
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedDays(['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'])}
-                          className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition cursor-pointer ${
-                            selectedDays.length === 7
-                              ? 'bg-[#781816] text-white border-[#781816]'
-                              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'
-                          }`}
-                        >
-                          Tutti i giorni
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedDays(['Lun', 'Mar', 'Mer', 'Gio', 'Ven'])}
-                          className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition cursor-pointer ${
-                            selectedDays.length === 5 && !selectedDays.includes('Sab') && !selectedDays.includes('Dom')
-                              ? 'bg-[#781816] text-white border-[#781816]'
-                              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'
-                          }`}
-                        >
-                          Lun-Ven
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Chips singoli giorni cliccabili */}
-                    <div className="grid grid-cols-7 gap-1">
-                      {GIORNI_SETTIMANA.map((giorno) => {
-                        const isDaySelected = selectedDays.includes(giorno);
-                        return (
-                          <button
-                            key={giorno}
-                            type="button"
-                            onClick={() => {
-                              if (isDaySelected) {
-                                setSelectedDays(selectedDays.filter((d) => d !== giorno));
-                              } else {
-                                setSelectedDays([...selectedDays, giorno]);
-                              }
-                            }}
-                            className={`py-1.5 text-center text-xs font-bold rounded-xl border transition cursor-pointer ${
-                              isDaySelected
-                                ? 'bg-amber-400 text-slate-950 border-amber-500 shadow-xs'
-                                : 'bg-white dark:bg-slate-900 text-slate-500 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
-                            }`}
-                          >
-                            {giorno}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* 2. Tipo di Orario */}
-                  <div className="space-y-1.5">
-                    <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 block">
-                      2. Modalità Orario:
-                    </span>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setOrarioTipo('spezzato')}
-                        className={`py-1.5 px-2 rounded-xl text-xs font-bold border text-center transition cursor-pointer ${
-                          orarioTipo === 'spezzato'
-                            ? 'bg-amber-500 text-slate-950 border-amber-600 shadow-xs'
-                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                        }`}
-                      >
-                        Pausa Pranzo
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setOrarioTipo('continuato')}
-                        className={`py-1.5 px-2 rounded-xl text-xs font-bold border text-center transition cursor-pointer ${
-                          orarioTipo === 'continuato'
-                            ? 'bg-amber-500 text-slate-950 border-amber-600 shadow-xs'
-                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                        }`}
-                      >
-                        Continuato
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setOrarioTipo('h24')}
-                        className={`py-1.5 px-2 rounded-xl text-xs font-bold border text-center transition cursor-pointer ${
-                          orarioTipo === 'h24'
-                            ? 'bg-amber-500 text-slate-950 border-amber-600 shadow-xs'
-                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                        }`}
-                      >
-                        H24 (24h/24)
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* 3. Selettori Fasce Orarie (Dropdown a tendina senza digitazione) */}
-                  {orarioTipo === 'spezzato' && (
-                    <div className="space-y-2 pt-1 border-t border-slate-200 dark:border-slate-700/80">
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-slate-500 block">Mattina: Apertura</label>
-                          <select
-                            value={oraAperturaMattina}
-                            onChange={(e) => setOraAperturaMattina(e.target.value)}
-                            className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white"
-                          >
-                            {TIME_SLOTS.map((t) => (
-                              <option key={`am-in-${t}`} value={t}>{t}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-slate-500 block">Mattina: Chiusura</label>
-                          <select
-                            value={oraChiusuraMattina}
-                            onChange={(e) => setOraChiusuraMattina(e.target.value)}
-                            className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white"
-                          >
-                            {TIME_SLOTS.map((t) => (
-                              <option key={`am-out-${t}`} value={t}>{t}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-slate-500 block">Pomeriggio: Riapertura</label>
-                          <select
-                            value={oraAperturaPomeriggio}
-                            onChange={(e) => setOraAperturaPomeriggio(e.target.value)}
-                            className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white"
-                          >
-                            {TIME_SLOTS.map((t) => (
-                              <option key={`pm-in-${t}`} value={t}>{t}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-slate-500 block">Sera: Chiusura</label>
-                          <select
-                            value={oraChiusuraPomeriggio}
-                            onChange={(e) => setOraChiusuraPomeriggio(e.target.value)}
-                            className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white"
-                          >
-                            {TIME_SLOTS.map((t) => (
-                              <option key={`pm-out-${t}`} value={t}>{t}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {orarioTipo === 'continuato' && (
-                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200 dark:border-slate-700/80">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 block">Apertura</label>
-                        <select
-                          value={oraAperturaContinuato}
-                          onChange={(e) => setOraAperturaContinuato(e.target.value)}
-                          className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white"
-                        >
-                          {TIME_SLOTS.map((t) => (
-                            <option key={`cont-in-${t}`} value={t}>{t}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 block">Chiusura</label>
-                        <select
-                          value={oraChiusuraContinuato}
-                          onChange={(e) => setOraChiusuraContinuato(e.target.value)}
-                          className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white"
-                        >
-                          {TIME_SLOTS.map((t) => (
-                            <option key={`cont-out-${t}`} value={t}>{t}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Risultato orario generato */}
-                  <div className="flex items-center justify-between p-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 text-[11px]">
-                    <span className="font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-amber-600" />
-                      <span>Orario inserito:</span>
-                    </span>
-                    <span className="font-black text-amber-950 dark:text-amber-100 bg-white dark:bg-slate-900 px-2 py-0.5 rounded-lg border border-amber-300 dark:border-amber-700">
-                      {formData.orari || 'Non specificato'}
-                    </span>
-                  </div>
+                {/* SELETTORE AVANZATO ORARI DI APERTURA & ECCEZIONI GIORNALIERE */}
+                <div className="space-y-1">
+                  <OrariEditorAvanzato
+                    key="reg-orari-editor"
+                    initialOrari={formData.orari}
+                    initialOrarioDettagliato={regOrarioDettagliato}
+                    onChange={handleRegOrariChange}
+                    darkMode={darkMode}
+                    showPreview={true}
+                  />
                 </div>
 
                 <div className="space-y-1">

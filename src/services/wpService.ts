@@ -66,6 +66,7 @@ export function getUserInteractions(): UserInteractions {
         puntiCivici: punti,
         mieProposte: Array.isArray(parsed.mieProposte) ? parsed.mieProposte.filter((id: number) => id !== 1 || !noActionsYet) : [],
         mieSegnalazioni: Array.isArray(parsed.mieSegnalazioni) ? parsed.mieSegnalazioni.filter((id: number) => id !== 1 || !noActionsYet) : [],
+        segnalazioniVotate: Array.isArray(parsed.segnalazioniVotate) ? parsed.segnalazioniVotate : [],
         mieAttivita: Array.isArray(parsed.mieAttivita) ? parsed.mieAttivita : [],
         negoziVotati: Array.isArray(parsed.negoziVotati) ? parsed.negoziVotati : [],
         notificheAbilitate: parsed.notificheAbilitate !== undefined ? parsed.notificheAbilitate : true,
@@ -78,6 +79,7 @@ export function getUserInteractions(): UserInteractions {
     eventiPartecipati: [],
     richiesteAderite: [],
     proposteVotate: [],
+    segnalazioniVotate: [],
     negoziVotati: [],
     puntiCivici: 0, // Al lancio l'app parte da 0 punti e la classifica si riempie con l'uso reale
     token: getOrCreateToken(),
@@ -293,27 +295,45 @@ export async function fetchAllData(): Promise<{
               const dNum = String(parseInt(ev.d || '1', 10)).padStart(2, '0');
               const iso = ev.dataCompleta || `${y}-${mNum}-${dNum}`;
               const isPassato = Boolean(ev.passato || (iso && iso < today));
+              const poster = ev.featured_media_url || ev.immagine_in_evidenza || ev.locandina || ev.locandina_url || ev.img || '';
               return {
                 ...ev,
                 anno: y,
                 dataCompleta: iso,
                 passato: isPassato,
+                locandina: poster,
+                featured_media_url: poster,
+                immagine_in_evidenza: poster,
               };
             });
           }
           if (Array.isArray(json.richieste)) {
-            liveRichieste = json.richieste.map((r: any) => ({
-              ...r,
-              data: r.data || '',
-              ora: r.ora || '',
-              data_ora: r.data_ora || (r.data ? `${r.data}${r.ora ? ` • ore ${r.ora}` : ''}` : (r.ora ? `Ore ${r.ora}` : '')),
-            }));
+            liveRichieste = json.richieste.map((r: any) => {
+              const poster = r.featured_media_url || r.immagine_in_evidenza || r.locandina || r.locandina_url || r.img || r.foto || r.immagine || r.locandina_r || '';
+              return {
+                ...r,
+                data: r.data || '',
+                ora: r.ora || '',
+                data_ora: r.data_ora || (r.data ? `${r.data}${r.ora ? ` • ore ${r.ora}` : ''}` : (r.ora ? `Ore ${r.ora}` : '')),
+                locandina: poster,
+                featured_media_url: poster,
+                immagine_in_evidenza: poster,
+              };
+            });
           }
           if (Array.isArray(json.segnalazioni)) {
             liveSegnalazioni = json.segnalazioni;
           }
           if (Array.isArray(json.proposte)) {
-            liveProposte = json.proposte;
+            liveProposte = json.proposte.map((p: any) => {
+              const poster = p.featured_media_url || p.immagine_in_evidenza || p.locandina || p.locandina_url || p.img || '';
+              return {
+                ...p,
+                locandina: poster,
+                featured_media_url: poster,
+                immagine_in_evidenza: poster,
+              };
+            });
           }
           if (Array.isArray(json.commercio)) {
             liveCommercio = json.commercio;
@@ -452,7 +472,7 @@ export function cleanExcerpt(html: string): string {
  * Registra o annulla interazione (Adesione evento, Volontariato "Ci sono", Like proposta)
  */
 export async function submitInteraction(params: {
-  tipo: 'evento_vengo' | 'cisono' | 'proposta_vota' | 'negozio_vota';
+  tipo: 'evento_vengo' | 'cisono' | 'proposta_vota' | 'negozio_vota' | 'segnalazione_vota';
   postId: number;
   nome?: string;
   telefono?: string;
@@ -497,6 +517,16 @@ export async function submitInteraction(params: {
     }
   } else if (params.tipo === 'negozio_vota') {
     countResult = 1;
+  } else if (params.tipo === 'segnalazione_vota') {
+    const s = store.segnalazioni.find((seg) => seg.id === params.postId);
+    if (s) {
+      if (params.annulla) {
+        s.voti = Math.max(0, (s.voti || 0) - 1);
+      } else {
+        s.voti = (s.voti || 0) + 1;
+      }
+      countResult = s.voti;
+    }
   }
   saveLocalDataStore(store);
 
@@ -712,6 +742,7 @@ export async function submitAttivitaCommercio(data: NuovaAttivitaForm & {
           telefono: data.telefono,
           whatsapp: data.whatsapp,
           orari: data.orari,
+          orario_dettagliato: data.orarioDettagliato || {},
           descrizione: data.descrizione,
           offerta_titolo: data.offertaTitolo,
           offerta_dettaglio: data.offertaDettaglio,
@@ -767,10 +798,14 @@ export async function adminCreateEvento(
 ): Promise<EventoQuartiere> {
   const store = getLocalDataStore();
   const newId = Date.now();
+  const poster = eventoData.featured_media_url || eventoData.immagine_in_evidenza || eventoData.locandina || '';
   const nuovoEvento: EventoQuartiere = {
     ...eventoData,
     id: newId,
     n: 0,
+    locandina: poster,
+    featured_media_url: poster,
+    immagine_in_evidenza: poster,
   };
   store.eventi.unshift(nuovoEvento);
   saveLocalDataStore(store);
@@ -910,10 +945,14 @@ export async function adminCreateRichiesta(
 ): Promise<RichiestaVolontariato> {
   const store = getLocalDataStore();
   const newId = Date.now();
+  const poster = richiestaData.featured_media_url || richiestaData.immagine_in_evidenza || richiestaData.locandina || '';
   const nuovaRichiesta: RichiestaVolontariato = {
     ...richiestaData,
     id: newId,
     have: 0,
+    locandina: poster,
+    featured_media_url: poster,
+    immagine_in_evidenza: poster,
   };
   store.richieste.unshift(nuovaRichiesta);
   saveLocalDataStore(store);

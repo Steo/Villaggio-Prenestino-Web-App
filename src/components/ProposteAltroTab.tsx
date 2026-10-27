@@ -14,6 +14,7 @@ import {
   TrendingUp,
   Sparkles,
   BellRing,
+  Image,
 } from 'lucide-react';
 
 interface ProposteAltroTabProps {
@@ -23,6 +24,7 @@ interface ProposteAltroTabProps {
   onVoteProposta: (proposta: PropostaCittadina) => void;
   onSubmitProposta: (titolo: string) => Promise<void>;
   onSimulateVoteForProposal?: (id: number) => void;
+  onOpenPhoto?: (url: string) => void;
 }
 
 export const ProposteAltroTab: React.FC<ProposteAltroTabProps> = ({
@@ -32,6 +34,7 @@ export const ProposteAltroTab: React.FC<ProposteAltroTabProps> = ({
   onVoteProposta,
   onSubmitProposta,
   onSimulateVoteForProposal,
+  onOpenPhoto,
 }) => {
   const [nuovaIdea, setNuovaIdea] = useState('');
   const [loading, setLoading] = useState(false);
@@ -231,57 +234,64 @@ export const ProposteAltroTab: React.FC<ProposteAltroTabProps> = ({
             const hasVoted = votedProposte.includes(p.id);
             // Posizione in classifica generale
             const rank = sortedProposte.findIndex((item) => item.id === p.id) + 1;
+            const posterUrl = p.featured_media_url || p.immagine_in_evidenza || p.locandina;
 
             return (
               <div
                 key={p.id}
-                className="p-3.5 rounded-xl border border-slate-200 bg-white transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-slate-300 shadow-2xs"
+                className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-slate-300 dark:hover:border-slate-700 shadow-2xs"
               >
-                <div className="min-w-0 flex-1 space-y-1">
+                <div className="min-w-0 flex-1 space-y-1.5">
                   <div className="flex items-center gap-2 flex-wrap">
                     {/* Badge Posizione Classifica */}
                     <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
+                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[11px] font-black uppercase tracking-wider ${
                         rank === 1
-                          ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                          ? 'bg-amber-100 dark:bg-amber-950/70 text-amber-950 dark:text-amber-200 border border-amber-300 dark:border-amber-700'
                           : rank === 2
-                          ? 'bg-slate-100 text-slate-800 border border-slate-300'
+                          ? 'bg-slate-150 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700'
                           : rank === 3
-                          ? 'bg-orange-100 text-orange-900 border border-orange-300'
-                          : 'bg-slate-50 text-slate-600 border border-slate-200'
+                          ? 'bg-orange-100 dark:bg-orange-950/70 text-orange-950 dark:text-orange-200 border border-orange-300 dark:border-orange-700'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
                       }`}
                     >
-                      {rank === 1 && <Trophy className="w-3 h-3 text-amber-600" />}
+                      {rank === 1 && <Trophy className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />}
                       #{rank} {rank === 1 ? 'Più votata' : 'Classifica'}
                     </span>
 
                     {mieProposte.includes(p.id) && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-300">
-                        <Sparkles className="w-3 h-3 text-rose-600" />
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[11px] font-black uppercase tracking-wider bg-rose-100 dark:bg-rose-950/70 text-rose-900 dark:text-rose-200 border border-rose-300 dark:border-rose-800">
+                        <Sparkles className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
                         La tua proposta
                       </span>
                     )}
 
                     {p.statoApprovazione === 'in_attesa' && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[11px] font-bold uppercase tracking-wider bg-amber-100 dark:bg-amber-950/70 text-amber-950 dark:text-amber-200 border border-amber-300 dark:border-amber-800">
                         ⏳ In attesa di approvazione
                       </span>
                     )}
 
                     {p.statoApprovazione === 'rifiutata' && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-300">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[11px] font-bold uppercase tracking-wider bg-rose-100 dark:bg-rose-950/70 text-rose-900 dark:text-rose-200 border border-rose-300 dark:border-rose-800">
                         ❌ Non approvata
                       </span>
                     )}
 
-                    <span className="text-[11px] text-slate-500 font-semibold inline-block">
-                      <strong className="text-slate-900 font-bold">{p.v}</strong> {p.v === 1 ? 'cittadino d\'accordo' : 'cittadini d\'accordo'}
+                    <span className="text-xs text-slate-600 dark:text-slate-300 font-semibold inline-block">
+                      <strong className="text-slate-950 dark:text-white font-bold">{p.v}</strong> {p.v === 1 ? 'cittadino d\'accordo' : 'cittadini d\'accordo'}
                     </span>
                   </div>
 
-                  <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
+                  <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-snug">
                     {p.t}
                   </h4>
+
+                  {p.desc && (
+                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed pt-0.5">
+                      {p.desc}
+                    </p>
+                  )}
 
                   {p.statoApprovazione === 'rifiutata' && p.motivazioneRifiuto && (
                     <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 text-xs mt-1 italic">
@@ -305,16 +315,39 @@ export const ProposteAltroTab: React.FC<ProposteAltroTabProps> = ({
                   )}
                 </div>
 
-                {/* Pulsante Mi Piace (Il contatore si ferma al primo click) */}
-                <div className="shrink-0 flex items-center justify-between sm:justify-end gap-2 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                {/* Azioni: Tasto Apri locandina (se presente) e Pulsante Mi Piace */}
+                <div className="shrink-0 flex items-center justify-between sm:justify-end gap-2 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
+                  {posterUrl && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenPhoto?.(posterUrl);
+                      }}
+                      className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 dark:hover:bg-amber-900/60 active:bg-amber-200 border border-amber-200 dark:border-amber-800/80 shadow-2xs transition flex items-center gap-1.5 cursor-pointer shrink-0"
+                      title="Apri e visualizza la locandina a tutto schermo"
+                      aria-label="Apri locandina della proposta"
+                    >
+                      <Image className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 stroke-[2.3]" />
+                      <span>Apri locandina</span>
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     disabled={hasVoted}
-                    onClick={() => onVoteProposta(p)}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 ${
+                    onClick={() => {
+                      try {
+                        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                          navigator.vibrate([35]);
+                        }
+                      } catch {}
+                      onVoteProposta(p);
+                    }}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all duration-150 select-none flex items-center gap-1.5 shrink-0 ${
                       hasVoted
-                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 cursor-default opacity-95 shadow-2xs animate-heartbeat'
-                        : 'bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 cursor-pointer shadow-2xs'
+                        ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 cursor-default opacity-95 shadow-2xs animate-heartbeat'
+                        : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-90 text-slate-700 dark:text-slate-200 cursor-pointer shadow-2xs hover:shadow-xs'
                     }`}
                     title={
                       hasVoted
@@ -324,12 +357,12 @@ export const ProposteAltroTab: React.FC<ProposteAltroTabProps> = ({
                   >
                     {hasVoted ? (
                       <>
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 transition-transform scale-110" />
                         <span>Votato ✓</span>
                       </>
                     ) : (
                       <>
-                        <ThumbsUp className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                        <ThumbsUp className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400 shrink-0 transition-transform group-hover:scale-110" />
                         <span>Mi piace</span>
                       </>
                     )}

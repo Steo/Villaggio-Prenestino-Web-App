@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan for UX refinements: micro-animations, confetti on voting/submitting, haptic feedback simulation, and smooth state transitions.",
-  "updatedAt": "2026-10-19T19:40:34.841231046Z",
-  "requestFeedback": true,
-  "userFacing": true
+  "summary":  "Piano d'integrazione per la gestione dei 'Custodi dei Parchi', con rimozione totale di ogni riferimento allo svuotamento dei cestini. L'attività è incentrata unicamente sull'apertura al Mattino e sulla chiusura alla Sera, con gestione dinamica dei parchi da pannello admin e attivazione su carenza volontari.",
+  "updatedAt":  "2026-10-26T20:03:11.128725138Z",
+  "requestFeedback":  true,
+  "userFacing":  true
 }

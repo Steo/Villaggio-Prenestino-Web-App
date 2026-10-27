@@ -25,6 +25,9 @@ export interface EventoQuartiere {
   tipo?: TipoEvento;   // 'volontariato' | 'pagamento' | 'gratuito' (default: 'volontariato')
   passato?: boolean;   // true se evento terminato/passato
   quota?: string;      // eventuale quota per eventi a pagamento (es. "15€")
+  locandina?: string;  // URL locandina/manifesto ad alta risoluzione (da Libreria Media WordPress)
+  featured_media_url?: string; // URL restituito dalle REST API di WordPress
+  immagine_in_evidenza?: string;
   lat?: number;        // Coordinate georeferenziate per Google Maps
   lng?: number;
 }
@@ -73,6 +76,8 @@ export interface AttivitaCommercio {
   nomeReferente?: string;
   emailReferente?: string;
   pinGestione?: string; // Codice PIN univoco (es. 4 cifre) per la modifica dei dati da parte del titolare senza registrazione
+  chiusoPerFerieFinoA?: string; // Data riapertura post ferie (es. "2026-08-25")
+  chiusuraStraordinaria?: boolean; // Se forzato chiuso temporaneamente dal titolare
 }
 
 export interface NuovaAttivitaForm {
@@ -82,6 +87,7 @@ export interface NuovaAttivitaForm {
   telefono: string;
   whatsapp: string;
   orari: string;
+  orarioDettagliato?: { [giorno: string]: string };
   descrizione: string;
   offertaTitolo: string;
   offertaDettaglio: string;
@@ -103,6 +109,9 @@ export interface RichiestaVolontariato {
   data?: string;       // Data dell'attività (es. "Sabato 24 Maggio" o "24/05/2026")
   ora?: string;        // Orario dell'attività (es. "09:30" o "09:30 - 12:30")
   data_ora?: string;   // Riferimento testuale combinato data e orario (da WordPress)
+  locandina?: string;  // URL locandina o immagine allegata (da Libreria Media WordPress)
+  featured_media_url?: string; // URL restituito dalle REST API di WordPress
+  immagine_in_evidenza?: string;
 }
 
 export type StatoSegnalazione = 1 | 2 | 3; // 1: Ricevuta, 2: Inoltrata all'ente preposto, 3: Risolta
@@ -119,6 +128,7 @@ export interface SegnalazioneCittadina {
   cittadinoTel?: string;
   statoApprovazione?: 'in_attesa' | 'approvata' | 'rifiutata';
   motivazioneRifiuto?: string;
+  voti?: number;       // Numero di cittadini che confermano o supportano la segnalazione
 }
 
 export interface PropostaCittadina {
@@ -130,6 +140,9 @@ export interface PropostaCittadina {
   cittadinoNome?: string;
   statoApprovazione?: 'in_attesa' | 'approvata' | 'rifiutata';
   motivazioneRifiuto?: string;
+  locandina?: string;  // URL locandina o immagine in evidenza (da WordPress)
+  featured_media_url?: string; // URL restituito dalle REST API di WordPress
+  immagine_in_evidenza?: string;
 }
 
 export interface CandidaturaVolontario {
@@ -141,7 +154,7 @@ export interface CandidaturaVolontario {
 
 export interface AppNotification {
   id: string;
-  tipo: 'proposta_voti' | 'segnalazione_stato' | 'sistema';
+  tipo: 'proposta_voti' | 'segnalazione_stato' | 'commercio_approvato' | 'sistema';
   titolo: string;
   messaggio: string;
   timestamp: number;
@@ -154,6 +167,7 @@ export interface UserInteractions {
   eventiPartecipati: number[];   // IDs degli eventi a cui ha aderito
   richiesteAderite: number[];    // IDs delle richieste a cui ha fatto "Ci sono"
   proposteVotate: number[];      // IDs delle proposte a cui ha messo like
+  segnalazioniVotate?: number[]; // IDs delle segnalazioni a cui ha dato conferma/voto
   negoziVotati?: number[];       // IDs dei commercianti/attività a cui ha messo like
   puntiCivici: number;           // Gamification punti
   token: string;                 // Token anonimo univoco per-device

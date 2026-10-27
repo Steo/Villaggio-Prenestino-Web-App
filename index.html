@@ -23,6 +23,25 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script>
+      // Disregistra i service worker e pulisce la cache in ambiente di sviluppo/preview per prevenire errori di chunk stale
+      if (window.location.hostname.includes('ais-dev-') || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(regs) {
+            for (var i = 0; i < regs.length; i++) {
+              regs[i].unregister();
+            }
+          });
+        }
+        if ('caches' in window) {
+          caches.keys().then(function(keys) {
+            for (var j = 0; j < keys.length; j++) {
+              caches.delete(keys[j]);
+            }
+          });
+        }
+      }
+    </script>
+    <script>
       /* Self-healing loader per hosting Apache/cPanel:
          Se i file compilati vengono estratti senza la cartella 'assets' (es. estratti piatti in /app/),
          oppure viceversa, intercetta il 404 e carica automaticamente il file dalla posizione corretta. */

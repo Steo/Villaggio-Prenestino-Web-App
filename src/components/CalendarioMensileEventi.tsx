@@ -16,8 +16,11 @@ import {
   CalendarCheck,
   Tag,
   ExternalLink,
+  Image,
+  CalendarPlus,
 } from 'lucide-react';
 import { EventDescription } from './EventDescription';
+import { getGoogleCalendarUrl } from '../utils/calendarUtils';
 
 interface CalendarioMensileEventiProps {
   eventi: EventoQuartiere[];
@@ -25,6 +28,7 @@ interface CalendarioMensileEventiProps {
   onRequestJoinEvento: (evento: EventoQuartiere) => void;
   onShareEvento: (evento: EventoQuartiere) => void;
   renderTipoTag: (tipo?: TipoEvento, passato?: boolean, quota?: string) => React.ReactNode;
+  onOpenPhoto?: (url: string) => void;
 }
 
 const NOMI_MESI = [
@@ -99,6 +103,7 @@ export const CalendarioMensileEventi: React.FC<CalendarioMensileEventiProps> = (
   onRequestJoinEvento,
   onShareEvento,
   renderTipoTag,
+  onOpenPhoto,
 }) => {
   // Data odierna di riferimento (Ottobre 2026)
   const today = useMemo(() => new Date(2026, 9, 12), []);
@@ -608,6 +613,7 @@ export const CalendarioMensileEventi: React.FC<CalendarioMensileEventiProps> = (
             {eventiSelezionati.map((ev) => {
               const isAttending = interactions.eventiPartecipati.includes(ev.id);
               const isPagamento = ev.tipo === 'pagamento';
+              const posterUrl = ev.featured_media_url || ev.immagine_in_evidenza || ev.locandina;
 
               return (
                 <div
@@ -677,8 +683,8 @@ export const CalendarioMensileEventi: React.FC<CalendarioMensileEventiProps> = (
                     {/* Barra inferiore con partecipanti e bottoni azione */}
                     {!ev.passato && (
                       <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2.5">
-                        {/* Prima riga: contatore e tasto secondario Condividi */}
-                        <div className="flex items-center justify-between gap-2">
+                        {/* Prima riga: contatore e tasti secondari (Vedi Locandina, Condividi) */}
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
                           <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
                             <Users className="w-4 h-4 text-amber-600 shrink-0" />
                             <span>
@@ -686,40 +692,92 @@ export const CalendarioMensileEventi: React.FC<CalendarioMensileEventiProps> = (
                             </span>
                           </span>
 
+                          {posterUrl && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenPhoto?.(posterUrl);
+                              }}
+                              className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 dark:hover:bg-amber-900/60 active:bg-amber-200 border border-amber-200 dark:border-amber-800/80 shadow-2xs transition flex items-center gap-1.5 cursor-pointer shrink-0"
+                              title="Apri e visualizza la locandina a tutto schermo"
+                              aria-label="Apri locandina dell'evento"
+                            >
+                              <Image className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 stroke-[2.3]" />
+                              <span>Apri locandina</span>
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Seconda riga: AZIONE PRINCIPALE - Tasto Iscriviti con Tasto Condividi alla sua destra (solo icona) */}
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => onRequestJoinEvento(ev)}
+                            className={`flex-1 min-h-[42px] sm:min-h-[44px] py-2.5 px-4 rounded-xl text-xs sm:text-sm font-black transition flex items-center justify-center gap-2 cursor-pointer shadow-xs hover:shadow-sm active:scale-[0.99] ${
+                              isAttending
+                                ? 'bg-amber-100 text-amber-950 border border-amber-300 hover:bg-amber-200 dark:bg-amber-950/80 dark:text-amber-200 dark:border-amber-700'
+                                : 'bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 shadow-md'
+                            }`}
+                          >
+                            {isAttending ? (
+                              <>
+                                <CheckCircle2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
+                                <span>{isPagamento ? "Iscritto all'evento ✓ (Tocca per annullare)" : "Ci sarai ✓ (Tocca per annullare)"}</span>
+                              </>
+                            ) : (
+                              <>
+                                <PlusCircle className="w-4 h-4" />
+                                <span>{isPagamento ? "Iscriviti all'evento" : "Iscriviti / Ci sarò (+5 pts civici)"}</span>
+                              </>
+                            )}
+                          </button>
+
+                          <a
+                            href={getGoogleCalendarUrl(ev)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Aggiungi al tuo calendario Google Calendar"
+                            aria-label="Aggiungi al tuo calendario"
+                            className="w-[42px] h-[42px] sm:w-[44px] sm:h-[44px] rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 text-white shadow-xs hover:shadow transition flex items-center justify-center cursor-pointer shrink-0"
+                          >
+                            <CalendarPlus className="w-4 h-4 text-white stroke-[2.3]" />
+                          </a>
+
                           <button
                             type="button"
                             onClick={() => onShareEvento(ev)}
-                            className="px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 active:bg-emerald-200 border border-emerald-200 dark:border-emerald-800 shadow-2xs transition flex items-center gap-1.5 cursor-pointer shrink-0"
                             title="Condividi evento su WhatsApp o altre app"
-                            aria-label="Condividi evento"
+                            aria-label="Condividi evento su WhatsApp o altre app"
+                            className="w-[42px] h-[42px] sm:w-[44px] sm:h-[44px] rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white shadow-xs hover:shadow transition flex items-center justify-center cursor-pointer shrink-0"
                           >
-                            <Share2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 stroke-[2.3]" />
-                            <span>Condividi</span>
+                            <Share2 className="w-4 h-4 text-white stroke-[2.3]" />
                           </button>
                         </div>
+                      </div>
+                    )}
 
-                        {/* Seconda riga: AZIONE PRINCIPALE - Tasto Iscriviti a tutta larghezza */}
-                        <button
-                          type="button"
-                          onClick={() => onRequestJoinEvento(ev)}
-                          className={`w-full py-2.5 px-4 rounded-xl text-xs sm:text-sm font-black transition flex items-center justify-center gap-2 cursor-pointer shadow-xs hover:shadow-sm active:scale-[0.99] ${
-                            isAttending
-                              ? 'bg-amber-100 text-amber-950 border border-amber-300 hover:bg-amber-200 dark:bg-amber-950/80 dark:text-amber-200 dark:border-amber-700'
-                              : 'bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 shadow-md'
-                          }`}
-                        >
-                          {isAttending ? (
-                            <>
-                              <CheckCircle2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
-                              <span>{isPagamento ? "Iscritto all'evento ✓ (Tocca per annullare)" : "Ci sarai ✓ (Tocca per annullare)"}</span>
-                            </>
-                          ) : (
-                            <>
-                              <PlusCircle className="w-4 h-4" />
-                              <span>{isPagamento ? "Iscriviti all'evento" : "Iscriviti / Ci sarò (+5 pts civici)"}</span>
-                            </>
-                          )}
-                        </button>
+                    {ev.passato && (
+                      <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+                          <Users className="w-4 h-4 text-slate-400" />
+                          <strong>{ev.n}</strong> partecipanti registrati
+                        </span>
+                        {posterUrl && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenPhoto?.(posterUrl);
+                            }}
+                            className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 shadow-2xs transition flex items-center gap-1.5 cursor-pointer shrink-0"
+                            title="Apri e visualizza la locandina a tutto schermo"
+                            aria-label="Apri locandina dell'evento concluso"
+                          >
+                            <Image className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 stroke-[2.3]" />
+                            <span>Apri locandina</span>
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

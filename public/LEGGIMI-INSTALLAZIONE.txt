@@ -1,8 +1,8 @@
 ========================================================================
-GUIDA ALL'INSTALLAZIONE: WEB APP VILLAGGIO PRENESTINO (V1.3.2)
+GUIDA ALL'INSTALLAZIONE: WEB APP VILLAGGIO PRENESTINO (V1.6.0)
 ========================================================================
 
-Questa cartella contiene i file di produzione della Web App del Comitato
+Questa cartella contiene i file di produzione della Web App dell'Associazione
 di Quartiere Villaggio Prenestino, pronta per essere caricata su qualsiasi
 hosting Apache/PHP (es. Ergonet, cPanel, Plesk) o server web.
 
@@ -41,5 +41,5 @@ INTEGRAZIONE CON WORDPRESS:
    API REST di WordPress su:
    https://www.villaggioprenestino.it/wp-json/vp/v1/
 
-Buon lavoro dal Comitato di Quartiere Villaggio Prenestino!
+Buon lavoro dall'Associazione di Quartiere Villaggio Prenestino!
 ========================================================================

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   X,
   Lock,
@@ -20,15 +20,21 @@ import {
   CheckCircle2,
   Loader2,
   Tag,
+  Calendar,
+  AlertTriangle,
 } from 'lucide-react';
 import { AttivitaCommercio, OffertaCommercio, CategoriaCommercioKey } from '../types';
 import { geocodeAndValidateAddress } from '../utils/geocodingUtils';
+import { getShopOpeningStatus } from '../utils/openingHoursUtils';
+import { GraficoOrariSettimana } from './GraficoOrariSettimana';
+import { OrariEditorAvanzato } from './OrariEditorAvanzato';
 
 interface GestioneTitolareModalProps {
   shop: AttivitaCommercio | null;
   isOpen: boolean;
   onClose: () => void;
   onSave: (id: number, updatedData: Partial<AttivitaCommercio>) => void;
+  darkMode?: boolean;
 }
 
 const STORAGE_UNLOCKED_KEY = 'vp_titolare_unlocked_shops';
@@ -68,6 +74,7 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
   isOpen,
   onClose,
   onSave,
+  darkMode = false,
 }) => {
   const [pinInput, setPinInput] = useState('');
   const [showPin, setShowPin] = useState(false);
@@ -96,7 +103,10 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
   const [offerExpiry, setOfferExpiry] = useState('');
 
   const [orari, setOrari] = useState('');
+  const [orarioDettagliato, setOrarioDettagliato] = useState<{ [giornoKey: string]: string } | undefined>(undefined);
   const [apertoOra, setApertoOra] = useState(true);
+  const [chiusoPerFerieFinoA, setChiusoPerFerieFinoA] = useState('');
+  const [chiusuraStraordinaria, setChiusuraStraordinaria] = useState(false);
 
   const [telefono, setTelefono] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
@@ -146,7 +156,10 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
     setOfferExpiry(shop.offertaAttiva?.scadenza || '');
 
     setOrari(shop.orari || '');
+    setOrarioDettagliato(shop.orarioDettagliato);
     setApertoOra(shop.apertoOra ?? true);
+    setChiusoPerFerieFinoA(shop.chiusoPerFerieFinoA || '');
+    setChiusuraStraordinaria(!!shop.chiusuraStraordinaria);
 
     setTelefono(shop.telefono || '');
     setWhatsapp(shop.whatsapp || '');
@@ -157,8 +170,19 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
     setPinError(false);
     setNewPin('');
     setConfirmNewPin('');
-    setNewPinError('');
   }, [shop, isOpen]);
+
+  const handleOrariEditorChange = useCallback((result: { orariText: string; orarioDettagliato: { [key: string]: string } }) => {
+    setOrari((prev) => (prev === result.orariText ? prev : result.orariText));
+    setOrarioDettagliato((prev) => {
+      const prevKeys = Object.keys(prev || {});
+      const nextKeys = Object.keys(result.orarioDettagliato || {});
+      if (prevKeys.length === nextKeys.length && prevKeys.every((k) => (prev as any)[k] === (result.orarioDettagliato as any)[k])) {
+        return prev;
+      }
+      return result.orarioDettagliato;
+    });
+  }, []);
 
   // Geocoding reattivo dell'indirizzo con debounce
   useEffect(() => {
@@ -253,7 +277,10 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
       lng: geocodedLng,
       offertaAttiva,
       orari: orari.trim(),
+      orarioDettagliato,
       apertoOra,
+      chiusoPerFerieFinoA: chiusoPerFerieFinoA.trim() || undefined,
+      chiusuraStraordinaria,
       telefono: telefono.trim(),
       whatsapp: whatsapp.trim() || undefined,
       sitoWeb: sitoWeb.trim() || undefined,
@@ -555,34 +582,85 @@ export const GestioneTitolareModal: React.FC<GestioneTitolareModalProps> = ({
                 )}
               </div>
 
-              {/* SEZIONE 4: ORARI & STATO APERTURA */}
-              <div className="space-y-3">
+              {/* SEZIONE 4: ORARI & STATO APERTURA CON GESTIONE ECCEZIONI */}
+              <div className="space-y-3.5 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-slate-200">
-                    <Clock className="w-4 h-4 text-slate-500" />
-                    <span>Orari di Apertura</span>
+                    <Clock className="w-4 h-4 text-amber-500" />
+                    <span>Orari e Stato di Apertura</span>
                   </div>
-                  <label className="flex items-center gap-2 text-xs font-bold cursor-pointer">
-                    <span className={apertoOra ? 'text-emerald-600' : 'text-slate-500'}>
-                      {apertoOra ? 'Aperto Adesso' : 'Chiuso'}
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={apertoOra}
-                      onChange={(e) => setApertoOra(e.target.checked)}
-                      className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                    />
-                  </label>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Orario base + Eccezioni per giorno
+                  </span>
                 </div>
-                <input
-                  type="text"
-                  value={orari}
-                  onChange={(e) => setOrari(e.target.value)}
-                  placeholder="Es. Lun-Sab 08:30 - 20:00 (Orario Continuato)"
-                  className="w-full text-xs py-2 px-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
-                  required
+
+                {/* Editor Avanzato con Anteprima Grafica inclusa */}
+                <OrariEditorAvanzato
+                  key={shop ? `titolare-orari-${shop.id}` : 'titolare-orari-empty'}
+                  initialOrari={orari}
+                  initialOrarioDettagliato={orarioDettagliato}
+                  onChange={handleOrariEditorChange}
+                  darkMode={darkMode}
+                  showPreview={true}
                 />
-              </div>
+
+                {/* Gestione Chiusure Speciali (Ferie & Chiusura Straordinaria) */}
+                <div className="pt-2 border-t border-slate-200/80 dark:border-slate-700/80 space-y-2.5">
+                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Ferie e Chiusure Straordinarie</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {/* Ferie con data riapertura */}
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 space-y-1">
+                          <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-400">
+                            Chiuso per Ferie fino al:
+                          </label>
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="date"
+                              value={chiusoPerFerieFinoA}
+                              onChange={(e) => setChiusoPerFerieFinoA(e.target.value)}
+                              className="w-full text-xs py-1.5 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+                            />
+                            {chiusoPerFerieFinoA && (
+                              <button
+                                type="button"
+                                onClick={() => setChiusoPerFerieFinoA('')}
+                                className="p-1.5 text-xs text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg"
+                                title="Rimuovi chiusura per ferie"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Chiusura straordinaria toggle */}
+                        <label className={`p-2.5 rounded-xl border flex items-center justify-between cursor-pointer transition ${
+                          chiusuraStraordinaria
+                            ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800'
+                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
+                        }`}>
+                          <div>
+                            <span className="block text-[10px] font-bold text-slate-700 dark:text-slate-300">
+                              Chiusura Immediata
+                            </span>
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+                              Per emergenze / imprevisti
+                            </span>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={chiusuraStraordinaria}
+                            onChange={(e) => setChiusuraStraordinaria(e.target.checked)}
+                            className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 cursor-pointer"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  </div>
 
               {/* SEZIONE 5: CONTATTI E RECAPITI */}
               <div className="space-y-3">

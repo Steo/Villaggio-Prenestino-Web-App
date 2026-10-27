@@ -14,6 +14,8 @@ import {
   Layers,
   Sparkles,
   ExternalLink,
+  Smartphone,
+  Info,
 } from 'lucide-react';
 
 interface ExportModalProps {
@@ -29,10 +31,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   darkMode = false,
   onOpenWpPanel,
 }) => {
+  const [activeTab, setActiveTab] = useState<'pacchetti' | 'android'>('pacchetti');
   const [copiatoPhp, setCopiatoPhp] = useState(false);
   const [copiatoIframe, setCopiatoIframe] = useState(false);
+  const [copiatoAssetlinks, setCopiatoAssetlinks] = useState(false);
   const [downloadingApp, setDownloadingApp] = useState(false);
   const [downloadingPlugin, setDownloadingPlugin] = useState(false);
+  const [downloadingAssetlinks, setDownloadingAssetlinks] = useState(false);
 
   if (!isOpen) return null;
 
@@ -51,12 +56,15 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 2000);
-    } catch {
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 4000);
+    } catch (err) {
+      console.warn('Download via Blob fallito, uso download diretto:', err);
       // Fallback: direct anchor trigger
       const a = document.createElement('a');
       a.href = url;
       a.download = filename;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -92,6 +100,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const handleCopyAssetlinks = () => {
+    const code = `[\n  {\n    "relation": ["delegate_permission/common.handle_all_urls"],\n    "target": {\n      "namespace": "android_app",\n      "package_name": "it.villaggioprenestino.app",\n      "sha256_cert_fingerprints": [\n        "SOSTITUISCI_CON_SHA256_FINGERPRINT_DA_GOOGLE_PLAY_CONSOLE"\n      ]\n    }\n  }\n]`;
+    navigator.clipboard.writeText(code);
+    setCopiatoAssetlinks(true);
+    setTimeout(() => setCopiatoAssetlinks(false), 2500);
   };
 
   return (
@@ -165,7 +180,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                       Plugin WordPress Ufficiale
                     </h4>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-600/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                      v1.5.0
+                      v1.6.0
                     </span>
                   </div>
                   <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
@@ -175,25 +190,37 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               </div>
 
               {/* Bottoni azione Plugin */}
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => handleDownload('/vp-quartiere.zip', 'vp-quartiere.zip', false)}
-                  disabled={downloadingPlugin}
-                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+              <div className="flex flex-col sm:items-end gap-1.5 shrink-0">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleDownload('/vp-quartiere.zip', 'vp-quartiere.zip', false)}
+                    disabled={downloadingPlugin}
+                    className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>{downloadingPlugin ? 'Scaricamento...' : 'Scarica Plugin (.zip)'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCopyPhp}
+                    title="Copia codice sorgente vp-quartiere.php"
+                    className="px-3 py-2 rounded-xl bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 font-semibold text-xs flex items-center gap-1 transition cursor-pointer"
+                  >
+                    {copiatoPhp ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                    <span>{copiatoPhp ? 'Copiato!' : 'Copia PHP'}</span>
+                  </button>
+                </div>
+                <a
+                  href="/vp-quartiere.zip"
+                  download="vp-quartiere.zip"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] text-emerald-700 dark:text-emerald-400 hover:underline flex items-center gap-1 font-medium"
                 >
-                  <Download className="w-4 h-4" />
-                  <span>{downloadingPlugin ? 'Scaricamento...' : 'Scarica Plugin (.zip)'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCopyPhp}
-                  title="Copia codice sorgente vp-quartiere.php"
-                  className="px-3 py-2 rounded-xl bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 font-semibold text-xs flex items-center gap-1 transition cursor-pointer"
-                >
-                  {copiatoPhp ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                  <span>{copiatoPhp ? 'Copiato!' : 'Copia PHP'}</span>
-                </button>
+                  <span>Oppure link diretto file .zip</span>
+                  <ExternalLink className="w-2.5 h-2.5" />
+                </a>
               </div>
             </div>
 
@@ -214,6 +241,14 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               <div className="flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                 <span>Installazione pulita (zero dati fittizi)</span>
+              </div>
+            </div>
+
+            {/* Avviso sicurezza database zero perdita dati */}
+            <div className="mt-3 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-start gap-2 text-[11px] text-emerald-900 dark:text-emerald-200 leading-snug">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <div>
+                <strong>Aggiornamento sicuro a zero perdita dati:</strong> Il caricamento di questo ZIP da WordPress (<em>"Sostituisci la versione attuale con quella caricata"</em>) aggiorna solo gli script PHP. Tutti i negozi registrati, le segnalazioni e le proposte risiedono nel database MySQL e rimangono intatti al 100%.
               </div>
             </div>
           </div>
@@ -247,15 +282,27 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               </div>
 
               {/* Bottone Scarica Web App */}
-              <button
-                type="button"
-                onClick={() => handleDownload('/villaggioprenestino-app.zip', 'villaggioprenestino-app.zip', true)}
-                disabled={downloadingApp}
-                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer shrink-0"
-              >
-                <Download className="w-4 h-4" />
-                <span>{downloadingApp ? 'Scaricamento...' : 'Scarica Web App (.zip)'}</span>
-              </button>
+              <div className="flex flex-col sm:items-end gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleDownload('/villaggioprenestino-app.zip', 'villaggioprenestino-app.zip', true)}
+                  disabled={downloadingApp}
+                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>{downloadingApp ? 'Scaricamento...' : 'Scarica Web App (.zip)'}</span>
+                </button>
+                <a
+                  href="/villaggioprenestino-app.zip"
+                  download="villaggioprenestino-app.zip"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] text-blue-700 dark:text-blue-400 hover:underline flex items-center gap-1 font-medium"
+                >
+                  <span>Oppure link diretto file .zip</span>
+                  <ExternalLink className="w-2.5 h-2.5" />
+                </a>
+              </div>
             </div>
 
             {/* Dettagli Web App */}
